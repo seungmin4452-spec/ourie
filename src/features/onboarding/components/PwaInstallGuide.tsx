@@ -1,6 +1,5 @@
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { useState } from 'react'
-
-import { cn } from '@/lib/utils'
 
 type Platform = 'android' | 'ios'
 
@@ -34,31 +33,24 @@ export function PwaInstallGuide() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-2 gap-2">
+      <SegmentedControl
+        label="플랫폼 선택"
+        value={platform}
+        onChange={(value) => setPlatform(value as Platform)}
+        layout="fill"
+      >
         {(Object.keys(PLATFORM_LABELS) as Platform[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setPlatform(key)}
-            className={cn(
-              'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
-              platform === key
-                ? 'border-transparent bg-primary text-primary-foreground'
-                : 'border-border bg-background hover:bg-muted',
-            )}
-          >
-            {PLATFORM_LABELS[key]}
-          </button>
+          <SegmentedControlItem key={key} value={key} label={PLATFORM_LABELS[key]} />
         ))}
-      </div>
+      </SegmentedControl>
 
       <ol className="flex flex-col gap-3 text-left text-sm">
         {STEPS[platform].map((step, index) => (
           <li key={step} className="flex gap-3">
-            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent-bg text-xs font-medium text-accent">
               {index + 1}
             </span>
-            <span className="text-muted-foreground">{step}</span>
+            <span className="text-secondary">{step}</span>
           </li>
         ))}
       </ol>

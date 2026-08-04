@@ -1,7 +1,7 @@
+import { Button } from '@astryxdesign/core/Button'
 import { useNavigate } from 'react-router-dom'
 
 import { BackButton } from '@/components/common/BackButton'
-import { Button } from '@/components/ui/button'
 import { PwaInstallGuide } from '../components/PwaInstallGuide'
 
 export function PwaSetupPage() {
@@ -12,14 +12,12 @@ export function PwaSetupPage() {
       <BackButton to="/onboarding/customize" />
       <div className="text-center">
         <h1 className="text-2xl font-semibold">홈 화면에 추가하기</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-secondary">
           앱처럼 바로 열 수 있도록 홈 화면에 추가해보세요
         </p>
       </div>
       <PwaInstallGuide />
-      <Button onClick={() => navigate('/')} className="w-full">
-        완료
-      </Button>
+      <Button label="완료" variant="primary" width="100%" onClick={() => navigate('/')} />
     </section>
   )
 }

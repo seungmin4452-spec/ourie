@@ -7,7 +7,7 @@ export function CustomizePage() {
       <BackButton to="/" />
       <div className="text-center">
         <h1 className="text-2xl font-semibold">우리 앱 꾸미기</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-secondary">
           우리만의 이름과 사진을 설정해보세요
         </p>
       </div>

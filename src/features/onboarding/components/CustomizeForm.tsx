@@ -1,9 +1,9 @@
+import { Button } from '@astryxdesign/core/Button'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useAuth } from '@/features/auth'
 import { updateProfile, uploadAvatar } from '../api/profile'
 
@@ -12,11 +12,11 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 export function CustomizeForm() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -24,15 +24,14 @@ export function CustomizeForm() {
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      setError('이미지 파일만 업로드할 수 있어요.')
+      showToast({ type: 'error', body: '이미지 파일만 업로드할 수 있어요.' })
       return
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setError('이미지 용량은 5MB 이하여야 해요.')
+      showToast({ type: 'error', body: '이미지 용량은 5MB 이하여야 해요.' })
       return
     }
 
-    setError(null)
     setImageFile(file)
     setPreviewUrl(URL.createObjectURL(file))
   }
@@ -41,7 +40,6 @@ export function CustomizeForm() {
     event.preventDefault()
     if (!user) return
 
-    setError(null)
     setIsSubmitting(true)
     try {
       const avatarUrl = imageFile ? await uploadAvatar(user.id, imageFile) : null
@@ -51,7 +49,10 @@ export function CustomizeForm() {
       })
       navigate('/onboarding/pwa')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
+      showToast({
+        type: 'error',
+        body: err instanceof Error ? err.message : '저장에 실패했습니다.',
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -63,7 +64,7 @@ export function CustomizeForm() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex size-24 items-center justify-center overflow-hidden rounded-full border border-dashed border-border bg-muted text-xs text-muted-foreground"
+          className="flex size-24 items-center justify-center overflow-hidden rounded-full border border-dashed border-border bg-surface text-xs text-secondary"
         >
           {previewUrl ? (
             <img src={previewUrl} alt="" className="size-full object-cover" />
@@ -80,22 +81,22 @@ export function CustomizeForm() {
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="app-name">앱 이름</Label>
-        <Input
-          id="app-name"
-          placeholder="예: 승민 ♥ 진선"
-          required
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </div>
+      <TextInput
+        label="앱 이름"
+        htmlName="app-name"
+        placeholder="예: 승민 ♥ 진선"
+        isRequired
+        value={name}
+        onChange={setName}
+      />
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? '저장 중...' : '다음'}
-      </Button>
+      <Button
+        type="submit"
+        label={isSubmitting ? '저장 중...' : '다음'}
+        variant="primary"
+        isLoading={isSubmitting}
+        width="100%"
+      />
     </form>
   )
 }
