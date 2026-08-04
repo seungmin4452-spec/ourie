@@ -1,3 +1,5 @@
+import { writeAppMetaToDb } from './appMetaDb'
+
 // Must stay in sync with the key read by the inline script in index.html.
 export const APP_META_STORAGE_KEY = 'ourie-app-meta'
 
@@ -16,4 +18,9 @@ export function cacheAppMeta(title: string, icon: string) {
   } catch {
     // Storage can be unavailable (private mode, quota) -- non-critical, skip.
   }
+  // sw.ts reads this copy to rewrite the HTML doc it serves for navigation
+  // requests -- service workers can't reach localStorage.
+  void writeAppMetaToDb({ title, icon }).catch(() => {
+    // IndexedDB can be unavailable (private mode, quota) -- non-critical, skip.
+  })
 }
