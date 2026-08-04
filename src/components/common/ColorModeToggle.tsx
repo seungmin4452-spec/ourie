@@ -14,7 +14,7 @@ export function ColorModeToggle() {
       icon={isLight ? <Moon className="size-4" /> : <Sun className="size-4" />}
       variant="ghost"
       onClick={toggle}
-      className="fixed top-4 right-4 z-50"
+      className="fixed z-50 top-[calc(1rem+env(safe-area-inset-top))] right-[calc(1rem+env(safe-area-inset-right))]"
     />
   )
 }

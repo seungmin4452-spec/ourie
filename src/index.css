@@ -9,7 +9,9 @@
 @import "tw-animate-css";
 
 @layer base {
+  html,
   body {
     min-height: 100svh;
+    background-color: var(--color-background-body);
   }
 }
