@@ -16,9 +16,11 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 // HTML response, not from anything JS does to the DOM afterward (confirmed:
 // neither live DOM mutation nor a service-worker-rewritten response changed
 // it). This static site has no per-request server, so for iOS we hand off to
-// a Supabase Edge Function that renders the title/icon into real HTML bytes
-// per request -- see supabase/functions/pwa-install.
-const PWA_INSTALL_FUNCTION_URL = 'https://kecnqncrvamcvbxndcpo.supabase.co/functions/v1/pwa-install'
+// a Vercel Edge Function that renders the title/icon into real HTML bytes
+// per request -- see api/pwa-install.ts. (Started out on a Supabase Edge
+// Function, but Supabase forces GET responses to text/plain on its free
+// *.supabase.co domain, so the browser never parsed it as a page.)
+const PWA_INSTALL_FUNCTION_URL = 'https://ourie.vercel.app/api/pwa-install'
 
 function isIOS(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
