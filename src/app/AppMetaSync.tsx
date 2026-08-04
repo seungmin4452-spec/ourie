@@ -27,13 +27,17 @@ function setAppleTouchIcon(href: string) {
   el.setAttribute('href', href)
 }
 
-// Keeps document.title / apple-mobile-web-app-title / apple-touch-icon in
-// sync with the logged-in couple's own nickname and photo, wherever in the
-// app they open the share sheet from. Also caches the resolved values (see
-// cacheAppMeta) so the *next* visit's index.html can apply them
-// synchronously before this effect even runs -- iOS Safari appears to read
-// the title from the document's early state rather than tracking later DOM
-// updates the way it does for the icon.
+// Keeps apple-mobile-web-app-title / apple-touch-icon in sync with the
+// logged-in couple's own nickname and photo, wherever in the app they open
+// the share sheet from. document.title is deliberately left as the static
+// "Ourie" from index.html: it drives the browser tab title and the Share
+// Sheet's page-preview row, which should stay branded, whereas
+// apple-mobile-web-app-title is the tag iOS documents specifically for the
+// home-screen icon label -- that's the one the couple's nickname belongs on.
+// Also caches the resolved values (see cacheAppMeta) so the *next* visit's
+// index.html can apply them synchronously before this effect even runs --
+// iOS Safari appears to read the title from the document's early state
+// rather than tracking later DOM updates the way it does for the icon.
 export function AppMetaSync() {
   const { user } = useAuth()
   const [fallbackEmoji] = useState(pickRandomAvatarEmoji)
@@ -48,7 +52,6 @@ export function AppMetaSync() {
     if (!user) return
 
     const title = profile?.nickname?.trim() || 'Ourie'
-    document.title = title
     setMetaContent('apple-mobile-web-app-title', title)
 
     const icon = profile?.avatar_url || renderEmojiIconDataUrl(fallbackEmoji)
