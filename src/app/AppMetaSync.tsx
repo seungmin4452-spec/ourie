@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { pickRandomAvatarEmoji } from '@/lib/avatar-emojis'
 import { renderEmojiIconDataUrl } from '@/lib/renderEmojiIcon'
+import { cacheAppMeta } from './appMeta'
 
 function setMetaContent(name: string, content: string) {
   let el = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)
@@ -24,17 +25,6 @@ function setAppleTouchIcon(href: string) {
     document.head.appendChild(el)
   }
   el.setAttribute('href', href)
-}
-
-// Must stay in sync with the key read by the inline script in index.html.
-const APP_META_STORAGE_KEY = 'ourie-app-meta'
-
-function cacheAppMeta(title: string, icon: string) {
-  try {
-    localStorage.setItem(APP_META_STORAGE_KEY, JSON.stringify({ title, icon }))
-  } catch {
-    // Storage can be unavailable (private mode, quota) -- non-critical, skip.
-  }
 }
 
 // Keeps document.title / apple-mobile-web-app-title / apple-touch-icon in

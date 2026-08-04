@@ -1,11 +1,10 @@
 import { Button } from '@astryxdesign/core/Button'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
-import { useQueryClient } from '@tanstack/react-query'
 import { Camera } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 
+import { cacheAppMeta, readCachedAppMeta } from '@/app/appMeta'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { ImageCropDialog } from '@/components/common/ImageCropDialog'
 import { useAuth } from '@/features/auth'
@@ -14,9 +13,7 @@ import { updateProfile, uploadAvatar } from '../api/profile'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 export function CustomizeForm() {
-  const navigate = useNavigate()
   const { user } = useAuth()
-  const queryClient = useQueryClient()
   const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
@@ -60,8 +57,17 @@ export function CustomizeForm() {
         nickname: name.trim(),
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       })
-      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] })
-      navigate('/onboarding/pwa')
+
+      // Cache the just-saved title/icon *before* leaving this page, then do a
+      // real browser navigation (not client-side routing) to /onboarding/pwa.
+      // iOS Safari's "Add to Home Screen" title is fixed from the tab's
+      // initial page-load snapshot -- later DOM/title changes within the same
+      // SPA session never reach it (unlike the icon, which it re-fetches live
+      // at add-time). A fresh page load lets index.html's inline script apply
+      // the cached title synchronously before that snapshot is taken.
+      const previousMeta = readCachedAppMeta()
+      cacheAppMeta(name.trim(), avatarUrl ?? previousMeta?.icon ?? '')
+      window.location.assign(`${import.meta.env.BASE_URL}onboarding/pwa`)
     } catch (err) {
       showToast({
         type: 'error',
