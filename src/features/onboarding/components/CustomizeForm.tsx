@@ -1,6 +1,7 @@
 import { Button } from '@astryxdesign/core/Button'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
+import { useQueryClient } from '@tanstack/react-query'
 import { Camera } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -14,6 +15,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 export function CustomizeForm() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
@@ -49,6 +51,7 @@ export function CustomizeForm() {
         nickname: name.trim(),
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       })
+      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] })
       navigate('/onboarding/pwa')
     } catch (err) {
       showToast({

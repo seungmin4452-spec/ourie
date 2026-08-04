@@ -33,9 +33,11 @@ export async function updateProfile(
   userId: string,
   updates: { nickname?: string; avatar_url?: string },
 ) {
+  // upsert, not update: some accounts don't have a profiles row yet (e.g. the
+  // handle_new_user signup trigger not having run for them), and .update()
+  // silently succeeds with zero rows affected when there's nothing to match.
   const { error } = await supabase
     .from('profiles')
-    .update(updates)
-    .eq('id', userId)
+    .upsert({ id: userId, ...updates })
   if (error) throw error
 }
