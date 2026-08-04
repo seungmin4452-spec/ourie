@@ -1,0 +1,7 @@
+project_id = "kecnqncrvamcvbxndcpo"
+
+[functions.pwa-install]
+# Reached via a plain browser navigation (Add to Home Screen), which can't
+# attach an Authorization header -- this function doesn't touch the DB or
+# any user data beyond the title/icon already passed in the query string.
+verify_jwt = false

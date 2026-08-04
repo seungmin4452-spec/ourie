@@ -12,6 +12,18 @@ import { updateProfile, uploadAvatar } from '../api/profile'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
+// iOS Safari's "Add to Home Screen" icon label reads from the server's raw
+// HTML response, not from anything JS does to the DOM afterward (confirmed:
+// neither live DOM mutation nor a service-worker-rewritten response changed
+// it). This static site has no per-request server, so for iOS we hand off to
+// a Supabase Edge Function that renders the title/icon into real HTML bytes
+// per request -- see supabase/functions/pwa-install.
+const PWA_INSTALL_FUNCTION_URL = 'https://kecnqncrvamcvbxndcpo.supabase.co/functions/v1/pwa-install'
+
+function isIOS(): boolean {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
 export function CustomizeForm() {
   const { user } = useAuth()
   const showToast = useToast()
@@ -58,16 +70,18 @@ export function CustomizeForm() {
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       })
 
-      // Cache the just-saved title/icon *before* leaving this page, then do a
-      // real browser navigation (not client-side routing) to /onboarding/pwa.
-      // iOS Safari's "Add to Home Screen" title is fixed from the tab's
-      // initial page-load snapshot -- later DOM/title changes within the same
-      // SPA session never reach it (unlike the icon, which it re-fetches live
-      // at add-time). A fresh page load lets index.html's inline script apply
-      // the cached title synchronously before that snapshot is taken.
       const previousMeta = readCachedAppMeta()
-      cacheAppMeta(name.trim(), avatarUrl ?? previousMeta?.icon ?? '')
-      window.location.assign(`${import.meta.env.BASE_URL}onboarding/pwa`)
+      const title = name.trim()
+      const icon = avatarUrl ?? previousMeta?.icon ?? ''
+      cacheAppMeta(title, icon)
+
+      if (isIOS()) {
+        const params = new URLSearchParams({ title })
+        if (icon) params.set('icon', icon)
+        window.location.assign(`${PWA_INSTALL_FUNCTION_URL}?${params.toString()}`)
+      } else {
+        window.location.assign(`${import.meta.env.BASE_URL}onboarding/pwa`)
+      }
     } catch (err) {
       showToast({
         type: 'error',
