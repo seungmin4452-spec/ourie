@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 
 import { ColorModeToggle } from '@/components/common/ColorModeToggle'
 import { AuthProvider } from '@/features/auth'
+import { AppMetaSync } from './AppMetaSync'
 import { ColorModeProvider } from './ColorModeProvider'
 import { useColorMode } from './useColorMode'
 import { RouterLinkAdapter } from './router-link'
@@ -35,6 +36,7 @@ function ThemedApp({ children }: { children: ReactNode }) {
       <LinkProvider component={RouterLinkAdapter}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <AppMetaSync />
             <div className="min-h-screen bg-body text-primary">
               <ColorModeToggle />
               {children}

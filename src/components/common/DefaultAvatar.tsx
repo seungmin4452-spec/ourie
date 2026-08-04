@@ -1,18 +1,10 @@
 import { useState } from 'react'
 
+import { pickRandomAvatarEmoji } from '@/lib/avatar-emojis'
 import { cn } from '@/lib/utils'
 
-const DEFAULT_AVATAR_EMOJIS = [
-  '💕', '💖', '💗', '💘', '💝', '🥰', '😍', '😻',
-  '🐻', '🐰', '🦊', '🐼', '🦋', '🌸', '🍑', '⭐️',
-]
-
-function pickRandomEmoji() {
-  return DEFAULT_AVATAR_EMOJIS[Math.floor(Math.random() * DEFAULT_AVATAR_EMOJIS.length)]
-}
-
 export function DefaultAvatar({ className }: { className?: string }) {
-  const [emoji] = useState(pickRandomEmoji)
+  const [emoji] = useState(pickRandomAvatarEmoji)
 
   return (
     <div
