@@ -1,9 +1,11 @@
 import { Button } from '@astryxdesign/core/Button'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
+import { Camera } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { useAuth } from '@/features/auth'
 import { updateProfile, uploadAvatar } from '../api/profile'
 
@@ -63,14 +65,18 @@ export function CustomizeForm() {
       <div className="flex flex-col items-center gap-3">
         <button
           type="button"
+          aria-label="프로필 이미지 선택"
           onClick={() => fileInputRef.current?.click()}
-          className="flex size-24 items-center justify-center overflow-hidden rounded-full border border-dashed border-border bg-surface text-xs text-secondary"
+          className="relative flex size-24 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface"
         >
           {previewUrl ? (
             <img src={previewUrl} alt="" className="size-full object-cover" />
           ) : (
-            '이미지 선택'
+            <DefaultAvatar className="size-full" />
           )}
+          <span className="absolute right-1 bottom-1 flex size-6 items-center justify-center rounded-full bg-accent text-on-accent">
+            <Camera className="size-3.5" />
+          </span>
         </button>
         <input
           ref={fileInputRef}

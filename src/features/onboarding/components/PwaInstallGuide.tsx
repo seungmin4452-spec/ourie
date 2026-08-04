@@ -47,7 +47,7 @@ export function PwaInstallGuide() {
       <ol className="flex flex-col gap-3 text-left text-sm">
         {STEPS[platform].map((step, index) => (
           <li key={step} className="flex gap-3">
-            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent-bg text-xs font-medium text-accent">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent-muted text-xs font-medium text-accent">
               {index + 1}
             </span>
             <span className="text-secondary">{step}</span>

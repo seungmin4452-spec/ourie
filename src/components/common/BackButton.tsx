@@ -17,6 +17,7 @@ export function BackButton({ to, label = '뒤로' }: BackButtonProps) {
       icon={<ChevronLeft className="size-4" />}
       label={label}
       onClick={() => navigate(to)}
+      className="self-start"
     />
   )
 }

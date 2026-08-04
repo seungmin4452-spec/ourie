@@ -4,27 +4,18 @@
 
 Ourie는 생산성 툴이 아니라 "감정을 기록하는 공간"이다. UI는 다음 원칙을 따른다.
 
-- **따뜻함**: 차갑고 기계적인 대시보드 느낌을 지양, 손글씨 느낌/부드러운 곡선/파스텔톤 활용
+- **심플함**: 색을 최소화한 화이트(라이트) / 다크 2가지 모드만 지원. 파스텔·브랜드 컬러 대신 Astryx neutral 팔레트 그대로 사용
 - **둘만의 공간감**: 폐쇄형 서비스라는 특성을 살려 아늑하고 프라이빗한 느낌
 - **사진이 주인공**: 텍스트보다 사진/추억이 시각적으로 강조되는 레이아웃
 - **가벼움**: 모바일 PWA 특성상 로딩이 빠르고 인터랙션이 가벼워야 함
 
-## 2. 컬러 팔레트 (초안)
+## 2. 컬러 팔레트
 
-기본 팔레트는 커플별 커스터마이징(테마 컬러)으로 덮어쓸 수 있어야 하므로, 아래는 **기본값**이자 **디자인 토큰 구조**의 예시다.
+화이트(라이트) / 다크 2가지 모드만 지원하며, 기본은 라이트 모드다. 별도 브랜드 컬러 없이 Astryx `neutralTheme`의 기본 팔레트를 그대로 사용한다 (`src/app/theme.ts`의 `ourieTheme`은 `radius-container`만 오버라이드).
 
-| 토큰 | 라이트 | 다크 | 용도 |
-|---|---|---|---|
-| `--color-bg` | `#FFF9FB` | `#1A1620` | 배경 |
-| `--color-surface` | `#FFFFFF` | `#241F2B` | 카드/표면 |
-| `--color-primary` | `#FF6B9D` | `#FF8FB3` | 강조색 (핑크 계열, 커플 테마로 대체 가능) |
-| `--color-primary-muted` | `#FFE1EC` | `#3A2A33` | 강조색 배경/뱃지 |
-| `--color-text` | `#3D3540` | `#EDEAF0` | 본문 텍스트 |
-| `--color-text-muted` | `#8B8391` | `#A9A2B0` | 보조 텍스트 |
-| `--color-border` | `#F0E4E9` | `#332C3B` | 구분선 |
-
-- 위 토큰은 `src/app/theme.ts`의 `ourieTheme`(Astryx `defineTheme`)에 그대로 반영되어 있다. 색상을 바꿀 땐 컴포넌트에 하드코딩하지 말고 `theme.ts`의 `tokens`를 수정할 것.
-- 커플별 `theme_color`(`DATABASE.md` 참고)는 `ourieTheme`을 `extends`하는 별도 `<Theme>`로 해당 서브트리를 감싸 `--color-accent`를 오버라이드하는 방식으로 적용 (아직 미구현, §7 참고)
+- `src/app/providers.tsx`에서 `<Theme theme={ourieTheme} mode="light">`로 기본 모드를 라이트로 고정했다. 다크 모드는 토큰 상 이미 지원되므로, 수동 전환 토글을 만들 때 `mode` prop만 바꿔주면 된다 (§7 참고).
+- 색상을 바꿀 땐 컴포넌트에 하드코딩하지 말고 `theme.ts`의 `tokens`를 수정할 것.
+- 커플별 `theme_color`(`DATABASE.md` 참고)를 다시 도입하고 싶다면 `ourieTheme`을 `extends`하는 별도 `<Theme>`로 해당 서브트리를 감싸 `--color-accent`를 오버라이드하는 방식을 쓴다 (현재는 요구사항에서 제외됨).
 - Tailwind 유틸리티는 Astryx의 `tailwind-theme.css` 브리지를 통해 토큰과 동기화된다 (`bg-surface`, `text-primary`, `text-secondary`, `bg-accent-bg`, `text-accent` 등). 임의 hex/px 값을 className에 직접 넣지 않는다.
 
 ## 3. 타이포그래피
@@ -76,8 +67,9 @@ UI는 Astryx(`@astryxdesign/core`)로 통일한다. 새 컴포넌트가 필요�
 - **지도 핀 상세 / 사진 확대**: Astryx에 Bottom Sheet 컴포넌트가 없음. `Dialog`를 하단 고정형으로 커스텀 스타일링해서 사용 (여행 지도 기능 구현 시 결정)
 
 ## 7. 다크모드
-- `prefers-color-scheme` 기반 자동 대응을 기본으로 하되, 설정에서 수동 전환 옵션 제공 여부는 후순위 검토
-- 커플 테마 컬러는 라이트/다크 각각에 대해 대비(contrast)가 확보된 변형 값을 함께 정의해야 함
+- 시스템 설정(`prefers-color-scheme`)을 따르지 않고 기본값을 라이트 모드로 고정
+- 사용자가 화면 우측 상단의 토글 버튼(`ColorModeToggle`)으로 라이트/다크를 직접 전환할 수 있다. 선택값은 `localStorage`(`ourie-color-mode`)에 저장되어 재방문 시에도 유지된다 (`src/app/ColorModeProvider.tsx`)
+- 구현 시 `src/index.css`에 `color-scheme`을 직접 선언하지 않는다 — Astryx `reset.css`가 `Theme`의 `mode`를 보고 알아서 처리하며, 직접 선언하면 이 동작을 깨뜨린다 (`CLAUDE.md` 참고)
 
 ## 8. 접근성
 - 이미지에는 대체 텍스트(간단한 설명) 입력 권장 (필수는 아니되 UX상 유도)
@@ -85,8 +77,7 @@ UI는 Astryx(`@astryxdesign/core`)로 통일한다. 새 컴포넌트가 필요�
 - 텍스트 대비 WCAG AA 기준 참고
 
 ## 9. 미결 사항
-- 실제 브랜드 컬러/로고 확정 전이므로 위 팔레트는 임시값 (`src/app/theme.ts`에 구현은 되어 있으나 값 자체는 재검토 가능)
 - 커스텀 폰트 도입 여부 (현재 `theme.ts`는 system-ui 사용)
-- 다크모드 수동 전환 지원 여부
-- 커플별 `theme_color` 런타임 적용 로직 미구현 (§2 참고)
+- 커플별 `theme_color` 커스터마이징 재도입 여부 (현재 요구사항에서 제외, §2 참고)
 - Bottom Sheet 대체 컴포넌트(Astryx Dialog 커스텀) 구체 구현 미착수
+- 라이트/다크 토글 위치가 현재는 임시로 우측 상단 고정 버튼. 설정 화면이 생기면 그쪽으로 옮길지 검토

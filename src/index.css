@@ -9,12 +9,7 @@
 @import "tw-animate-css";
 
 @layer base {
-  html {
-    color-scheme: light dark;
-  }
-
   body {
-    @apply bg-body text-primary;
     min-height: 100svh;
   }
 }
