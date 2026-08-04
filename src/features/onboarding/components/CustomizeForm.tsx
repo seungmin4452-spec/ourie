@@ -7,6 +7,7 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
+import { ImageCropDialog } from '@/components/common/ImageCropDialog'
 import { useAuth } from '@/features/auth'
 import { updateProfile, uploadAvatar } from '../api/profile'
 
@@ -21,10 +22,12 @@ export function CustomizeForm() {
   const [name, setName] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [pendingCropFile, setPendingCropFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
@@ -36,8 +39,14 @@ export function CustomizeForm() {
       return
     }
 
-    setImageFile(file)
-    setPreviewUrl(URL.createObjectURL(file))
+    setPendingCropFile(file)
+  }
+
+  function handleCropConfirm(blob: Blob) {
+    const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+    setImageFile(croppedFile)
+    setPreviewUrl(URL.createObjectURL(blob))
+    setPendingCropFile(null)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -87,6 +96,11 @@ export function CustomizeForm() {
           accept="image/*"
           className="hidden"
           onChange={handleImageChange}
+        />
+        <ImageCropDialog
+          file={pendingCropFile}
+          onCancel={() => setPendingCropFile(null)}
+          onConfirm={handleCropConfirm}
         />
       </div>
 

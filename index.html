@@ -11,6 +11,31 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ourie" />
     <title>Ourie</title>
+    <script>
+      // iOS Safari's "Add to Home Screen" seems to read the title/icon from
+      // the document's initial state rather than tracking later DOM updates
+      // (unlike the icon, which it re-fetches fresh at add-time). AppMetaSync
+      // caches the logged-in couple's nickname/icon here after it loads them,
+      // so on the *next* visit we can set them synchronously before this
+      // script tag's siblings are even parsed -- must stay in sync with the
+      // 'ourie-app-meta' key written in src/app/AppMetaSync.tsx.
+      (function () {
+        try {
+          var raw = localStorage.getItem('ourie-app-meta');
+          if (!raw) return;
+          var meta = JSON.parse(raw);
+          if (meta.title) {
+            document.title = meta.title;
+            var titleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+            if (titleMeta) titleMeta.setAttribute('content', meta.title);
+          }
+          if (meta.icon) {
+            var iconLink = document.querySelector('link[rel="apple-touch-icon"]');
+            if (iconLink) iconLink.setAttribute('href', meta.icon);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

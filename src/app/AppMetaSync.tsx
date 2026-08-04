@@ -26,11 +26,24 @@ function setAppleTouchIcon(href: string) {
   el.setAttribute('href', href)
 }
 
-// Safari's "Add to Home Screen" reads the current document title and
-// apple-touch-icon at the moment the user taps it, not a static value from
-// first load. Keeping these synced to the logged-in couple's own nickname
-// and photo means the home screen icon reflects what they set in customize,
-// wherever in the app they happen to trigger the share sheet from.
+// Must stay in sync with the key read by the inline script in index.html.
+const APP_META_STORAGE_KEY = 'ourie-app-meta'
+
+function cacheAppMeta(title: string, icon: string) {
+  try {
+    localStorage.setItem(APP_META_STORAGE_KEY, JSON.stringify({ title, icon }))
+  } catch {
+    // Storage can be unavailable (private mode, quota) -- non-critical, skip.
+  }
+}
+
+// Keeps document.title / apple-mobile-web-app-title / apple-touch-icon in
+// sync with the logged-in couple's own nickname and photo, wherever in the
+// app they open the share sheet from. Also caches the resolved values (see
+// cacheAppMeta) so the *next* visit's index.html can apply them
+// synchronously before this effect even runs -- iOS Safari appears to read
+// the title from the document's early state rather than tracking later DOM
+// updates the way it does for the icon.
 export function AppMetaSync() {
   const { user } = useAuth()
   const [fallbackEmoji] = useState(pickRandomAvatarEmoji)
@@ -48,11 +61,10 @@ export function AppMetaSync() {
     document.title = title
     setMetaContent('apple-mobile-web-app-title', title)
 
-    if (profile?.avatar_url) {
-      setAppleTouchIcon(profile.avatar_url)
-    } else {
-      const dataUrl = renderEmojiIconDataUrl(fallbackEmoji)
-      if (dataUrl) setAppleTouchIcon(dataUrl)
+    const icon = profile?.avatar_url || renderEmojiIconDataUrl(fallbackEmoji)
+    if (icon) {
+      setAppleTouchIcon(icon)
+      cacheAppMeta(title, icon)
     }
   }, [user, profile, fallbackEmoji])
 
