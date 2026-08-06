@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { LoginPage, RequireAuth, RequireGuest, SignUpPage } from '@/features/auth'
+import { CoupleInvitePage, RequireCouple } from '@/features/couple'
 import { HomePage } from '@/features/couple/pages/HomePage'
 import { CustomizePage, PwaSetupPage } from '@/features/onboarding'
 
@@ -9,7 +10,17 @@ export const router = createBrowserRouter(
       path: '/',
       element: (
         <RequireAuth>
-          <HomePage />
+          <RequireCouple>
+            <HomePage />
+          </RequireCouple>
+        </RequireAuth>
+      ),
+    },
+    {
+      path: '/onboarding/couple',
+      element: (
+        <RequireAuth>
+          <CoupleInvitePage />
         </RequireAuth>
       ),
     },

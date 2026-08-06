@@ -23,6 +23,78 @@ create table public.couples (
 
 create index couples_invite_code_idx on public.couples (invite_code);
 
+-- Invite codes are valid for 1 hour from creation (checked against
+-- created_at below). The client mirrors this window when deciding whether
+-- to reuse a pending invite vs. mint a fresh one -- see
+-- INVITE_CODE_TTL_MS in src/features/couple/api/couple.ts. Keep both in
+-- sync if this changes.
+
+-- joins the caller to the couple that owns p_invite_code, as user_b.
+-- security definer: the caller can't select a couples row they're not yet a
+-- member of (couples_select_member RLS), so this needs to run with elevated
+-- privileges to look the code up and connect both sides atomically.
+create or replace function public.join_couple(p_invite_code text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_couple public.couples%rowtype;
+begin
+  if v_uid is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  if exists (
+    select 1 from public.profiles where id = v_uid and couple_id is not null
+  ) then
+    raise exception 'already_connected';
+  end if;
+
+  select * into v_couple
+    from public.couples
+    where invite_code = p_invite_code and user_b is null and connected_at is null
+    for update;
+
+  if not found then
+    raise exception 'invalid_code';
+  end if;
+
+  if v_couple.created_at < now() - interval '1 hour' then
+    raise exception 'expired_code';
+  end if;
+
+  if v_couple.user_a = v_uid then
+    raise exception 'own_code';
+  end if;
+
+  update public.couples
+    set user_b = v_uid, connected_at = now()
+    where id = v_couple.id;
+
+  update public.profiles
+    set couple_id = v_couple.id
+    where id in (v_couple.user_a, v_uid);
+
+  -- Either side may have minted their own never-used invite before this one
+  -- connected (both people default to the "create code" tab on first visit).
+  -- Those rows would otherwise sit around forever with user_b/connected_at
+  -- null -- harmless, but confusing to find in the table. Clear them out now
+  -- that this couple is settled.
+  delete from public.couples
+    where id <> v_couple.id
+      and user_b is null
+      and connected_at is null
+      and user_a in (v_couple.user_a, v_uid);
+
+  return v_couple.id;
+end;
+$$;
+
+grant execute on function public.join_couple(text) to authenticated;
+
 -- ------------------------------------------------------------
 -- profiles
 -- 1:1 with auth.users (id is both PK and FK)

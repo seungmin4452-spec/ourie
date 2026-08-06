@@ -47,6 +47,10 @@ couples ◄───────┘ (couple_id로 연결)
 | connected_at | timestamptz (nullable) | 상대방 연결 완료 시점 |
 | created_at | timestamptz | default now() |
 
+초대 코드 생성은 클라이언트에서 직접 insert (`couples_insert_creator` RLS로 허용). 코드 입력을 통한 연결은 `public.join_couple(p_invite_code)` RPC(security definer)로 처리한다 — 상대방은 아직 `couples`/`profiles` row의 소유자가 아니어서 일반 RLS로는 코드를 조회할 수 없기 때문에, 코드 조회·`user_b`/`connected_at` 갱신·양쪽 `profiles.couple_id` 갱신을 하나의 트랜잭션으로 원자적으로 수행한다. 이미 연결된 사용자, 자기 자신의 코드, 존재하지 않거나 이미 사용된 코드, 생성 후 1시간이 지난 코드는 각각 `already_connected` / `own_code` / `invalid_code` / `expired_code` 예외로 구분한다.
+
+초대 코드는 생성 후 1시간만 유효하다 (`join_couple`이 `created_at`을 검사). 클라이언트는 같은 1시간 창을 기준으로 아직 유효한 pending invite가 있으면 재사용하고, 만료되면 새 코드를 발급한다 (`src/features/couple/api/couple.ts`의 `INVITE_CODE_TTL_MS`). 만료된 초대의 `couples` row는 별도로 정리하지 않고 그대로 남는다 (미결 사항 참고).
+
 ### 2.3 `anniversaries` (디데이)
 
 | 컬럼 | 타입 | 설명 |

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 
 export interface Profile {
   id: string
+  couple_id: string | null
   nickname: string | null
   avatar_url: string | null
 }
@@ -9,7 +10,7 @@ export interface Profile {
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, nickname, avatar_url')
+    .select('id, couple_id, nickname, avatar_url')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error

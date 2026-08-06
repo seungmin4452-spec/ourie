@@ -7,31 +7,9 @@
 // never actually parsed it as a page. Vercel serves text/html normally even
 // on its free *.vercel.app domain, so the same logic lives here instead.
 
+import { APP_URL, DEFAULT_TITLE, escapeHtmlAttr, sanitizeIconUrl } from './_shared'
+
 export const config = { runtime: 'edge' }
-
-const APP_URL = 'https://seungmin4452-spec.github.io/ourie/'
-const DEFAULT_TITLE = 'Ourie'
-const DEFAULT_ICON = `${APP_URL}apple-touch-icon.png`
-
-function escapeHtmlAttr(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-function sanitizeIconUrl(value: string | null): string {
-  if (!value) return DEFAULT_ICON
-  try {
-    const parsed = new URL(value)
-    if (parsed.protocol === 'https:' || parsed.protocol === 'data:') return value
-  } catch {
-    // Not a valid absolute URL -- fall through to the default.
-  }
-  return DEFAULT_ICON
-}
 
 function renderHtml(title: string, icon: string): string {
   const safeTitle = escapeHtmlAttr(title)
