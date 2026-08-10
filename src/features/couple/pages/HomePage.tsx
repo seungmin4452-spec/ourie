@@ -35,7 +35,7 @@ export function HomePage() {
   const { user } = useAuth()
   const [isInstalled] = useState(isStandalone)
 
-  const { widgets, addWidget, removeWidget } = useHomeWidgets()
+  const { widgets, addWidget, removeWidget, moveWidget } = useHomeWidgets()
   const [isEditing, setIsEditing] = useState(false)
   const [isPickerOpen, setIsPickerOpen] = useState(false)
 
@@ -134,11 +134,16 @@ export function HomePage() {
           }
         />
       ) : (
-        widgets.map((id) => (
+        widgets.map((id, index) => (
           <WidgetCard
             key={id}
             meta={widgetMeta(id)}
             isEditing={isEditing}
+            index={index}
+            isFirst={index === 0}
+            isLast={index === widgets.length - 1}
+            onMoveUp={() => moveWidget(id, 'up')}
+            onMoveDown={() => moveWidget(id, 'down')}
             onRemove={() => removeWidget(id)}
           >
             {renderWidgetBody(id)}

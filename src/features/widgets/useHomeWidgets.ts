@@ -54,5 +54,23 @@ export function useHomeWidgets() {
     setWidgets((current) => current.filter((widget) => widget !== id))
   }, [])
 
-  return { widgets, addWidget, removeWidget }
+  /**
+   * 위젯 하나를 위/아래 이웃과 맞바꾼다. 목록의 끝에서 더 밀면 아무 일도
+   * 일어나지 않는다 — 버튼이 이미 비활성이지만, 순서는 저장되는 값이라
+   * 여기서도 한 번 더 막는다.
+   */
+  const moveWidget = useCallback((id: WidgetId, direction: 'up' | 'down') => {
+    setWidgets((current) => {
+      const from = current.indexOf(id)
+      const to = direction === 'up' ? from - 1 : from + 1
+      if (from === -1 || to < 0 || to >= current.length) return current
+
+      const next = [...current]
+      next[from] = current[to]
+      next[to] = current[from]
+      return next
+    })
+  }, [])
+
+  return { widgets, addWidget, removeWidget, moveWidget }
 }

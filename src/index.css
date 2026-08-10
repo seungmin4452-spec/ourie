@@ -31,4 +31,40 @@
     padding-inline-start: calc(var(--spacing-4, 1rem) + env(safe-area-inset-left));
     padding-inline-end: calc(var(--spacing-4, 1rem) + env(safe-area-inset-right));
   }
+
+  /* 위젯 편집 모드에서 카드가 흔들린다. iOS 홈 화면에서 아이콘을 정리할 때와
+     같은 신호다 — 지금 이 카드들은 옮기거나 뗄 수 있다는 뜻.
+
+     키프레임은 컴포넌트 prop으로 표현할 수 없어 유틸리티로 둔다. 시간 값은
+     Astryx 모션 토큰(--duration-*, --ease-standard)을 그대로 쓰고, 각도는
+     카드 모서리가 옆 카드와 어긋나 보이지 않을 만큼만 준다.
+     WidgetCard.tsx에서만 쓴다. */
+  @keyframes widget-wiggle {
+    0%,
+    100% {
+      transform: rotate(-0.45deg);
+    }
+    50% {
+      transform: rotate(0.45deg);
+    }
+  }
+
+  .widget-wiggle {
+    animation: widget-wiggle var(--duration-medium-min, 310ms) var(--ease-standard, ease-in-out)
+      infinite;
+  }
+
+  /* 카드가 전부 같은 박자로 흔들리면 한 덩어리처럼 보인다. 짝수 번째는
+     반대 위상으로 돌려 각각이 따로 노는 느낌을 준다. */
+  .widget-wiggle-offset {
+    animation-direction: reverse;
+  }
+
+  /* 모션에 민감한 사용자를 위해 흔들림만 끈다. 삭제·순서 버튼은 그대로 뜨므로
+     편집 모드 자체는 알아볼 수 있다. */
+  @media (prefers-reduced-motion: reduce) {
+    .widget-wiggle {
+      animation: none;
+    }
+  }
 }
