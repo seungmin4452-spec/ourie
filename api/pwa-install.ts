@@ -71,7 +71,11 @@ function renderHtml(
         align-items: center;
         justify-content: center;
         gap: 12px;
-        padding: 32px 24px;
+        padding:
+          calc(32px + env(safe-area-inset-top))
+          calc(24px + env(safe-area-inset-right))
+          calc(32px + env(safe-area-inset-bottom))
+          calc(24px + env(safe-area-inset-left));
         box-sizing: border-box;
         font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
         text-align: center;
@@ -138,11 +142,24 @@ function renderHtml(
         cursor: pointer;
       }
       button#install[disabled] { opacity: 0.5; cursor: default; }
-      a {
-        margin-top: 8px;
-        color: #6b7280;
-        font-size: 14px;
-        text-decoration: underline;
+      /* 이 화면에서 빠져나가는 유일한 출구. 설치를 마쳤든, 나중에 하기로 했든,
+         안내만 읽고 말았든 여기서 앱으로 돌아갈 수 있어야 한다. 링크처럼
+         작게 두었더니 막다른 길처럼 보여서 버튼으로 키웠다. */
+      a#done {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 320px;
+        margin-top: 4px;
+        padding: 14px 20px;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #111112;
+        background: #ffffff;
+        text-align: center;
+        text-decoration: none;
       }
     </style>
   </head>
@@ -178,7 +195,7 @@ function renderHtml(
       </ol>
     </section>
 
-    <a href="/">앱으로 돌아가기</a>
+    <a id="done" href="${escapeHtmlAttr(launchUrl)}">완료</a>
 
     <script>
       (function () {
