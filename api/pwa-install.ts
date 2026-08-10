@@ -11,9 +11,10 @@ import { DEFAULT_TITLE, escapeHtmlAttr, requestOrigin, sanitizeIconUrl } from '.
 
 export const config = { runtime: 'edge' }
 
-function renderHtml(title: string, icon: string): string {
+function renderHtml(title: string, icon: string, manifestUrl: string): string {
   const safeTitle = escapeHtmlAttr(title)
   const safeIcon = escapeHtmlAttr(icon)
+  const safeManifestUrl = escapeHtmlAttr(manifestUrl)
 
   return `<!doctype html>
 <html lang="ko">
@@ -26,10 +27,16 @@ function renderHtml(title: string, icon: string): string {
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="${safeTitle}" />
     <link rel="apple-touch-icon" href="${safeIcon}" />
+    <!-- Declares scope "/" so the app added from here covers the whole site.
+         Without it iOS infers a narrow scope and bounces the launch into an
+         in-app browser -- see api/manifest.ts. -->
+    <link rel="manifest" href="${safeManifestUrl}" />
     <title>${safeTitle}</title>
     <script>
-      // Re-launched from the home-screen icon (not a normal Safari tab) --
-      // this page has done its job, send them into the real app.
+      // Only a fallback now: the manifest's start_url sends the home-screen
+      // icon straight to "/", so iOS versions that honour it never load this
+      // page again. Older ones relaunch the added URL, and this forwards them
+      // -- staying in scope, since the manifest declares "/".
       if (window.navigator.standalone) {
         location.replace("/");
       }
@@ -91,7 +98,11 @@ export default function handler(request: Request): Response {
   const title = url.searchParams.get('title')?.trim() || DEFAULT_TITLE
   const icon = sanitizeIconUrl(url.searchParams.get('icon'), requestOrigin(request))
 
-  return new Response(renderHtml(title, icon), {
+  // Hand the same title/icon through to the manifest, which has no other way
+  // of knowing which couple is installing.
+  const manifestUrl = `/api/manifest?${url.searchParams.toString()}`
+
+  return new Response(renderHtml(title, icon, manifestUrl), {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   })
 }

@@ -24,8 +24,12 @@ export function escapeHtmlAttr(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+export function defaultIconUrl(origin: string): string {
+  return `${origin}/apple-touch-icon.png`
+}
+
 export function sanitizeIconUrl(value: string | null, origin: string): string {
-  const fallback = `${origin}/apple-touch-icon.png`
+  const fallback = defaultIconUrl(origin)
   if (!value) return fallback
   try {
     const parsed = new URL(value)
