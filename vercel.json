@@ -5,6 +5,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/add-to-home",
+      "destination": "/api/pwa-install"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

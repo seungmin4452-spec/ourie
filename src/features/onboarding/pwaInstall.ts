@@ -9,7 +9,7 @@
 // index.html, which is exactly the trap this helper exists to keep everyone
 // out of.
 
-const PWA_INSTALL_PATH = '/api/pwa-install'
+import { PWA_INSTALL_PATH } from '@/lib/pwaInstallPath'
 
 export function isIOS(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
