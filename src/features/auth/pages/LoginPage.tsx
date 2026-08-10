@@ -1,23 +1,31 @@
+import { Heading } from '@astryxdesign/core/Heading'
 import { Link } from '@astryxdesign/core/Link'
+import { Text } from '@astryxdesign/core/Text'
+import { VStack } from '@astryxdesign/core/VStack'
 
+import { PageShell } from '@/components/common/PageShell'
 import { LoginForm } from '../components/LoginForm'
 
 export function LoginPage() {
   return (
-    <section className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center gap-6 px-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">로그인</h1>
-        <p className="mt-1 text-sm text-secondary">
+    <PageShell gap={6} isCentered maxWidth={384}>
+      <VStack gap={1}>
+        <Heading level={1} justify="center">
+          로그인
+        </Heading>
+        <Text type="supporting" justify="center">
           Ourie에서 우리의 추억을 이어가요
-        </p>
-      </div>
+        </Text>
+      </VStack>
+
       <LoginForm />
-      <p className="text-center text-sm text-secondary">
+
+      <Text type="supporting" justify="center">
         아직 계정이 없으신가요?{' '}
         <Link href="/signup" hasUnderline>
           회원가입
         </Link>
-      </p>
-    </section>
+      </Text>
+    </PageShell>
   )
 }

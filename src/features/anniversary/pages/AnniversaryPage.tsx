@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react'
 
 import { BackButton } from '@/components/common/BackButton'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
+import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { deleteAnniversary } from '../api/anniversary'
@@ -76,15 +77,7 @@ export function AnniversaryPage() {
   }
 
   return (
-    <VStack
-      as="section"
-      gap={5}
-      padding={4}
-      width="100%"
-      maxWidth={560}
-      minHeight="100svh"
-      className="mx-auto"
-    >
+    <PageShell gap={5}>
       <BackButton to="/" label="홈" />
 
       <VStack gap={1}>
@@ -157,6 +150,6 @@ export function AnniversaryPage() {
           if (pendingDelete) deletion.mutate(pendingDelete)
         }}
       />
-    </VStack>
+    </PageShell>
   )
 }

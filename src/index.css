@@ -15,3 +15,20 @@
     background-color: var(--color-background-body);
   }
 }
+
+@layer utilities {
+  /* iOS 홈 화면 앱은 상태바와 홈 인디케이터 "아래까지" 화면을 쓴다
+     (index.html의 viewport-fit=cover + black-translucent). 그래서 페이지
+     기본 여백만으로는 맨 위 요소 — 뒤로가기 버튼이 대표적이다 — 가 상태바에
+     가려져 눌리지도 보이지도 않는다. 안전 영역을 여백에 더해서 막는다.
+
+     컴포넌트 prop이나 토큰으로는 표현할 수 없는 값(env())이라 유틸리티
+     클래스로 둔다. 여백 자체는 --spacing-4 토큰을 쓰므로 페이지 padding={4}와
+     같은 리듬을 유지한다. PageShell.tsx에서만 쓴다. */
+  .page-safe-padding {
+    padding-block-start: calc(var(--spacing-4, 1rem) + env(safe-area-inset-top));
+    padding-block-end: calc(var(--spacing-4, 1rem) + env(safe-area-inset-bottom));
+    padding-inline-start: calc(var(--spacing-4, 1rem) + env(safe-area-inset-left));
+    padding-inline-end: calc(var(--spacing-4, 1rem) + env(safe-area-inset-right));
+  }
+}

@@ -1,6 +1,10 @@
+import { Heading } from '@astryxdesign/core/Heading'
+import { Text } from '@astryxdesign/core/Text'
+import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
 
 import { BackButton } from '@/components/common/BackButton'
+import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
 import { getProfile } from '../api/profile'
 import { CustomizeForm } from '../components/CustomizeForm'
@@ -19,15 +23,19 @@ export function CustomizePage() {
   const canGoBack = profile?.couple_id != null
 
   return (
-    <section className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center gap-6 px-4">
+    <PageShell gap={6} isCentered maxWidth={384}>
       {canGoBack && <BackButton to="/" />}
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">우리 앱 꾸미기</h1>
-        <p className="mt-1 text-sm text-secondary">
+
+      <VStack gap={1}>
+        <Heading level={1} justify="center">
+          우리 앱 꾸미기
+        </Heading>
+        <Text type="supporting" justify="center">
           우리만의 이름과 사진을 설정해보세요
-        </p>
-      </div>
+        </Text>
+      </VStack>
+
       <CustomizeForm />
-    </section>
+    </PageShell>
   )
 }

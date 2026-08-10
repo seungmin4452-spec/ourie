@@ -1,8 +1,12 @@
+import { Heading } from '@astryxdesign/core/Heading'
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
+import { Text } from '@astryxdesign/core/Text'
+import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { openPwaInstallPage } from '@/features/onboarding/pwaInstall'
@@ -54,13 +58,15 @@ export function CoupleInvitePage() {
   }, [coupleId, nickname, avatarUrl, navigate])
 
   return (
-    <section className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center gap-6 px-4">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">커플 연결하기</h1>
-        <p className="mt-1 text-sm text-secondary">
+    <PageShell gap={6} isCentered maxWidth={384}>
+      <VStack gap={1}>
+        <Heading level={1} justify="center">
+          커플 연결하기
+        </Heading>
+        <Text type="supporting" justify="center">
           둘만의 공간을 시작하려면 서로 연결해주세요
-        </p>
-      </div>
+        </Text>
+      </VStack>
 
       <SegmentedControl
         label="연결 방법 선택"
@@ -77,6 +83,6 @@ export function CoupleInvitePage() {
       ) : (
         <JoinCoupleForm initialCode={initialCode} />
       )}
-    </section>
+    </PageShell>
   )
 }
