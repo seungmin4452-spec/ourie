@@ -13,6 +13,7 @@ import { BackButton } from '@/components/common/BackButton'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
 import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
+import { NotificationSettings } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { deleteAnniversary } from '../api/anniversary'
 import { AnniversaryFormDialog } from '../components/AnniversaryFormDialog'
@@ -125,6 +126,13 @@ export function AnniversaryPage() {
           />
         </>
       )}
+
+      {/* 알림은 기념일에서 파생되는 기능이라 같은 화면에 둔다. 커플이 기념일을
+          등록한 바로 그 자리에서 "매일 알려줄까요?"를 만나는 게 자연스럽다. */}
+      <VStack gap={2}>
+        <Heading level={2}>알림</Heading>
+        <NotificationSettings anniversaries={anniversaries ?? []} />
+      </VStack>
 
       <AnniversaryFormDialog
         isOpen={isFormOpen}

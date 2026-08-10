@@ -72,6 +72,83 @@ async function personalizeNavigation(request: Request): Promise<Response> {
   })
 }
 
+// ------------------------------------------------------------
+// 디데이 알림 (Web Push)
+//
+// api/notify-dday.ts가 하루 한 번 보내는 알림을 여기서 받는다. 페이로드는
+// 그쪽이 만든 JSON 그대로다.
+//
+// iOS는 push 이벤트를 받고도 알림을 띄우지 않으면(silent push) 구독 자체를
+// 회수해버린다. 그래서 페이로드가 깨졌거나 비어 있어도 아래 기본 문구로 반드시
+// 하나는 띄운다.
+// ------------------------------------------------------------
+
+interface PushPayload {
+  title: string
+  body: string
+  url?: string
+}
+
+const FALLBACK_PUSH: PushPayload = {
+  title: '오늘의 디데이',
+  body: '앱에서 오늘이 며칠째인지 확인해보세요.',
+}
+
+function readPushPayload(event: PushEvent): PushPayload {
+  try {
+    const data = event.data?.json() as Partial<PushPayload> | null
+    if (!data?.title || !data.body) return FALLBACK_PUSH
+    return { title: data.title, body: data.body, url: data.url }
+  } catch {
+    // JSON이 아니면 서버가 보낸 게 아니거나 형식이 바뀐 것이다. 알림을
+    // 거르는 대신 기본 문구로 띄운다 (위 silent push 문제).
+    return FALLBACK_PUSH
+  }
+}
+
+self.addEventListener('push', (event) => {
+  const payload = readPushPayload(event)
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      // 안드로이드·데스크톱이 쓰는 값이다. iOS 홈 화면 앱은 이 값을 무시하고
+      // 홈 화면 아이콘을 그대로 쓴다.
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      // 하루 한 번이라 겹칠 일이 드물지만, 재발송이 있어도 알림이 쌓이지 않고
+      // 마지막 하나로 덮이게 한다.
+      tag: 'ourie-dday',
+      data: { url: payload.url ?? '/' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+
+  const target = (event.notification.data as { url?: string } | null)?.url ?? '/'
+
+  event.waitUntil(
+    (async () => {
+      // 이미 열려 있는 창이 있으면 새로 띄우지 않는다. 홈 화면 앱에서 창을 또
+      // 열면 브라우저로 튕겨 나가고, 그 순간 standalone 밖이라 돌아올 길이
+      // 없어진다 (vite.config.ts의 scope 주석과 같은 이유).
+      const clients = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      })
+      const existing = clients.find((client) => client.url.startsWith(self.location.origin))
+      if (existing) {
+        await existing.focus()
+        if ('navigate' in existing) await existing.navigate(target).catch(() => undefined)
+        return
+      }
+      await self.clients.openWindow(target)
+    })(),
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   if (event.request.mode !== 'navigate') return
 

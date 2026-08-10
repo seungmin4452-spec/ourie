@@ -31,6 +31,8 @@
 - [x] 디데이 등록/수정/삭제 UI (`/anniversaries`)
 - [x] D+N/D-N 계산 로직 (유틸 함수) — `src/features/anniversary/dday.ts`
 - [x] 홈 화면에 다가오는 디데이 강조 표시
+- [x] 매일 디데이 알림 (Web Push) — `push_subscriptions` 테이블, `/anniversaries`의 알림 스위치, `api/notify-dday.ts` + Vercel Cron
+- [x] 마일스톤 문구 (100일 단위 · 주년 · D-3 예고) — `src/features/notification/message.ts`
 
 ## Phase 4 — 추억 타임라인
 - [ ] `memories`, `memory_photos` 테이블 생성 + RLS 정책

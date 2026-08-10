@@ -67,6 +67,24 @@ couples ◄───────┘ (couple_id로 연결)
 
 `timestamptz`가 아니라 `date`인 이유: 기념일은 달력상의 하루라서, 보는 사람의 타임존만큼 밀리면 여행 중인 쪽에게 엉뚱한 날이 보인다. 클라이언트도 같은 이유로 `new Date('YYYY-MM-DD')`(UTC 파싱) 대신 로컬 자정으로 직접 파싱한다.
 
+### 2.3.1 `push_subscriptions` (디데이 알림)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| id | uuid (PK) | |
+| user_id | uuid (FK → profiles.id) | 커플이 아니라 **사람** 단위 |
+| endpoint | text (unique) | 브라우저가 발급한 푸시 서비스 주소 |
+| p256dh | text | 페이로드 암호화용 공개 키 |
+| auth | text | 페이로드 암호화용 인증 비밀 |
+| last_notified_on | date (nullable) | 마지막으로 발송한 날 (KST 기준) |
+| created_at | timestamptz | default now() |
+
+알림은 커플 공유 설정이 아니라 개인 설정이다 (PRD §3.5의 "개인 단위 설정"). 그래서 RLS도 `couple_id`가 아니라 `user_id = auth.uid()`로 좁힌다 — 상대방이 내 기기 알림을 끄거나 켤 수 없어야 한다.
+
+한 사람이 여러 기기에서 켜면 row가 여러 개다 (기기가 아니라 "설치된 앱" 단위로 endpoint가 발급된다). `user_id`가 `auth.users`가 아닌 `profiles`를 가리키는 이유는 발송 함수가 구독에서 곧바로 `couple_id`를 따라가야 하는데, PostgREST의 embed가 실제 외래 키를 요구하기 때문이다.
+
+`last_notified_on`이 "1일 1알림"을 지키는 자물쇠다. cron이 재시도되거나 엔드포인트를 손으로 한 번 더 불러도, 이 값이 이미 오늘이면 건너뛴다. 발송은 `api/notify-dday.ts`가 하며 service role 키로 RLS를 우회한다 (모두를 대신해 도는 작업이라 특정 사용자의 세션이 없다).
+
 ### 2.4 `memories` (추억 타임라인)
 
 | 컬럼 | 타입 | 설명 |

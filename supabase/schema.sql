@@ -232,6 +232,31 @@ create trigger themes_set_updated_at
   for each row
   execute function public.set_updated_at();
 
+-- ------------------------------------------------------------
+-- push_subscriptions (디데이 알림)
+-- 브라우저가 발급한 Web Push 구독 하나가 한 row다. 사람이 아니라 "설치된 앱"
+-- 단위라, 같은 사람이 아이폰과 노트북에서 각각 켜면 두 row가 된다.
+--
+-- user_id가 auth.users가 아니라 profiles를 가리키는 이유: 발송 함수가
+-- 구독에서 곧바로 couple_id를 따라가야 하는데, PostgREST의 embed는 실제
+-- 외래 키가 있어야 걸린다 (api/notify-dday.ts의 profiles!inner).
+--
+-- last_notified_on은 "하루 한 번"을 지키는 자물쇠다. cron이 재시도되거나 두
+-- 번 트리거돼도 이 날짜가 이미 오늘이면 건너뛴다. 커플의 달력 기준 날짜라
+-- timestamptz가 아니라 date다 (anniversaries.date와 같은 이유).
+-- ------------------------------------------------------------
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  last_notified_on date,
+  created_at timestamptz not null default now()
+);
+
+create index push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
+
 -- ============================================================
 -- Row Level Security
 -- All tables are couple-scoped: a user may only read/write rows
@@ -256,6 +281,7 @@ alter table public.memories enable row level security;
 alter table public.photos enable row level security;
 alter table public.travel_places enable row level security;
 alter table public.themes enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 -- couples: only the two members can see/manage their own couple row
 create policy "couples_select_member"
@@ -371,6 +397,25 @@ create policy "themes_insert_couple"
 create policy "themes_update_couple"
   on public.themes for update
   using (couple_id = public.current_couple_id());
+
+-- push_subscriptions: 알림은 커플 공유가 아니라 개인 설정이다. 상대방이 내
+-- 기기 알림을 끄거나 켤 수 있으면 안 되므로 커플 범위가 아니라 본인 범위로
+-- 좁힌다. 발송하는 cron 함수는 service role 키로 이 정책을 우회한다.
+create policy "push_subscriptions_select_self"
+  on public.push_subscriptions for select
+  using (user_id = auth.uid());
+
+create policy "push_subscriptions_insert_self"
+  on public.push_subscriptions for insert
+  with check (user_id = auth.uid());
+
+create policy "push_subscriptions_update_self"
+  on public.push_subscriptions for update
+  using (user_id = auth.uid());
+
+create policy "push_subscriptions_delete_self"
+  on public.push_subscriptions for delete
+  using (user_id = auth.uid());
 
 -- ============================================================
 -- Storage: profile avatars

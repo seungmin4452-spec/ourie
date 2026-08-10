@@ -99,7 +99,33 @@ features/<name>/
 
 - `vite-plugin-pwa`로 manifest 및 서비스워커 생성
 - 정적 자산은 사전 캐싱(`generateSW` 전략), 추억 사진 등 사용자 업로드 이미지는 런타임 캐싱 전략 별도 검토
-- iOS PWA 제약(푸시 알림 미지원 등)을 고려해 알림 기능은 로드맵 후순위로 배치
+
+### 6.1 디데이 알림 (Web Push)
+
+하루 한 번 "오늘 며칠째"를 보내고, 100일 단위·주년에는 다른 문구를 보낸다.
+
+```
+Vercel Cron (매일 UTC 00:00 = KST 09:00)
+        │
+        ▼
+api/notify-dday.ts  ── service role ──►  Supabase
+   (Node 런타임)                          push_subscriptions + profiles + anniversaries
+        │
+        │ web-push (VAPID 서명 + 페이로드 암호화)
+        ▼
+  푸시 서비스 (APNs / FCM ...)
+        │
+        ▼
+  src/sw.ts의 push 리스너 → showNotification
+```
+
+- **런타임**: 이 함수만 edge가 아니라 Node다. `web-push`가 Node의 crypto를 쓴다. 시그니처는 Web 표준(`GET(request)`)이라 다른 `api/` 파일과 모양은 같다.
+- **발송 시각**: KST 오전 9시 고정. Vercel Hobby 플랜은 cron을 하루 1회만 허용하므로 사용자별 시각/타임존은 지원하지 않는다 (지원하려면 구독마다 타임존을 저장하고 cron을 매시간 돌려야 하며 Pro 플랜이 필요하다).
+- **중복 방지**: `push_subscriptions.last_notified_on`. cron 재시도나 수동 호출로 같은 날 두 번 울리지 않는다.
+- **기준 기념일**: 여러 기념일 중 **기준일이 가장 이른 것** 하나 (`src/features/notification/baseAnniversary.ts`). 홈 위젯의 큰 숫자(`pickHighlight`)는 "가장 가까이 다가온" 기념일이라 기준이 다르다 — 위젯은 다음에 뭐가 오는지, 알림은 오늘이 며칠째인지를 말하는 자리다.
+- **문구**: `src/features/notification/message.ts`. 브라우저(설정 화면의 미리보기)와 서버가 같은 함수를 쓴다. 그래서 이 파일은 DOM·Supabase에 손대지 않는 순수 함수만 두고, `api/`에서 상대 경로로 import한다 (Vercel은 `api/`의 tsconfig path mapping을 지원하지 않아 `@/` 별칭을 쓸 수 없다).
+- **iOS 제약**: 홈 화면에 추가한 앱에서만 Web Push가 동작한다 (Safari 탭에는 `PushManager`가 없다). 설정 화면은 이 경우를 "지원 안 함"이 아니라 "홈 화면에 추가하면 켤 수 있어요"로 구분해 안내한다. 또 iOS는 알림을 띄우지 않는 push를 받으면 구독을 회수하므로, 서비스워커는 페이로드가 깨져도 기본 문구로 반드시 하나를 띄운다.
+- **환경변수**: `VITE_VAPID_PUBLIC_KEY`(클라이언트) / `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`·`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`CRON_SECRET`(서버). `.env.example` 참고. service role 키에는 절대 `VITE_` 접두사를 붙이지 않는다.
 
 ## 7. 배포 구조
 
