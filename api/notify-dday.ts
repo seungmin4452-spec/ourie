@@ -10,7 +10,12 @@
 // api/ 파일들과 모양은 같다.
 
 import { createClient } from '@supabase/supabase-js'
-import { sendNotification, setVapidDetails, WebPushError } from 'web-push'
+// 반드시 기본 임포트여야 한다. web-push는 CJS 모듈이고 `module.exports`에
+// 담기는 값이 정적으로 읽히지 않는 형태(메서드 참조, .bind())라, Node의 ESM
+// 로더가 명명 임포트를 링크하지 못한다 -- `import { sendNotification }`으로
+// 쓰면 함수가 실행되기도 전에 모듈 로드 단계에서 죽는다 (배포 후 인증 검사에
+// 닿지도 못하고 FUNCTION_INVOCATION_FAILED가 났던 원인).
+import webpush from 'web-push'
 
 import { pickBaseAnniversary } from '../src/features/notification/baseAnniversary'
 import { buildDdayNotification } from '../src/features/notification/message'
@@ -82,7 +87,7 @@ export async function GET(request: Request): Promise<Response> {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  setVapidDetails(
+  webpush.setVapidDetails(
     // mailto: 주소는 규격상 필수다. 푸시 서비스가 문제 생겼을 때 연락할 곳이다.
     requiredEnv('VAPID_SUBJECT'),
     requiredEnv('VAPID_PUBLIC_KEY'),
@@ -157,7 +162,7 @@ export async function GET(request: Request): Promise<Response> {
     })
 
     try {
-      await sendNotification(
+      await webpush.sendNotification(
         {
           endpoint: subscription.endpoint,
           keys: { p256dh: subscription.p256dh, auth: subscription.auth },
@@ -169,7 +174,7 @@ export async function GET(request: Request): Promise<Response> {
     } catch (error) {
       // 404/410은 "이 구독은 이제 없다"는 뜻이다 (앱 삭제, 브라우저 데이터
       // 정리 등). 지우지 않으면 매일 같은 실패를 반복한다.
-      if (error instanceof WebPushError && (error.statusCode === 404 || error.statusCode === 410)) {
+      if (error instanceof webpush.WebPushError && (error.statusCode === 404 || error.statusCode === 410)) {
         staleIds.push(subscription.id)
         continue
       }
