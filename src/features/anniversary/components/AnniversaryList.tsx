@@ -2,10 +2,15 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { List, ListItem } from '@astryxdesign/core/List'
-import { Text } from '@astryxdesign/core/Text'
 import { Pencil, Trash2 } from 'lucide-react'
 
-import { formatDateKey, formatDday, formatMilestone, toDateKey, type DdaySummary } from '../dday'
+import {
+  formatDateKey,
+  formatDayCount,
+  formatDday,
+  formatMilestone,
+  type DdaySummary,
+} from '../dday'
 import type { Anniversary } from '../types'
 
 interface AnniversaryListProps {
@@ -34,22 +39,25 @@ function AnniversaryRow({
   onEdit,
   onDelete,
 }: { summary: DdaySummary } & Pick<AnniversaryListProps, 'onEdit' | 'onDelete'>) {
-  const { anniversary, daysUntil, nextDate, yearsAt } = summary
+  const { anniversary, daysUntil, yearsAt } = summary
   const milestone = formatMilestone(yearsAt)
-  const shownDate = nextDate ? toDateKey(nextDate) : anniversary.date
+
+  // 기준일과 그 기준일부터 센 D+N을 짝지어 보여준다. 다가오는 주년까지의
+  // 카운트다운은 부가 정보라 설명줄로 내린다.
+  const upcoming =
+    milestone && daysUntil != null ? `${milestone} ${formatDday(daysUntil)}` : null
 
   return (
     <ListItem
       label={anniversary.title}
-      description={[formatDateKey(shownDate), milestone].filter(Boolean).join(' · ')}
+      description={[formatDateKey(anniversary.date), upcoming].filter(Boolean).join(' · ')}
       endContent={
         <HStack gap={1} hAlign="center">
-          {daysUntil == null ? (
-            // 이미 지나간 일회성 기념일. 남은 카운트다운이 없으므로
-            // 날짜만 보여준다.
-            <Text type="supporting">지남</Text>
+          {daysUntil === 0 ? (
+            // 오늘이 그 기념일. D+N만으로는 오늘이라는 게 안 드러난다.
+            <Badge variant="info" label="D-DAY" />
           ) : (
-            <Badge variant={daysUntil === 0 ? 'info' : 'neutral'} label={formatDday(daysUntil)} />
+            <Badge variant="neutral" label={formatDayCount(summary)} />
           )}
           <IconButton
             label={`${anniversary.title} 수정`}

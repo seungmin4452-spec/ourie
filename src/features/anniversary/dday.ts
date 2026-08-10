@@ -70,6 +70,8 @@ export interface DdaySummary {
    * N이다. 기준일이 아직 오지 않았으면 null.
    */
   daysSince: number | null
+  /** 기준일이 아직 오지 않았을 때 그날까지 남은 일수. 이미 지났으면 null. */
+  daysUntilOrigin: number | null
 }
 
 export function summarize(anniversary: Anniversary, today: Date): DdaySummary {
@@ -86,6 +88,7 @@ export function summarize(anniversary: Anniversary, today: Date): DdaySummary {
         ? nextDate.getFullYear() - origin.getFullYear()
         : null,
     daysSince: elapsed >= 0 ? elapsed + 1 : null,
+    daysUntilOrigin: elapsed < 0 ? -elapsed : null,
   }
 }
 
@@ -107,11 +110,31 @@ export function summarizeAll(anniversaries: Anniversary[], today: Date): DdaySum
     })
 }
 
-/** 홈 화면이 큰 글씨로 보여줄 기념일 — 가장 가까이 다가온 것. */
+/**
+ * 홈 위젯이 큰 글씨로 보여줄 기념일 — 가장 가까이 다가온 것. 다가오는 게
+ * 하나도 없으면(반복하지 않는 기념일만 등록했고 전부 지난 경우) 그중 가장
+ * 최근 것을 쓴다. 등록된 기념일이 있는데 위젯이 비어 보이는 게 더 이상하다.
+ */
 export function pickHighlight(summaries: DdaySummary[]): DdaySummary | null {
-  return summaries.find((summary) => summary.daysUntil != null) ?? null
+  return summaries.find((summary) => summary.daysUntil != null) ?? summaries[0] ?? null
 }
 
+/**
+ * 화면에 크게 뜨는 디데이 표기.
+ *
+ * 기준일을 1일째로 센다 — 등록한 날이 D+1이고 그 이튿날이 D+2다 (국내 커플
+ * 앱들의 관례이자 PRD §3.2가 말하는 "만난 날부터 N일"). 기준일이 아직
+ * 오지 않았으면 그날까지 남은 날을 D-N으로 센다.
+ */
+export function formatDayCount(summary: DdaySummary): string {
+  const { daysSince, daysUntilOrigin } = summary
+  return daysSince != null ? `D+${daysSince}` : `D-${daysUntilOrigin ?? 0}`
+}
+
+/**
+ * 다가오는 반복 기념일까지의 카운트다운. 큰 숫자가 아니라 그 아래 보조
+ * 문구용이다 — 큰 숫자는 formatDayCount가 맡는다.
+ */
 export function formatDday(daysUntil: number): string {
   if (daysUntil === 0) return 'D-DAY'
   return daysUntil > 0 ? `D-${daysUntil}` : `D+${-daysUntil}`
