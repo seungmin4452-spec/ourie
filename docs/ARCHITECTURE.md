@@ -79,13 +79,16 @@ features/<name>/
 
 라우트 진입점(페이지)은 각 feature의 `pages/` 아래에 두고, 별도 최상위 `pages/` 디렉터리는 두지 않는다. `app/router.tsx`는 각 feature의 `pages/` 컴포넌트를 import해 라우트에 연결하는 역할만 한다.
 
-## 4. 인증 & 커플 연결 흐름
+## 4. 인증 & 온보딩 흐름
 
 1. 사용자가 이메일(또는 매직링크)로 회원가입/로그인 → Supabase Auth 세션 발급
 2. 최초 로그인 시 `profiles` 테이블에 프로필 row 생성 (트리거 또는 클라이언트 로직)
-3. `couple_id`가 없는 사용자는 온보딩(커플 연결) 플로우로 리다이렉트
+3. `RequireOnboarding`(`features/onboarding`)이 `/` 진입 시 남은 단계로 리다이렉트한다. 순서는 **앱 꾸미기 → 커플 연결**: `nickname`이 없으면 `/onboarding/customize`, 그 다음 `couple_id`가 없으면 `/onboarding/couple`
 4. 초대 코드 생성 → 상대방이 코드 입력 → `couples` row 생성 및 양쪽 `profiles.couple_id` 업데이트
-5. 이후 모든 도메인 데이터(추억, 디데이 등)는 `couple_id` 기준으로 조회/기록 (자세한 스키마는 `DATABASE.md` 참고)
+5. 연결이 감지되면 마지막 단계인 홈 화면 추가 페이지(`/add-to-home`, `api/pwa-install.ts`)로 이동하고, 거기서 앱(`/`)으로 복귀한다
+6. 이후 모든 도메인 데이터(추억, 디데이 등)는 `couple_id` 기준으로 조회/기록 (자세한 스키마는 `DATABASE.md` 참고)
+
+초대 링크(`/onboarding/couple?code=...`)로 바로 들어온 사용자는 코드 파라미터를 잃지 않도록 연결을 먼저 하고, 이름이 없으면 그 뒤에 꾸미기로 보낸다.
 
 ## 5. 데이터 접근 보안 원칙
 

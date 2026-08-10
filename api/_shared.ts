@@ -11,6 +11,27 @@
 
 export const DEFAULT_TITLE = 'Ourie'
 
+// 설치를 진행한 브라우저의 로그인 세션을 매니페스트의 start_url을 통해 설치된
+// 앱으로 넘겨준다. iOS는 홈 화면 앱에 별도의 저장소 컨테이너를 주기 때문에, 이게
+// 없으면 커플이 방금 만든 아이콘이 로그인 화면부터 열린다. 이 파라미터를 써넣고
+// 다시 읽어들이는 쪽은 src/features/auth/sessionHandoff.ts이고, 그쪽 이름과
+// 항상 같아야 한다.
+export const SESSION_HANDOFF_PARAM = 'session'
+
+// Supabase refresh token은 짧은 불투명 문자열이다. 그 형태가 아니면 토큰이
+// 아니고, 우리가 서비스하는 매니페스트에 끼어들 이유도 없다.
+export function sanitizeSessionHandoff(value: string | null): string | null {
+  if (!value) return null
+  return /^[A-Za-z0-9._~-]{8,512}$/.test(value) ? value : null
+}
+
+// 홈 화면 아이콘이 실행할 URL. 넘겨줄 세션 인계 토큰이 있으면 같이 싣는다.
+export function appLaunchUrl(handoff: string | null): string {
+  return handoff
+    ? `/?${SESSION_HANDOFF_PARAM}=${encodeURIComponent(handoff)}`
+    : '/'
+}
+
 export function requestOrigin(request: Request): string {
   return new URL(request.url).origin
 }

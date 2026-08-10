@@ -27,10 +27,10 @@
 - [x] 커플 미연결 사용자 온보딩 라우트 가드
 
 ## Phase 3 — 디데이
-- [ ] `anniversaries` 테이블 생성 + RLS 정책
-- [ ] 디데이 등록/수정/삭제 UI
-- [ ] D+N/D-N 계산 로직 (유틸 함수)
-- [ ] 홈 화면에 다가오는 디데이 강조 표시
+- [x] `anniversaries` 테이블 생성 + RLS 정책
+- [x] 디데이 등록/수정/삭제 UI (`/anniversaries`)
+- [x] D+N/D-N 계산 로직 (유틸 함수) — `src/features/anniversary/dday.ts`
+- [x] 홈 화면에 다가오는 디데이 강조 표시
 
 ## Phase 4 — 추억 타임라인
 - [ ] `memories`, `memory_photos` 테이블 생성 + RLS 정책

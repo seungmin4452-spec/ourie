@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/features/auth'
 import { getProfile } from '@/features/onboarding/api/profile'
+import { openPwaInstallPage } from '@/features/onboarding/pwaInstall'
 import { InviteCodeCard } from '../components/InviteCodeCard'
 import { JoinCoupleForm } from '../components/JoinCoupleForm'
 
@@ -33,11 +34,24 @@ export function CoupleInvitePage() {
     refetchOnWindowFocus: 'always',
   })
 
+  const coupleId = profile?.couple_id ?? null
+  const nickname = profile?.nickname?.trim() ?? ''
+  const avatarUrl = profile?.avatar_url ?? null
+
   useEffect(() => {
-    if (profile?.couple_id) {
+    if (!coupleId) return
+
+    // Normally the name is already set (customize comes first), so pairing is
+    // the second-to-last step and the install page closes the flow. Someone
+    // who arrived straight here from an invite link skipped customize, so send
+    // them there instead -- installing without a name bakes "Ourie" onto the
+    // home screen, which is exactly what api/pwa-install.ts exists to avoid.
+    if (!nickname) {
       navigate('/onboarding/customize', { replace: true })
+    } else {
+      void openPwaInstallPage(nickname, avatarUrl)
     }
-  }, [profile?.couple_id, navigate])
+  }, [coupleId, nickname, avatarUrl, navigate])
 
   return (
     <section className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center gap-6 px-4">

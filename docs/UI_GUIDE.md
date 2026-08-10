@@ -43,6 +43,12 @@ Ourie는 생산성 툴이 아니라 "감정을 기록하는 공간"이다. UI는
 - 상단: 커플 대표 사진/닉네임 + 가장 가까운 디데이 큰 숫자로 강조
 - 그 아래: 최근 추억 미리보기 카드 (2~3개)
 
+구현 상태 (`src/features/couple/pages/HomePage.tsx`):
+- 디데이 강조는 `DdayHighlight` (Astryx `Card variant="muted"` + `Heading type="display-2"`). 숫자 크기는 §3의 32~40px를 px로 박지 않고 display 타입 스케일 토큰을 쓴다
+- 어떤 기념일을 크게 띄울지는 `pickHighlight` — 등록된 기념일 중 **가장 가까이 다가온 것** 하나 (PRD §3.2). 기준일이 이미 지났으면 "함께한 지 N일째"(한국식으로 기준일이 1일째)를 아래에 덧붙인다
+- 기념일이 하나도 없으면 `EmptyState`로 `/anniversaries` 등록을 유도한다
+- 최근 추억 영역은 타임라인(PRD §3.3) 구현 전까지 `EmptyState` 자리표시자다
+
 ### 5.2 추억 타임라인
 - 날짜 그룹핑된 세로 스크롤 리스트
 - 카드형: 사진(대표 1장 또는 그리드) + 날짜 + 짧은 텍스트 미리보기

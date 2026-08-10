@@ -1,6 +1,7 @@
 -- ============================================================
 -- Ourie — Supabase database schema
--- Tables: profiles, couples, memories, photos, travel_places, themes
+-- Tables: profiles, couples, anniversaries, memories, photos,
+--         travel_places, themes
 -- ============================================================
 
 create extension if not exists "pgcrypto";
@@ -129,6 +130,27 @@ create trigger on_auth_user_created
   execute function public.handle_new_user();
 
 -- ------------------------------------------------------------
+-- anniversaries (디데이)
+-- `date`는 다음 기념일이 아니라 기준일이다. repeat_yearly인 행은 매년 같은
+-- 월/일에 돌아오고, 다가오는 기념일과 함께한 날 수는 클라이언트가 이 기준일에서
+-- 계산한다 (src/features/anniversary/dday.ts).
+-- timestamptz가 아니라 date인 이유: 기념일은 달력상의 하루라서, 보는 사람의
+-- 타임존만큼 밀리면 여행 중인 쪽에게 엉뚱한 날이 보인다.
+-- ------------------------------------------------------------
+create table public.anniversaries (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  created_by uuid not null references public.profiles (id) on delete cascade,
+  title text not null,
+  date date not null,
+  repeat_yearly boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index anniversaries_couple_id_date_idx
+  on public.anniversaries (couple_id, date);
+
+-- ------------------------------------------------------------
 -- memories
 -- ------------------------------------------------------------
 create table public.memories (
@@ -229,6 +251,7 @@ $$;
 
 alter table public.couples enable row level security;
 alter table public.profiles enable row level security;
+alter table public.anniversaries enable row level security;
 alter table public.memories enable row level security;
 alter table public.photos enable row level security;
 alter table public.travel_places enable row level security;
@@ -259,6 +282,23 @@ create policy "profiles_insert_self"
 create policy "profiles_update_self"
   on public.profiles for update
   using (id = auth.uid());
+
+-- anniversaries: couple-scoped
+create policy "anniversaries_select_couple"
+  on public.anniversaries for select
+  using (couple_id = public.current_couple_id());
+
+create policy "anniversaries_insert_couple"
+  on public.anniversaries for insert
+  with check (couple_id = public.current_couple_id());
+
+create policy "anniversaries_update_couple"
+  on public.anniversaries for update
+  using (couple_id = public.current_couple_id());
+
+create policy "anniversaries_delete_couple"
+  on public.anniversaries for delete
+  using (couple_id = public.current_couple_id());
 
 -- memories: couple-scoped
 create policy "memories_select_couple"

@@ -63,6 +63,10 @@ couples ◄───────┘ (couple_id로 연결)
 | created_by | uuid (FK → profiles.id) | |
 | created_at | timestamptz | default now() |
 
+`date`는 다음 기념일이 아니라 **기준일**이다. `repeat_yearly`인 행은 매년 같은 월/일에 돌아오고, 다가오는 기념일·주년·함께한 날 수는 클라이언트가 이 기준일에서 계산한다 (`src/features/anniversary/dday.ts`). 평년의 2월 29일은 3월 1일로 넘긴다.
+
+`timestamptz`가 아니라 `date`인 이유: 기념일은 달력상의 하루라서, 보는 사람의 타임존만큼 밀리면 여행 중인 쪽에게 엉뚱한 날이 보인다. 클라이언트도 같은 이유로 `new Date('YYYY-MM-DD')`(UTC 파싱) 대신 로컬 자정으로 직접 파싱한다.
+
 ### 2.4 `memories` (추억 타임라인)
 
 | 컬럼 | 타입 | 설명 |
@@ -134,6 +138,7 @@ create policy "couple members can insert"
 - `profiles`는 본인 row는 전체 접근, 같은 `couple_id`인 상대방 row는 read-only 허용 검토
 
 ## 5. 인덱스 고려사항
+- `anniversaries(couple_id, date)` — 커플별 기념일 조회
 - `memories(couple_id, memory_date desc)` — 타임라인 조회 최적화
 - `memories(couple_id, latitude, longitude)` — 지도 조회 시 위치 있는 row만 필터링 (`where latitude is not null`)
 - `couples(invite_code)` unique — 코드 조회 성능 및 중복 방지

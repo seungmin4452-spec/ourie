@@ -1,21 +1,24 @@
 import { Button } from '@astryxdesign/core/Button'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { cacheAppMeta, readCachedAppMeta } from '@/app/appMeta'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { ImageCropDialog } from '@/components/common/ImageCropDialog'
 import { useAuth } from '@/features/auth'
 import { getProfile, updateProfile, uploadAvatar } from '../api/profile'
-import { buildPwaInstallUrl, isIOS } from '../pwaInstall'
+import { openPwaInstallPage } from '../pwaInstall'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 export function CustomizeForm() {
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [typedName, setTypedName] = useState<string | null>(null)
@@ -82,10 +85,20 @@ export function CustomizeForm() {
       const icon = avatarUrl ?? profile?.avatar_url ?? previousMeta?.icon ?? ''
       cacheAppMeta(title, icon)
 
-      if (isIOS()) {
-        window.location.assign(buildPwaInstallUrl(title, icon))
+      // The next screen is reached by client-side navigation now, so the
+      // cached profile has to catch up: RequireOnboarding reads this same
+      // query, and a stale row with no nickname would send them right back
+      // here.
+      await queryClient.invalidateQueries({ queryKey: ['profile', user.id] })
+
+      // This is the first onboarding step, so the couple usually isn't paired
+      // yet -- send them there and let CoupleInvitePage close the flow with
+      // the install page. Re-editing the name later skips straight to the
+      // install page so the new name can be baked onto the icon.
+      if (!profile?.couple_id) {
+        navigate('/onboarding/couple')
       } else {
-        window.location.assign(`${import.meta.env.BASE_URL}onboarding/pwa`)
+        await openPwaInstallPage(title, icon)
       }
     } catch (err) {
       showToast({
