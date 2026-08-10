@@ -43,6 +43,11 @@ export function HomePage() {
         variant="secondary"
         onClick={() => navigate('/onboarding/customize')}
       />
+      <Button
+        label="홈 화면에 다시 추가하기"
+        variant="ghost"
+        onClick={() => navigate('/onboarding/pwa')}
+      />
     </section>
   )
 }

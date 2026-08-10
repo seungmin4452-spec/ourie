@@ -15,9 +15,12 @@ const STEPS: Record<Platform, string[]> = {
     '"앱 설치" 또는 "홈 화면에 추가"를 선택해주세요.',
     '"설치"를 눌러 완료해주세요.',
   ],
+  // The iOS steps deliberately route through the button below rather than
+  // telling you to share *this* page: the home-screen name is baked from the
+  // HTML the server sent, so adding from here would always say "Ourie".
   ios: [
-    'Safari 브라우저로 이 페이지를 열어주세요. (다른 브라우저는 지원하지 않아요)',
-    '하단 공유 버튼을 눌러주세요.',
+    'Safari 브라우저에서 아래 "홈 화면 추가 페이지 열기"를 눌러주세요. (다른 브라우저는 지원하지 않아요)',
+    '열린 페이지에서 하단 공유 버튼을 눌러주세요.',
     '"홈 화면에 추가"를 선택해주세요.',
     '오른쪽 위 "추가"를 눌러 완료해주세요.',
   ],

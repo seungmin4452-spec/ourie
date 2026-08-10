@@ -1,6 +1,7 @@
 import { Button } from '@astryxdesign/core/Button'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
+import { useQuery } from '@tanstack/react-query'
 import { Camera } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 
@@ -8,38 +9,37 @@ import { cacheAppMeta, readCachedAppMeta } from '@/app/appMeta'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { ImageCropDialog } from '@/components/common/ImageCropDialog'
 import { useAuth } from '@/features/auth'
-import { updateProfile, uploadAvatar } from '../api/profile'
+import { getProfile, updateProfile, uploadAvatar } from '../api/profile'
+import { buildPwaInstallUrl, isIOS } from '../pwaInstall'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
-// iOS Safari's "Add to Home Screen" icon label reads from the server's raw
-// HTML response, not from anything JS does to the DOM afterward (confirmed:
-// neither live DOM mutation nor a service-worker-rewritten response changed
-// it). The static build has no per-request server, so for iOS we hand off to
-// an Edge Function that renders the title/icon into real HTML bytes per
-// request -- see api/pwa-install.ts. (Started out on a Supabase Edge
-// Function, but Supabase forces GET responses to text/plain on its free
-// *.supabase.co domain, so the browser never parsed it as a page.)
-//
-// Must stay same-origin/root-relative: this function used to sit on a
-// separate vercel.app host while the app was on GitHub Pages, and navigating
-// across origins dropped iOS out of standalone into an in-app browser -- with
-// no way back into the installed app.
-const PWA_INSTALL_FUNCTION_URL = '/api/pwa-install'
-
-function isIOS(): boolean {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
-}
 
 export function CustomizeForm() {
   const { user } = useAuth()
   const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [name, setName] = useState('')
+  const [typedName, setTypedName] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => getProfile(user!.id),
+    enabled: user != null,
+  })
+
+  // "꾸미기 다시 하기" reopens this form on an already-configured couple, and
+  // the name field is isRequired -- starting blank would force them to retype
+  // a name they already chose just to get back to the install step. Derived
+  // rather than synced into state by an effect: null means "untouched, show
+  // whatever is saved", and the first keystroke takes over for good.
+  const name = typedName ?? profile?.nickname ?? ''
+
+  // The locally cropped pick wins while it exists; otherwise show what's
+  // already saved so reopening the form doesn't look like the photo is gone.
+  const displayedAvatarUrl = previewUrl ?? profile?.avatar_url ?? null
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -79,13 +79,11 @@ export function CustomizeForm() {
 
       const previousMeta = readCachedAppMeta()
       const title = name.trim()
-      const icon = avatarUrl ?? previousMeta?.icon ?? ''
+      const icon = avatarUrl ?? profile?.avatar_url ?? previousMeta?.icon ?? ''
       cacheAppMeta(title, icon)
 
       if (isIOS()) {
-        const params = new URLSearchParams({ title })
-        if (icon) params.set('icon', icon)
-        window.location.assign(`${PWA_INSTALL_FUNCTION_URL}?${params.toString()}`)
+        window.location.assign(buildPwaInstallUrl(title, icon))
       } else {
         window.location.assign(`${import.meta.env.BASE_URL}onboarding/pwa`)
       }
@@ -108,8 +106,8 @@ export function CustomizeForm() {
           onClick={() => fileInputRef.current?.click()}
           className="relative flex size-24 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface"
         >
-          {previewUrl ? (
-            <img src={previewUrl} alt="" className="size-full object-cover" />
+          {displayedAvatarUrl ? (
+            <img src={displayedAvatarUrl} alt="" className="size-full object-cover" />
           ) : (
             <DefaultAvatar className="size-full" />
           )}
@@ -137,7 +135,7 @@ export function CustomizeForm() {
         placeholder="예: 승민 ♥ 진선"
         isRequired
         value={name}
-        onChange={setName}
+        onChange={setTypedName}
       />
 
       <Button
