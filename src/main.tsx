@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { AppProviders } from '@/app/providers'
 import { router } from '@/app/router'
+import { watchForServiceWorkerUpdate } from '@/app/serviceWorkerUpdates'
 import './index.css'
+
+watchForServiceWorkerUpdate()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
