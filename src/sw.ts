@@ -55,7 +55,14 @@ async function personalizeNavigation(request: Request): Promise<Response> {
 }
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(personalizeNavigation(event.request))
-  }
+  if (event.request.mode !== 'navigate') return
+
+  // api/ now shares this origin (and therefore falls inside the SW scope),
+  // but those pages are already rendered per request with the right
+  // title/icon -- rewriting them here would clobber fresh values with
+  // whatever happened to be cached. Let them through untouched.
+  const url = new URL(event.request.url)
+  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return
+
+  event.respondWith(personalizeNavigation(event.request))
 })

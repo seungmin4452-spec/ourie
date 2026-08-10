@@ -7,14 +7,13 @@
 // never actually parsed it as a page. Vercel serves text/html normally even
 // on its free *.vercel.app domain, so the same logic lives here instead.
 
-import { APP_URL, DEFAULT_TITLE, escapeHtmlAttr, sanitizeIconUrl } from './_shared'
+import { DEFAULT_TITLE, escapeHtmlAttr, requestOrigin, sanitizeIconUrl } from './_shared'
 
 export const config = { runtime: 'edge' }
 
 function renderHtml(title: string, icon: string): string {
   const safeTitle = escapeHtmlAttr(title)
   const safeIcon = escapeHtmlAttr(icon)
-  const safeAppUrl = escapeHtmlAttr(APP_URL)
 
   return `<!doctype html>
 <html lang="ko">
@@ -31,7 +30,7 @@ function renderHtml(title: string, icon: string): string {
       // Re-launched from the home-screen icon (not a normal Safari tab) --
       // this page has done its job, send them into the real app.
       if (window.navigator.standalone) {
-        location.replace(${JSON.stringify(APP_URL)});
+        location.replace("/");
       }
     </script>
     <style>
@@ -81,7 +80,7 @@ function renderHtml(title: string, icon: string): string {
       <li>"홈 화면에 추가"를 선택해주세요.</li>
       <li>오른쪽 위 "추가"를 눌러 완료해주세요.</li>
     </ol>
-    <a href="${safeAppUrl}">앱으로 돌아가기</a>
+    <a href="/">앱으로 돌아가기</a>
   </body>
 </html>`
 }
@@ -89,7 +88,7 @@ function renderHtml(title: string, icon: string): string {
 export default function handler(request: Request): Response {
   const url = new URL(request.url)
   const title = url.searchParams.get('title')?.trim() || DEFAULT_TITLE
-  const icon = sanitizeIconUrl(url.searchParams.get('icon'))
+  const icon = sanitizeIconUrl(url.searchParams.get('icon'), requestOrigin(request))
 
   return new Response(renderHtml(title, icon), {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },

@@ -1,12 +1,11 @@
-// Link-preview page for shared invite codes. The SPA on GitHub Pages can't
-// serve per-request <meta> tags, so when a couple shares their invite link
-// (KakaoTalk, iMessage, SMS...) the receiving app's crawler needs a real
-// server response with og:image/og:title pointing at the inviter's own app
-// photo -- this renders that, then forwards a human visitor into the real
-// app. Same reasoning as pwa-install.ts, reused here for the same host
-// limitation.
+// Link-preview page for shared invite codes. The app is a static SPA with a
+// single index.html, so it can't serve per-request <meta> tags -- but when a
+// couple shares their invite link (KakaoTalk, iMessage, SMS...) the receiving
+// app's crawler needs a real server response with og:image/og:title pointing
+// at the inviter's own app photo. This renders that, then forwards a human
+// visitor into the real app. Same reasoning as pwa-install.ts.
 
-import { APP_URL, DEFAULT_TITLE, escapeHtmlAttr, sanitizeIconUrl } from './_shared'
+import { DEFAULT_TITLE, escapeHtmlAttr, requestOrigin, sanitizeIconUrl } from './_shared'
 
 export const config = { runtime: 'edge' }
 
@@ -83,15 +82,18 @@ function renderHtml(title: string, icon: string, joinUrl: string): string {
 
 export default function handler(request: Request): Response {
   const url = new URL(request.url)
+  const origin = requestOrigin(request)
   const code = url.searchParams.get('code')?.trim().toUpperCase() ?? null
   const title = url.searchParams.get('title')?.trim() || DEFAULT_TITLE
-  const icon = sanitizeIconUrl(url.searchParams.get('icon'))
+  const icon = sanitizeIconUrl(url.searchParams.get('icon'), origin)
 
   if (!isValidInviteCode(code)) {
-    return Response.redirect(APP_URL, 302)
+    return Response.redirect(`${origin}/`, 302)
   }
 
-  const joinUrl = `${APP_URL}onboarding/couple?code=${encodeURIComponent(code)}`
+  // Root-relative: the app lives on this same origin, so staying relative
+  // keeps an installed PWA inside its scope (and inside standalone mode).
+  const joinUrl = `/onboarding/couple?code=${encodeURIComponent(code)}`
 
   return new Response(renderHtml(title, icon, joinUrl), {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },

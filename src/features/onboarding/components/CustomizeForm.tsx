@@ -15,12 +15,17 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 // iOS Safari's "Add to Home Screen" icon label reads from the server's raw
 // HTML response, not from anything JS does to the DOM afterward (confirmed:
 // neither live DOM mutation nor a service-worker-rewritten response changed
-// it). This static site has no per-request server, so for iOS we hand off to
-// a Vercel Edge Function that renders the title/icon into real HTML bytes
-// per request -- see api/pwa-install.ts. (Started out on a Supabase Edge
+// it). The static build has no per-request server, so for iOS we hand off to
+// an Edge Function that renders the title/icon into real HTML bytes per
+// request -- see api/pwa-install.ts. (Started out on a Supabase Edge
 // Function, but Supabase forces GET responses to text/plain on its free
 // *.supabase.co domain, so the browser never parsed it as a page.)
-const PWA_INSTALL_FUNCTION_URL = 'https://ourie.vercel.app/api/pwa-install'
+//
+// Must stay same-origin/root-relative: this function used to sit on a
+// separate vercel.app host while the app was on GitHub Pages, and navigating
+// across origins dropped iOS out of standalone into an in-app browser -- with
+// no way back into the installed app.
+const PWA_INSTALL_FUNCTION_URL = '/api/pwa-install'
 
 function isIOS(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)

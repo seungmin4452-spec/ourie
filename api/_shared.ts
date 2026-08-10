@@ -2,10 +2,18 @@
 // route itself: Vercel only turns files directly under api/ (and its
 // subdirectories) that export a default handler into endpoints, and this
 // file is imported by those, not routed to.
+//
+// The app is served from the same Vercel origin as these functions, so links
+// back into it are plain root-relative paths -- no hardcoded host. Only
+// absolute URLs that leave the page (og:image, Response.redirect) need an
+// origin, and that is read off the incoming request so preview deployments
+// and any future custom domain work without a code change.
 
-export const APP_URL = 'https://seungmin4452-spec.github.io/ourie/'
 export const DEFAULT_TITLE = 'Ourie'
-export const DEFAULT_ICON = `${APP_URL}apple-touch-icon.png`
+
+export function requestOrigin(request: Request): string {
+  return new URL(request.url).origin
+}
 
 export function escapeHtmlAttr(value: string): string {
   return value
@@ -16,13 +24,14 @@ export function escapeHtmlAttr(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export function sanitizeIconUrl(value: string | null): string {
-  if (!value) return DEFAULT_ICON
+export function sanitizeIconUrl(value: string | null, origin: string): string {
+  const fallback = `${origin}/apple-touch-icon.png`
+  if (!value) return fallback
   try {
     const parsed = new URL(value)
     if (parsed.protocol === 'https:' || parsed.protocol === 'data:') return value
   } catch {
     // Not a valid absolute URL -- fall through to the default.
   }
-  return DEFAULT_ICON
+  return fallback
 }

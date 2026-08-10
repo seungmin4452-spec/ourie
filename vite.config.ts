@@ -5,7 +5,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-const base = '/ourie/'
+// The app and its api/ functions are served from a single Vercel origin, so
+// the PWA scope covers both. Keep this at the root: an out-of-scope
+// navigation drops iOS out of standalone into an in-app browser, and there is
+// no way back into the installed app from there.
+const base = '/'
 
 export default defineConfig({
   base,

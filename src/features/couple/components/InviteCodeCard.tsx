@@ -11,8 +11,9 @@ import { getProfile } from '@/features/onboarding/api/profile'
 import { createInviteCode, INVITE_CODE_TTL_MS } from '../api/couple'
 
 // Renders the OG preview card (image/title) for the shared link -- the SPA
-// itself can't serve per-request <meta> tags, see api/invite.ts.
-const INVITE_SHARE_FUNCTION_URL = 'https://ourie.vercel.app/api/invite'
+// itself can't serve per-request <meta> tags, see api/invite.ts. Absolute
+// (unlike the other api/ calls) because this URL is handed to other apps.
+const INVITE_SHARE_FUNCTION_PATH = '/api/invite'
 
 function formatRemaining(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000))
@@ -75,7 +76,7 @@ export function InviteCodeCard() {
     const params = new URLSearchParams({ code: invite.invite_code })
     if (profile?.nickname) params.set('title', profile.nickname)
     if (profile?.avatar_url) params.set('icon', profile.avatar_url)
-    const shareUrl = `${INVITE_SHARE_FUNCTION_URL}?${params.toString()}`
+    const shareUrl = `${window.location.origin}${INVITE_SHARE_FUNCTION_PATH}?${params.toString()}`
     const shareTitle = profile?.nickname
       ? `${profile.nickname}이(가) Ourie 커플 연결을 초대했어요`
       : 'Ourie 커플 연결 초대'
