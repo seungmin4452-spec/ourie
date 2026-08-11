@@ -11,8 +11,12 @@
 // 확장자를 챙겨야 한다.
 
 /**
- * 보낼 수 있는 세 가지. 이 문자열은 DB의 pokes.kind check 제약과 같아야 한다
+ * 기본으로 주는 세 가지. 이 문자열은 DB의 pokes.kind check 제약과 같아야 한다
  * (supabase/schema.sql). 한쪽만 늘리면 발송이 invalid_kind로 막힌다.
+ *
+ * 커플이 직접 만든 버튼은 여기 없다 — 그건 poke_presets 테이블에 있고
+ * kind는 'custom' 하나로 기록된다. 문구도 이 파일이 아니라 DB에서 온다
+ * (아래 buildCustomPokeNotification 참고).
  *
  * 배열 순서가 화면에 버튼이 놓이는 순서다.
  */
@@ -93,6 +97,42 @@ export function buildPokeNotification(
     title: TITLES[kind](pokeNameLabel(senderName)),
     body: BODIES[kind],
     tag: `ourie-poke-${kind}`,
+    renotify: true,
+  }
+}
+
+/** 커플이 만든 버튼에 적을 수 있는 길이. DB의 check 제약과 같아야 한다. */
+export const POKE_PRESET_LIMITS = { label: 20, body: 80 } as const
+
+/**
+ * 한 커플이 만들 수 있는 버튼 수. DB가 아니라 화면에서만 막는다 — 위젯에
+ * 버튼이 끝없이 쌓이는 걸 막는 게 목적이고, 넘겨도 데이터가 깨지지는 않는다.
+ */
+export const POKE_PRESET_MAX = 12
+
+/**
+ * 커플이 직접 만든 버튼으로 나가는 알림.
+ *
+ * 제목에 보낸 사람을 앞세우는 이유는 기본 세 개("승민님이 보고 싶대요")와 같다 —
+ * 잠금화면에서 제목 한 줄만 보고도 누가 불렀는지 알아야 한다. 사용자가 적은
+ * 말은 그 뒤에 그대로 붙는다.
+ *
+ * label과 body는 반드시 **DB에서 읽은 값**이어야 한다. 보내는 쪽 화면이 넘긴
+ * 값을 그대로 쓰면 상대방 잠금화면에 아무 말이나 띄울 수 있다 (그래서
+ * api/poke.ts는 send_poke가 돌려준 값만 여기에 넘긴다).
+ */
+export function buildCustomPokeNotification(
+  presetId: string,
+  label: string,
+  body: string,
+  senderName: string | null | undefined,
+): PokeNotification {
+  return {
+    title: `${pokeNameLabel(senderName)}: ${label}`,
+    body,
+    // 버튼마다 tag가 달라야 서로를 덮지 않는다. "밥 먹자"가 "잘 자"를 지우면
+    // 안 되는 건 "보고싶어"가 "전화해줘"를 지우면 안 되는 것과 같은 이유다.
+    tag: `ourie-poke-custom-${presetId}`,
     renotify: true,
   }
 }

@@ -5,6 +5,8 @@ import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Settings2 } from 'lucide-react'
+import { useState } from 'react'
 
 import { useAuth } from '@/features/auth'
 import { usePushNotifications, type PushState } from '@/features/notification'
@@ -12,7 +14,11 @@ import type { Profile } from '@/features/onboarding/api/profile'
 import { getPokePartner, setPokeOptIn } from '../api/partner'
 import { PokeError, sendPoke } from '../api/poke'
 import { pokeIcon } from '../catalog'
-import { POKE_KINDS, POKE_LABELS, pokeNameLabel, type PokeKind } from '../message'
+import { usePokePresets } from '../hooks/usePokePresets'
+import { pokePresetIcon } from '../icons'
+import { POKE_KINDS, POKE_LABELS, pokeNameLabel } from '../message'
+import type { PokeTarget } from '../types'
+import { PokePresetDialog } from './PokePresetDialog'
 
 /**
  * 수신 동의 스위치를 아예 켤 수 없는 상태들. 알림 자체가 불가능한 기기라서,
@@ -41,12 +47,16 @@ interface PokeWidgetProps {
  *    "왜 상대는 나한테 못 보내지?"를 아무도 못 찾는다.
  *
  * 실제 차단은 서버가 한다 (supabase/schema.sql의 send_poke). 여기 잠금은 안내다.
+ *
+ * 버튼은 기본으로 주는 세 개 뒤에 커플이 만든 것들이 붙는다. 새로 만든 게
+ * 아래에 쌓여야 이미 손에 익은 버튼의 자리가 흔들리지 않는다.
  */
 export function PokeWidget({ profile }: PokeWidgetProps) {
   const { user } = useAuth()
   const showToast = useToast()
   const queryClient = useQueryClient()
   const { state: pushState, toggle: togglePush } = usePushNotifications(user?.id)
+  const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false)
 
   const coupleId = profile?.couple_id
   const { data: partner, isLoading: isPartnerLoading } = useQuery({
@@ -54,6 +64,8 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
     queryFn: () => getPokePartner(coupleId!, profile!.id),
     enabled: coupleId != null && profile != null,
   })
+
+  const { data: presets } = usePokePresets(coupleId)
 
   const canSend = partner?.poke_opt_in === true
   const unavailableReason = UNAVAILABLE[pushState]
@@ -66,16 +78,16 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
     ])
   }
 
-  async function send(kind: PokeKind) {
+  async function send(target: PokeTarget, label: string) {
     try {
-      const { delivered } = await sendPoke(kind)
+      const { delivered } = await sendPoke(target)
       if (delivered === 0) {
         // 동의는 켰는데 켜둔 기기가 하나도 없는 경우. 보낸 건 기록에 남지만
         // 상대는 모르므로, 전했다고 말하면 거짓말이 된다.
         showToast({ type: 'info', body: '보냈지만 상대방 기기에 닿지 않았어요.' })
         return
       }
-      showToast({ type: 'info', body: `"${POKE_LABELS[kind]}"라고 전했어요.` })
+      showToast({ type: 'info', body: `"${label}"라고 전했어요.` })
     } catch (error) {
       if (error instanceof PokeError) {
         // 1초 안에 두 번 눌린 것. 사용자가 뭘 잘못한 게 아니라 이미 보낸
@@ -85,6 +97,12 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
         // 우리가 알던 상태가 낡았다는 뜻이다 (상대가 방금 껐다). 다시 읽어
         // 버튼을 잠근다.
         if (error.code === 'not_opted_in') void refreshProfiles()
+
+        // 상대가 방금 이 버튼을 지운 경우도 여기로 온다 (invalid_kind).
+        // 목록을 다시 읽어 없어진 버튼을 화면에서도 치운다.
+        if (error.code === 'invalid_kind' && target.type === 'custom') {
+          void queryClient.invalidateQueries({ queryKey: ['poke-presets', coupleId] })
+        }
 
         showToast({ type: 'error', body: error.message })
         return
@@ -108,7 +126,20 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
             // clickAction은 promise가 끝날 때까지 버튼에 스피너를 띄우고 중복
             // 클릭을 막는다. 서버의 1초 쿨다운과 별개로, 느린 회선에서 연타가
             // 쌓이지 않게 하는 첫 번째 방어선이다.
-            clickAction={() => send(kind)}
+            clickAction={() => send({ type: 'builtin', kind }, POKE_LABELS[kind])}
+          />
+        ))}
+
+        {presets?.map((preset) => (
+          <Button
+            key={preset.id}
+            label={preset.label}
+            variant="secondary"
+            width="100%"
+            icon={pokePresetIcon(preset.icon)}
+            isDisabled={!canSend}
+            tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
+            clickAction={() => send({ type: 'custom', preset }, preset.label)}
           />
         ))}
       </VStack>
@@ -119,6 +150,28 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
             ? `${pokeNameLabel(partner.name)}이 아직 콕 찌르기 알림을 켜지 않았어요.`
             : '커플이 연결되면 보낼 수 있어요.'}
         </Text>
+      )}
+
+      {/* 커플이 연결돼야 버튼을 만들 수 있다 — poke_presets는 커플 단위이고,
+          RLS도 커플이 없으면 insert를 막는다. */}
+      {coupleId != null && user != null && (
+        <>
+          <Button
+            label="콕 찌르기 만들기"
+            variant="ghost"
+            width="100%"
+            icon={<Settings2 className="size-4" />}
+            onClick={() => setIsPresetDialogOpen(true)}
+          />
+          <PokePresetDialog
+            isOpen={isPresetDialogOpen}
+            onOpenChange={setIsPresetDialogOpen}
+            coupleId={coupleId}
+            userId={user.id}
+            presets={presets ?? []}
+            senderName={profile?.name}
+          />
+        </>
       )}
 
       <Divider />

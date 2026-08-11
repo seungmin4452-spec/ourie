@@ -292,6 +292,36 @@ create table public.push_subscriptions (
 create index push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
 
 -- ------------------------------------------------------------
+-- poke_presets (커플이 직접 만든 콕 찌르기 버튼)
+--
+-- 기본으로 주는 세 개(miss/kakao/call) 말고 커플이 아이콘·제목·알림 내용을
+-- 적어 늘리는 버튼들. 한 row가 위젯의 버튼 하나다.
+--
+-- 이걸 기기(localStorage)가 아니라 DB에 두는 이유는 알림 문구를 **서버가**
+-- 알아야 하기 때문이다. 무엇보다 클라이언트가 보낸 문구를 그대로 믿으면 누구든
+-- 아무 말이나 상대방 잠금화면에 띄울 수 있다 — 그래서 send_poke가 여기서 읽은
+-- 값만 쓴다. 커플 단위인 것도 같은 맥락이다: 둘이 같은 버튼을 본다.
+-- ------------------------------------------------------------
+create table public.poke_presets (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  created_by uuid not null references public.profiles (id) on delete cascade,
+  -- 아이콘 이름. 허용 목록을 check로 박지 않는 이유는 아이콘을 하나 더할 때마다
+  -- 마이그레이션을 돌려야 하기 때문이다. 대신 화면이 모르는 이름을 만나면
+  -- 기본 아이콘으로 떨어진다 (src/features/poke/icons.tsx).
+  icon text not null check (char_length(icon) between 1 and 40),
+  -- 위젯 버튼에 적히고 알림 제목에도 쓰이는 말. 잠금화면에서 잘리지 않을 길이.
+  label text not null check (char_length(btrim(label)) between 1 and 20),
+  -- 알림 본문.
+  body text not null check (char_length(btrim(body)) between 1 and 80),
+  created_at timestamptz not null default now()
+);
+
+-- 위젯이 커플의 버튼을 만든 순서대로 읽는다.
+create index poke_presets_couple_created_idx
+  on public.poke_presets (couple_id, created_at);
+
+-- ------------------------------------------------------------
 -- pokes (콕 찌르기)
 -- 한쪽이 버튼을 눌러 상대방 기기를 울린 기록 하나가 한 row다.
 --
@@ -309,11 +339,19 @@ create table public.pokes (
   couple_id uuid not null references public.couples (id) on delete cascade,
   sender_id uuid not null references public.profiles (id) on delete cascade,
   recipient_id uuid not null references public.profiles (id) on delete cascade,
-  -- 종류는 3개 고정이다 (src/features/poke/kinds.ts의 POKE_KINDS와 같아야
-  -- 한다). text + check인 이유는 enum이면 종류를 늘릴 때마다 타입 변경
-  -- 마이그레이션이 필요하기 때문이다.
-  kind text not null check (kind in ('miss', 'kakao', 'call')),
-  created_at timestamptz not null default now()
+  -- 기본으로 주는 세 개(src/features/poke/message.ts의 POKE_KINDS와 같아야
+  -- 한다)와, 커플이 만든 버튼을 가리키는 'custom'. text + check인 이유는
+  -- enum이면 종류를 늘릴 때마다 타입 변경 마이그레이션이 필요하기 때문이다.
+  kind text not null check (kind in ('miss', 'kakao', 'call', 'custom')),
+  -- 커플이 만든 버튼이었다면 어떤 것이었는지. 버튼을 지우면 그 기록도 같이
+  -- 사라진다 — 문구를 잃은 기록은 나중에 뭘 보여줄 수도 없다.
+  preset_id uuid references public.poke_presets (id) on delete cascade,
+  created_at timestamptz not null default now(),
+
+  -- 'custom'이면 어떤 버튼이었는지가 반드시 있어야 하고, 반대로 기본 세 개는
+  -- preset_id를 가질 수 없다. 이 짝이 어긋나면 알림 문구를 만들 수가 없다.
+  constraint pokes_preset_matches_kind
+    check ((kind = 'custom') = (preset_id is not null))
 );
 
 -- 쿨다운 조회용. send_poke가 (sender_id, kind)로 가장 최근 한 건만 본다.
@@ -341,7 +379,11 @@ create index pokes_couple_created_idx on public.pokes (couple_id, created_at des
 -- id를 넣어 부를 수 없게 한다. 실제 신원 확인은 호출 전 access token 검증이
 -- 담당한다.
 -- ------------------------------------------------------------
-create or replace function public.send_poke(p_sender uuid, p_kind text)
+create or replace function public.send_poke(
+  p_sender uuid,
+  p_kind text,
+  p_preset uuid default null
+)
 returns jsonb
 language plpgsql
 security definer
@@ -352,11 +394,9 @@ declare
   v_couple_id uuid;
   v_recipient uuid;
   v_name text;
+  v_kind text;
+  v_preset public.poke_presets;
 begin
-  if p_kind not in ('miss', 'kakao', 'call') then
-    raise exception 'invalid_kind';
-  end if;
-
   -- app_name이 아니라 name이다. app_name은 앱 이름이라 알림에 쓰면
   -- "승민 ♥ 진선님이 보고 싶대요"가 된다 (profiles 위 주석 참고).
   select couple_id, name into v_couple_id, v_name
@@ -366,8 +406,31 @@ begin
     raise exception 'no_couple';
   end if;
 
-  -- 같은 사람이 같은 종류를 동시에 두 번 보내는 것만 직렬화한다.
-  perform pg_advisory_xact_lock(hashtext(p_sender::text || ':' || p_kind));
+  if p_preset is null then
+    if p_kind not in ('miss', 'kakao', 'call') then
+      raise exception 'invalid_kind';
+    end if;
+    v_kind := p_kind;
+  else
+    -- 커플이 만든 버튼인지 여기서 확인한다. 남의 커플 버튼 id를 넣어도 걸린다.
+    -- 문구를 호출자에게서 받지 않고 이 조회 결과만 쓰는 것이 핵심이다 — 받으면
+    -- 아무 말이나 상대방 잠금화면에 띄울 수 있다.
+    select * into v_preset
+      from public.poke_presets
+      where id = p_preset and couple_id = v_couple_id;
+
+    if not found then
+      raise exception 'invalid_kind';
+    end if;
+
+    v_kind := 'custom';
+  end if;
+
+  -- 같은 사람이 같은 버튼을 동시에 두 번 누르는 것만 직렬화한다. 기본 세 개는
+  -- 종류로, 커플이 만든 버튼은 그 id로 구분한다.
+  perform pg_advisory_xact_lock(
+    hashtext(p_sender::text || ':' || coalesce(p_preset::text, v_kind))
+  );
 
   select * into v_couple from public.couples where id = v_couple_id;
 
@@ -386,14 +449,16 @@ begin
     raise exception 'not_opted_in';
   end if;
 
-  -- 같은 종류는 1초에 한 번. 실수로 두 번 눌린 것을 거르는 게 목적이라 창이
+  -- 같은 버튼은 1초에 한 번. 실수로 두 번 눌린 것을 거르는 게 목적이라 창이
   -- 짧다 (하루 총량 제한은 두지 않는다).
-  insert into public.pokes (couple_id, sender_id, recipient_id, kind)
-  select v_couple_id, p_sender, v_recipient, p_kind
+  insert into public.pokes (couple_id, sender_id, recipient_id, kind, preset_id)
+  select v_couple_id, p_sender, v_recipient, v_kind, p_preset
   where not exists (
     select 1 from public.pokes
     where sender_id = p_sender
-      and kind = p_kind
+      and kind = v_kind
+      -- 커플이 만든 버튼끼리는 서로의 쿨다운에 걸리지 않아야 한다.
+      and preset_id is not distinct from p_preset
       and created_at > now() - interval '1 second'
   );
 
@@ -401,9 +466,13 @@ begin
     raise exception 'too_soon';
   end if;
 
+  -- preset_label / preset_body는 기본 세 개일 때 null이다 (v_preset이 비어 있다).
+  -- 그때의 문구는 코드가 들고 있다 (src/features/poke/message.ts).
   return jsonb_build_object(
     'recipient_id', v_recipient,
-    'sender_name', v_name
+    'sender_name', v_name,
+    'preset_label', v_preset.label,
+    'preset_body', v_preset.body
   );
 end;
 $$;
@@ -420,8 +489,8 @@ $$;
 --
 -- 바꿀 때는 반드시 anon 키로 rpc를 직접 호출해 42501(permission denied)이
 -- 나오는지 확인할 것. 권한이 남아 있으면 함수가 실행돼 다른 에러가 나온다.
-revoke execute on function public.send_poke(uuid, text) from public, anon, authenticated;
-grant execute on function public.send_poke(uuid, text) to service_role;
+revoke execute on function public.send_poke(uuid, text, uuid) from public, anon, authenticated;
+grant execute on function public.send_poke(uuid, text, uuid) to service_role;
 
 -- ============================================================
 -- Row Level Security
@@ -448,6 +517,7 @@ alter table public.photos enable row level security;
 alter table public.travel_places enable row level security;
 alter table public.themes enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.poke_presets enable row level security;
 alter table public.pokes enable row level security;
 
 -- couples: only the two members can see/manage their own couple row
@@ -583,6 +653,24 @@ create policy "push_subscriptions_update_self"
 create policy "push_subscriptions_delete_self"
   on public.push_subscriptions for delete
   using (user_id = auth.uid());
+
+-- poke_presets: 커플이 함께 쓰는 버튼 목록이라 커플 범위다. 상대가 만든 버튼도
+-- 지울 수 있다 — "내가 만든 것만"으로 좁히면 상대가 없을 때 정리할 방법이 없다.
+create policy "poke_presets_select_couple"
+  on public.poke_presets for select
+  using (couple_id = public.current_couple_id());
+
+create policy "poke_presets_insert_couple"
+  on public.poke_presets for insert
+  with check (couple_id = public.current_couple_id());
+
+create policy "poke_presets_update_couple"
+  on public.poke_presets for update
+  using (couple_id = public.current_couple_id());
+
+create policy "poke_presets_delete_couple"
+  on public.poke_presets for delete
+  using (couple_id = public.current_couple_id());
 
 -- pokes: 주고받은 기록은 둘 다 본다 (보낸 쪽은 보냈는지, 받는 쪽은 누가
 -- 불렀는지). insert/update/delete 정책은 일부러 없다 — 위 send_poke 주석 참고.

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { PokeKind } from '../message'
+import type { PokeTarget } from '../types'
 
 /**
  * 서버가 알려준 실패 이유. 화면이 상황마다 다르게 반응해야 해서 문구가 아니라
@@ -19,7 +19,6 @@ export class PokeError extends Error {
 }
 
 export interface PokeSendResult {
-  kind: PokeKind
   /** 실제로 알림이 나간 상대방 기기 수. 0이면 상대가 켜둔 기기가 없다. */
   delivered: number
 }
@@ -30,8 +29,12 @@ export interface PokeSendResult {
  * 클라이언트가 직접 상대방의 구독을 읽어 보낼 수는 없다 (RLS가 자기 것만
  * 보여준다). 그래서 서버 함수를 부르고, 신원 증명으로 지금 세션의 access
  * token을 싣는다 — 보내는 사람이 누구인지는 서버가 그 토큰에서 읽는다.
+ *
+ * 커플이 만든 버튼일 때도 **문구는 보내지 않는다**. id만 넘기고 서버가 DB에서
+ * 읽는다 — 여기서 보낸 문구를 서버가 믿으면 아무 말이나 상대방 잠금화면에
+ * 띄울 수 있다.
  */
-export async function sendPoke(kind: PokeKind): Promise<PokeSendResult> {
+export async function sendPoke(target: PokeTarget): Promise<PokeSendResult> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) {
@@ -44,7 +47,9 @@ export async function sendPoke(kind: PokeKind): Promise<PokeSendResult> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ kind }),
+    body: JSON.stringify(
+      target.type === 'builtin' ? { kind: target.kind } : { presetId: target.preset.id },
+    ),
   })
 
   // 서버가 500으로 죽었거나 프록시가 HTML을 돌려준 경우 JSON 파싱이 실패한다.
@@ -59,5 +64,5 @@ export async function sendPoke(kind: PokeKind): Promise<PokeSendResult> {
     )
   }
 
-  return { kind, delivered: payload?.delivered ?? 0 }
+  return { delivered: payload?.delivered ?? 0 }
 }

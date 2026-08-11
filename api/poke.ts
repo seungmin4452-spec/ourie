@@ -30,7 +30,11 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-import { buildPokeNotification, isPokeKind } from '../src/features/poke/message.js'
+import {
+  buildCustomPokeNotification,
+  buildPokeNotification,
+  isPokeKind,
+} from '../src/features/poke/message.js'
 import {
   configureWebPush,
   requiredEnv,
@@ -74,7 +78,23 @@ interface SendPokeResult {
    * 된다. 키 이름은 supabase/schema.sql의 send_poke 반환값과 같아야 한다.
    */
   sender_name: string | null
+  /**
+   * 커플이 만든 버튼이었다면 그 버튼의 문구. 기본 세 개일 때는 둘 다 null이고,
+   * 그때 문구는 코드(message.ts)가 들고 있다.
+   *
+   * **이 값이 요청 본문이 아니라 여기서 오는 것이 중요하다.** 클라이언트가 보낸
+   * 문구를 그대로 쓰면 누구든 아무 말이나 상대방 잠금화면에 띄울 수 있다.
+   */
+  preset_label: string | null
+  preset_body: string | null
 }
+
+/**
+ * 커플이 만든 버튼의 id 형태만 본다. 여기서 안 거르면 아무 문자열이나 그대로
+ * Postgres로 가서 uuid 캐스팅 에러(22P02)가 나고, 그건 우리가 아는 실패 코드가
+ * 아니라 사용자에게 500으로 보인다.
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function failure(code: string): Response {
   const known = FAILURES[code]
@@ -103,11 +123,20 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // 본문이 비었거나 JSON이 아닌 경우까지 여기서 걸러진다.
-  const body = (await request.json().catch(() => null)) as { kind?: unknown } | null
-  if (!isPokeKind(body?.kind)) {
+  const body = (await request.json().catch(() => null)) as
+    | { kind?: unknown; presetId?: unknown }
+    | null
+
+  // 기본 세 개(kind)이거나 커플이 만든 버튼(presetId)이거나, 둘 중 정확히
+  // 하나여야 한다. 둘 다 오면 무엇을 보내려는 건지 알 수 없다.
+  const kind = isPokeKind(body?.kind) ? body.kind : null
+  const presetId =
+    typeof body?.presetId === 'string' && UUID_PATTERN.test(body.presetId)
+      ? body.presetId
+      : null
+  if ((kind == null) === (presetId == null)) {
     return failure('invalid_kind')
   }
-  const kind = body.kind
 
   // service role 키. 위 주석 2번의 이유이며, 이 키는 서버 환경변수로만 존재해야
   // 한다 (VITE_ 접두사 금지 — 붙이면 클라이언트 번들에 그대로 실린다).
@@ -130,6 +159,7 @@ export async function POST(request: Request): Promise<Response> {
   const { data: sendResult, error: sendError } = await supabase.rpc('send_poke', {
     p_sender: senderId,
     p_kind: kind,
+    p_preset: presetId,
   })
 
   if (sendError) {
@@ -140,8 +170,22 @@ export async function POST(request: Request): Promise<Response> {
     return failure(code ?? sendError.message)
   }
 
-  const { recipient_id: recipientId, sender_name: senderName } =
-    sendResult as SendPokeResult
+  const {
+    recipient_id: recipientId,
+    sender_name: senderName,
+    preset_label: presetLabel,
+    preset_body: presetBody,
+  } = sendResult as SendPokeResult
+
+  // 커플이 만든 버튼인데 문구가 안 왔다면 send_poke가 우리가 아는 모양이
+  // 아니라는 뜻이다 (마이그레이션이 덜 돌았거나). 빈 알림을 쏘느니 여기서 멈춘다.
+  if (presetId && (presetLabel == null || presetBody == null)) {
+    console.error('send_poke returned no preset text', presetId)
+    return Response.json(
+      { error: 'unknown', message: '알림을 보내지 못했어요.' },
+      { status: 500 },
+    )
+  }
 
   // 상대방이 켜둔 기기 전부. 아이폰과 노트북에서 각각 켰으면 둘 다 울린다.
   const { data: subscriptionRows, error: subscriptionError } = await supabase
@@ -155,7 +199,11 @@ export async function POST(request: Request): Promise<Response> {
 
   const subscriptions = (subscriptionRows ?? []) as PushTarget[]
   const payload = {
-    ...buildPokeNotification(kind, senderName),
+    // 커플이 만든 버튼의 문구는 요청 본문이 아니라 위 send_poke 반환값에서
+    // 온다 — SendPokeResult 주석 참고.
+    ...(presetId
+      ? buildCustomPokeNotification(presetId, presetLabel!, presetBody!, senderName)
+      : buildPokeNotification(kind!, senderName)),
     url: NOTIFICATION_URL,
   }
 
@@ -174,5 +222,5 @@ export async function POST(request: Request): Promise<Response> {
   // 되돌리지 않는다 — 보낸 건 보낸 것이고, 대신 delivered를 그대로 내려서
   // 화면이 "상대방 기기에 닿지 않았어요"를 말할 수 있게 한다. 수신 동의를
   // 켜려면 알림을 먼저 켜야 하므로(화면에서 강제한다) 흔한 경우는 아니다.
-  return Response.json({ kind, delivered: sentIds.length, removed: staleIds.length, failed })
+  return Response.json({ delivered: sentIds.length, removed: staleIds.length, failed })
 }
