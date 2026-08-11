@@ -101,5 +101,14 @@ begin
 end;
 $$;
 
-revoke execute on function public.send_poke(uuid, text) from public;
+-- `from public`만으로는 안 막힌다 — Supabase의 default privileges가 anon과
+-- authenticated에게 명시적 grant를 따로 붙이기 때문이다. 자세한 건 schema.sql의
+-- 같은 자리 주석 참고.
+revoke execute on function public.send_poke(uuid, text) from public, anon, authenticated;
 grant execute on function public.send_poke(uuid, text) to service_role;
+
+-- 확인용. 셋 다 false, service_role만 true여야 한다.
+-- select
+--   has_function_privilege('anon',          'public.send_poke(uuid,text)', 'execute') as anon,
+--   has_function_privilege('authenticated', 'public.send_poke(uuid,text)', 'execute') as authenticated,
+--   has_function_privilege('service_role',  'public.send_poke(uuid,text)', 'execute') as service_role;

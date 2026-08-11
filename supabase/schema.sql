@@ -380,10 +380,19 @@ begin
 end;
 $$;
 
--- 기본적으로 함수는 PUBLIC에 실행 권한이 열려 있다. 그대로 두면 로그인한
--- 사용자가 supabase.rpc('send_poke', { p_sender: <남의 id> })로 남의 이름을
--- 사칭해 알림을 보낼 수 있다.
-revoke execute on function public.send_poke(uuid, text) from public;
+-- 그대로 두면 로그인한 사용자가 supabase.rpc('send_poke', { p_sender: <남의 id> })
+-- 로 남의 이름을 사칭해 알림을 보낼 수 있다.
+--
+-- **`from public`만으로는 안 막힌다.** Postgres 기본값인 PUBLIC 실행 권한 외에,
+-- Supabase가 `alter default privileges in schema public grant execute on
+-- functions to anon, authenticated, service_role`을 걸어두기 때문이다. 함수를
+-- 만드는 순간 anon/authenticated에게 *명시적* grant가 따로 붙고, PUBLIC에서
+-- revoke해도 그건 그대로 남는다. 실제로 `from public`만 썼을 때 anon 키로
+-- 호출이 함수 본문까지 들어갔다 (배포 전 확인해서 잡았다).
+--
+-- 바꿀 때는 반드시 anon 키로 rpc를 직접 호출해 42501(permission denied)이
+-- 나오는지 확인할 것. 권한이 남아 있으면 함수가 실행돼 다른 에러가 나온다.
+revoke execute on function public.send_poke(uuid, text) from public, anon, authenticated;
 grant execute on function public.send_poke(uuid, text) to service_role;
 
 -- ============================================================
