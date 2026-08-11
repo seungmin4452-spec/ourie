@@ -1,5 +1,6 @@
 export { NotificationSettings } from './components/NotificationSettings'
 export { usePushNotifications } from './hooks/usePushNotifications'
+export type { PushState } from './hooks/usePushNotifications'
 export { pickBaseAnniversary } from './baseAnniversary'
 export { buildDdayNotification, dayCount } from './message'
 export type { DdayNotification } from './message'

@@ -4,9 +4,9 @@
 // (vercel.json의 crons). 시간대를 바꾸려면 그쪽 schedule과 아래 KST_OFFSET을
 // 같이 고쳐야 한다.
 //
-// 이 파일만 edge가 아니라 Node 런타임이다 (config를 두지 않으면 Node가
+// 이 파일은 edge가 아니라 Node 런타임이다 (config를 두지 않으면 Node가
 // 기본값이다). web-push가 VAPID 서명과 페이로드 암호화에 Node의 crypto를 쓰기
-// 때문이다.
+// 때문이다. 실제 발송은 같은 제약을 공유하는 api/_push.ts가 맡는다.
 //
 // **핸들러를 `export default`로 바꾸지 말 것.** 다른 api/ 파일들은 default
 // export지만 이 파일은 HTTP 메서드 이름의 명명 export(`GET`)여야 한다. Vercel의
@@ -26,15 +26,15 @@
 // src/features/notification/message.ts에도 같은 규칙이 적용된다.
 
 import { createClient } from '@supabase/supabase-js'
-// 반드시 기본 임포트여야 한다. web-push는 CJS 모듈이고 `module.exports`에
-// 담기는 값이 정적으로 읽히지 않는 형태(메서드 참조, .bind())라, Node의 ESM
-// 로더가 명명 임포트를 링크하지 못한다 -- `import { sendNotification }`으로
-// 쓰면 함수가 실행되기도 전에 모듈 로드 단계에서 죽는다 (배포 후 인증 검사에
-// 닿지도 못하고 FUNCTION_INVOCATION_FAILED가 났던 원인).
-import webpush from 'web-push'
 
 import { pickBaseAnniversary } from '../src/features/notification/baseAnniversary.js'
 import { buildDdayNotification } from '../src/features/notification/message.js'
+import {
+  configureWebPush,
+  requiredEnv,
+  sendPushToTargets,
+  type PushTarget,
+} from './_push.js'
 
 /** 알림이 향하는 화면. 눌러서 열면 오늘 숫자가 크게 보이는 홈이 맞다. */
 const NOTIFICATION_URL = '/'
@@ -52,11 +52,7 @@ const KST_OFFSET_MINUTES = 9 * 60
  */
 const TTL_SECONDS = 12 * 60 * 60
 
-interface SubscriptionRow {
-  id: string
-  endpoint: string
-  p256dh: string
-  auth: string
+interface SubscriptionRow extends PushTarget {
   // PostgREST의 embed 결과. to-one 관계라 객체 하나지만, 배열로 오는 경우도
   // 있어 둘 다 받아 넘긴다.
   profiles: { couple_id: string | null } | { couple_id: string | null }[] | null
@@ -81,12 +77,6 @@ function coupleIdOf(row: SubscriptionRow): string | null {
   return profile?.couple_id ?? null
 }
 
-function requiredEnv(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`Missing environment variable: ${name}`)
-  return value
-}
-
 /**
  * Vercel Cron은 CRON_SECRET이 설정돼 있으면 Authorization 헤더에 실어 보낸다.
  * 비밀값이 없으면 아무나 부를 수 있는 발송 버튼이 되므로, 그 경우엔 아예
@@ -103,12 +93,7 @@ export async function GET(request: Request): Promise<Response> {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  webpush.setVapidDetails(
-    // mailto: 주소는 규격상 필수다. 푸시 서비스가 문제 생겼을 때 연락할 곳이다.
-    requiredEnv('VAPID_SUBJECT'),
-    requiredEnv('VAPID_PUBLIC_KEY'),
-    requiredEnv('VAPID_PRIVATE_KEY'),
-  )
+  configureWebPush()
 
   // service role 키를 쓴다 — 이 함수는 특정 사용자의 요청이 아니라 모두를 대신해
   // 도는 작업이라 RLS로는 아무 row도 볼 수 없다. 이 키는 서버 환경변수로만
@@ -160,50 +145,32 @@ export async function GET(request: Request): Promise<Response> {
     if (base) baseByCouple.set(coupleId, base)
   }
 
-  const notifiedIds: string[] = []
-  const staleIds: string[] = []
-  let failed = 0
+  const { sentIds, staleIds, failed } = await sendPushToTargets(
+    subscriptions,
+    (subscription) => {
+      const coupleId = coupleIdOf(subscription)
+      const base = coupleId ? baseByCouple.get(coupleId) : undefined
+      // 커플 연결이 끊겼거나 기념일을 다 지운 경우. 보낼 말이 없으니 조용히
+      // 넘긴다 — 구독은 남겨두고, 기념일이 다시 생기면 내일부터 알아서 간다.
+      if (!base) return null
 
-  for (const subscription of subscriptions) {
-    const coupleId = coupleIdOf(subscription)
-    const base = coupleId ? baseByCouple.get(coupleId) : undefined
-    // 커플 연결이 끊겼거나 기념일을 다 지운 경우. 보낼 말이 없으니 조용히
-    // 넘긴다 — 구독은 남겨두고, 기념일이 다시 생기면 내일부터 알아서 간다.
-    if (!base) continue
-
-    const message = buildDdayNotification({
-      anniversaryTitle: base.title,
-      date: base.date,
-      today,
-    })
-
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: subscription.endpoint,
-          keys: { p256dh: subscription.p256dh, auth: subscription.auth },
-        },
-        JSON.stringify({ ...message, url: NOTIFICATION_URL }),
-        { TTL: TTL_SECONDS },
-      )
-      notifiedIds.push(subscription.id)
-    } catch (error) {
-      // 404/410은 "이 구독은 이제 없다"는 뜻이다 (앱 삭제, 브라우저 데이터
-      // 정리 등). 지우지 않으면 매일 같은 실패를 반복한다.
-      if (error instanceof webpush.WebPushError && (error.statusCode === 404 || error.statusCode === 410)) {
-        staleIds.push(subscription.id)
-        continue
+      return {
+        ...buildDdayNotification({ anniversaryTitle: base.title, date: base.date, today }),
+        url: NOTIFICATION_URL,
+        // 재발송이 있어도 알림이 쌓이지 않고 마지막 하나로 덮이게 한다.
+        // 콕 찌르기는 다른 tag를 쓰므로 서로 덮지 않는다
+        // (src/features/poke/message.ts).
+        tag: 'ourie-dday',
       }
-      failed += 1
-      console.error('push failed', subscription.id, error)
-    }
-  }
+    },
+    TTL_SECONDS,
+  )
 
-  if (notifiedIds.length > 0) {
+  if (sentIds.length > 0) {
     await supabase
       .from('push_subscriptions')
       .update({ last_notified_on: today })
-      .in('id', notifiedIds)
+      .in('id', sentIds)
   }
 
   if (staleIds.length > 0) {
@@ -212,7 +179,7 @@ export async function GET(request: Request): Promise<Response> {
 
   return Response.json({
     today,
-    sent: notifiedIds.length,
+    sent: sentIds.length,
     removed: staleIds.length,
     failed,
   })

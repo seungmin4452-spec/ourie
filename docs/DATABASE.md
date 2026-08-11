@@ -33,6 +33,7 @@ couples ◄───────┘ (couple_id로 연결)
 | couple_id | uuid (FK → couples.id, nullable) | 연결 전에는 null |
 | nickname | text | |
 | avatar_url | text (nullable) | Storage 경로 또는 URL |
+| poke_opt_in | boolean | default false — 콕 찌르기 수신 동의 (§2.3.2) |
 | created_at | timestamptz | default now() |
 
 ### 2.2 `couples`
@@ -84,6 +85,29 @@ couples ◄───────┘ (couple_id로 연결)
 한 사람이 여러 기기에서 켜면 row가 여러 개다 (기기가 아니라 "설치된 앱" 단위로 endpoint가 발급된다). `user_id`가 `auth.users`가 아닌 `profiles`를 가리키는 이유는 발송 함수가 구독에서 곧바로 `couple_id`를 따라가야 하는데, PostgREST의 embed가 실제 외래 키를 요구하기 때문이다.
 
 `last_notified_on`이 "1일 1알림"을 지키는 자물쇠다. cron이 재시도되거나 엔드포인트를 손으로 한 번 더 불러도, 이 값이 이미 오늘이면 건너뛴다. 발송은 `api/notify-dday.ts`가 하며 service role 키로 RLS를 우회한다 (모두를 대신해 도는 작업이라 특정 사용자의 세션이 없다).
+
+### 2.3.2 `pokes` (콕 찌르기)
+
+한쪽이 버튼을 눌러 상대방 기기를 울린 기록.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| id | uuid (PK) | |
+| couple_id | uuid (FK → couples.id) | |
+| sender_id | uuid (FK → profiles.id) | 버튼을 누른 사람 |
+| recipient_id | uuid (FK → profiles.id) | 알림을 받은 사람 |
+| kind | text | `miss` / `kakao` / `call` (check 제약) |
+| created_at | timestamptz | default now() |
+
+`kind`는 `src/features/poke/message.ts`의 `POKE_KINDS`와 같아야 한다. 한쪽만 늘리면 발송이 `invalid_kind`로 막힌다.
+
+**수신 동의가 전제다.** 이 기능만은 내가 아니라 상대방이 내 기기를 울리므로, `profiles.poke_opt_in`(기본 `false`)을 켠 사람에게만 간다. 매일 디데이 알림과 별개의 스위치인 이유이기도 하다 — 디데이는 받고 콕 찌르기는 안 받고 싶을 수 있다. 수정은 본인만(`profiles_update_self`), 읽기는 커플 상대방도 가능하다(`profiles_select_self_or_partner`) — 그래서 보내는 쪽 화면이 눌러보기 전에 "상대가 아직 안 켰어요"를 보여줄 수 있다.
+
+**쓰기 정책이 없다.** insert는 `public.send_poke(p_sender, p_kind)`(security definer)와 service role만 한다. 클라이언트가 직접 넣을 수 있으면 쿨다운도 수신 동의도 우회된다. 그 함수는 `authenticated`/`anon`의 실행 권한을 revoke해 두었고(남의 id를 넣어 사칭하는 것을 막는다), 실제 신원 확인은 `api/poke.ts`가 access token을 검증해 한다.
+
+**연타 방지**는 같은 종류 1초 1회다 (하루 총량 제한은 없다). 직전 발송 조회와 insert가 `send_poke` 한 트랜잭션 안에 있고, `pg_advisory_xact_lock(sender, kind)`으로 동시에 들어온 두 요청을 직렬화한다 — 여러 조회로 나누면 버튼 연타가 정확히 그 검사를 빠져나간다.
+
+기록을 남기는 건 쿨다운 때문만은 아니다. 나중에 "오늘 세 번 보고 싶다고 했어요" 같은 화면을 붙일 수 있게 하려는 것이라, 발송 성공 여부가 아니라 "보내기로 했다"는 사실을 적는다.
 
 ### 2.4 `memories` (추억 타임라인)
 
@@ -163,5 +187,6 @@ create policy "couple members can insert"
 
 ## 6. 미결 사항
 - 커플 연결 해제 시 `couples`, 하위 데이터 처리 정책 (soft delete vs hard delete)
+- `pokes` 보관 기간 — 쿨다운은 최근 1초만 보므로 오래된 기록은 조회 화면을 붙일 때까지 순수하게 쌓이기만 한다
 - `memories`를 개인 단위로 비공개 작성 가능하게 할지 여부 (현재는 커플 전체 공유 전제)
 - 다국어/타임존 처리 방식 (`date` vs `timestamptz` 선택 재검토 필요)

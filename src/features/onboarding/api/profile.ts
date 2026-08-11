@@ -5,12 +5,14 @@ export interface Profile {
   couple_id: string | null
   nickname: string | null
   avatar_url: string | null
+  /** 상대방이 보내는 콕 찌르기 알림을 받겠다는 동의. src/features/poke 참고. */
+  poke_opt_in: boolean
 }
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, couple_id, nickname, avatar_url')
+    .select('id, couple_id, nickname, avatar_url, poke_opt_in')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error

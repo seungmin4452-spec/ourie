@@ -22,6 +22,7 @@ import {
 import { useAuth } from '@/features/auth'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { isStandalone, openPwaInstallPage } from '@/features/onboarding/pwaInstall'
+import { PokeWidget } from '@/features/poke'
 import {
   useHomeWidgets,
   widgetMeta,
@@ -91,6 +92,8 @@ export function HomePage() {
             }
           />
         )
+      case 'poke':
+        return <PokeWidget profile={profile} />
       case 'memories':
         return (
           <Text type="supporting" justify="center">

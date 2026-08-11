@@ -119,7 +119,7 @@ api/notify-dday.ts  ── service role ──►  Supabase
   src/sw.ts의 push 리스너 → showNotification
 ```
 
-- **런타임**: 이 함수만 edge가 아니라 Node다. `web-push`가 Node의 crypto를 쓴다. 시그니처는 Web 표준(`GET(request)`)이라 다른 `api/` 파일과 모양은 같다.
+- **런타임**: 이 함수는 edge가 아니라 Node다. `web-push`가 Node의 crypto를 쓴다. 시그니처는 Web 표준(`GET(request)`)이라 다른 `api/` 파일과 모양은 같다. 실제 발송(VAPID 설정, 전송, 죽은 구독 수거)은 §6.2의 콕 찌르기와 공유하는 `api/_push.ts`가 맡는다.
 - **발송 시각**: KST 오전 9시 고정. Hobby 플랜의 cron 제약이 두 가지 걸린다 — (1) 하루 1회만 실행 가능하고(`0 * * * *` 같은 식은 배포 자체가 실패한다), (2) 실행 시각 정밀도가 ±59분이라 실제 발송은 09:00~09:59 사이다. 그래서 설정 화면도 "9시"가 아니라 "9시쯤"이라고 안내한다. 사용자별 시각/타임존을 지원하려면 구독마다 타임존을 저장하고 cron을 매시간 돌려야 하며, 둘 다 Pro 플랜이 필요하다.
 - **한 번에 보내는 개수**: 하루 1회 제약은 *cron이 함수를 깨우는 횟수*지 한 실행이 보내는 알림 수가 아니다. 한 번 깨어난 함수가 구독 전부를 순회하며 각자에게 보내므로, 커플 두 사람이 각각 켜두면 같은 실행에서 둘 다 받는다.
 - **중복 방지**: `push_subscriptions.last_notified_on`. cron 재시도나 수동 호출로 같은 날 두 번 울리지 않는다.
@@ -127,6 +127,34 @@ api/notify-dday.ts  ── service role ──►  Supabase
 - **문구**: `src/features/notification/message.ts`. 브라우저(설정 화면의 미리보기)와 서버가 같은 함수를 쓴다. 그래서 이 파일은 DOM·Supabase에 손대지 않는 순수 함수만 두고, `api/`에서 상대 경로로 import한다 (Vercel은 `api/`의 tsconfig path mapping을 지원하지 않아 `@/` 별칭을 쓸 수 없다).
 - **iOS 제약**: 홈 화면에 추가한 앱에서만 Web Push가 동작한다 (Safari 탭에는 `PushManager`가 없다). 설정 화면은 이 경우를 "지원 안 함"이 아니라 "홈 화면에 추가하면 켤 수 있어요"로 구분해 안내한다. 또 iOS는 알림을 띄우지 않는 push를 받으면 구독을 회수하므로, 서비스워커는 페이로드가 깨져도 기본 문구로 반드시 하나를 띄운다.
 - **환경변수**: `VITE_VAPID_PUBLIC_KEY`(클라이언트) / `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`·`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`CRON_SECRET`(서버). `.env.example` 참고. service role 키에는 절대 `VITE_` 접두사를 붙이지 않는다.
+
+### 6.2 콕 찌르기 (사용자가 보내는 알림)
+
+홈 위젯의 버튼("보고싶어" / "카톡 확인해줘" / "전화해줘")을 누르면 커플 상대방의 기기가 울린다.
+
+```
+홈 위젯 버튼 클릭
+        │  fetch POST /api/poke  (Authorization: 사용자 access token)
+        ▼
+api/poke.ts (Node 런타임)
+        │  ① auth.getUser(token) — 보낸 사람이 누구인지 확정
+        │  ② rpc('send_poke')    — 커플 확인 · 수신 동의 확인 · 쿨다운 · 기록 (한 트랜잭션)
+        │  ③ service role로 상대방의 push_subscriptions 조회
+        ▼
+api/_push.ts → 푸시 서비스 → src/sw.ts의 push 리스너
+```
+
+§6.1과 다른 점만 정리하면:
+
+- **트리거**: cron이 아니라 사용자 요청이다. 그래서 Hobby 플랜의 "하루 1회" cron 제약과 무관하다.
+- **인증**: `CRON_SECRET`이 아니라 로그인 세션의 access token이다. **보내는 사람을 request body로 받지 않는다** — 받으면 아무나 남의 이름으로 알림을 쏠 수 있다.
+- **service role이 필요한 이유**: `push_subscriptions`의 RLS가 `user_id = auth.uid()`라 사용자 세션으로는 상대방 구독이 보이지 않는다. 그 정책 자체는 유지한다(상대가 내 기기 알림을 켜고 끄면 안 된다). 대신 발송만 서버가 대신한다.
+- **수신 동의**: `profiles.poke_opt_in`(기본 `false`). 이 기능만은 내가 아니라 상대방이 내 기기를 울리므로, 켠 적 없는 사람에게는 가지 않는다. 매일 디데이 알림과 별개의 스위치다. 위젯이 상대방의 이 값을 미리 읽어 버튼을 잠그지만(`profiles_select_self_or_partner`가 커플 상대방 읽기를 허용한다), 실제 차단은 서버가 한다.
+- **연타 방지**: 같은 종류는 1초에 한 번 (하루 총량 제한은 없다). 검사와 기록이 `send_poke` 한 트랜잭션 안에 있고, `pg_advisory_xact_lock`으로 동시에 들어온 두 요청을 직렬화한다 — 여러 조회로 나누면 버튼 연타가 정확히 그 검사를 빠져나간다.
+- **권한**: `send_poke`는 `security definer`이고 `p_sender`를 인자로 받으므로, `authenticated`/`anon`의 실행 권한을 revoke해 클라이언트가 직접 부를 수 없게 한다.
+- **알림 tag**: 종류별로 다르다(`ourie-poke-{kind}`). 디데이(`ourie-dday`)를 덮지 않고, 같은 말을 여러 번 보내면 알림함에 쌓이는 대신 마지막 하나로 덮인다. 이때도 소리가 나도록 `renotify`를 실어 보낸다.
+- **TTL**: 1시간 (디데이는 12시간). "보고싶어"는 지금 도착해야 의미가 있고, 몇 시간 뒤에 뜨면 상대는 무슨 상황인지 알 수 없다.
+- **문구**: `src/features/poke/message.ts`. §6.1의 `message.ts`와 같은 이유로 순수 모듈이고, import를 하나도 하지 않아 서버 쪽 `.js` 확장자 규칙을 애초에 만들지 않는다.
 
 ## 7. 배포 구조
 

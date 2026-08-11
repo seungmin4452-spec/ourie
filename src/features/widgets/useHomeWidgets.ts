@@ -5,7 +5,7 @@ import { isWidgetId, type WidgetId } from './types'
 const STORAGE_KEY = 'ourie-home-widgets'
 
 /** 처음 홈에 들어왔을 때의 기본 구성. */
-const DEFAULT_WIDGETS: WidgetId[] = ['dday', 'memories']
+const DEFAULT_WIDGETS: WidgetId[] = ['dday', 'poke', 'memories']
 
 /**
  * 저장된 구성을 읽는다. 손상됐거나(수동 편집, 예전 버전의 id) 비어 있으면

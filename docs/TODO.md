@@ -33,6 +33,7 @@
 - [x] 홈 화면에 다가오는 디데이 강조 표시
 - [x] 매일 디데이 알림 (Web Push) — `push_subscriptions` 테이블, `/anniversaries`의 알림 스위치, `api/notify-dday.ts` + Vercel Cron
 - [x] 마일스톤 문구 (100일 단위 · 주년 · D-3 예고) — `src/features/notification/message.ts`
+- [x] 콕 찌르기 — `pokes` 테이블 + `send_poke` RPC, `api/poke.ts`, 홈 위젯 `src/features/poke`
 
 ## Phase 4 — 추억 타임라인
 - [ ] `memories`, `memory_photos` 테이블 생성 + RLS 정책

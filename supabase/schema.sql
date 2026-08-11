@@ -100,11 +100,19 @@ grant execute on function public.join_couple(text) to authenticated;
 -- profiles
 -- 1:1 with auth.users (id is both PK and FK)
 -- ------------------------------------------------------------
+-- poke_opt_in은 "상대방이 눌러서 보내는 알림"(콕 찌르기)을 받겠다는 동의다.
+-- 기본값이 false인 게 핵심이다 — 이 기능만은 내가 아니라 상대방이 내 기기를
+-- 울리므로, 켠 적 없는 사람에게는 절대 가지 않아야 한다. 매일 디데이 알림과
+-- 분리된 스위치인 이유이기도 하다 (디데이는 켜고 콕 찌르기는 안 받고 싶을 수
+-- 있다). 수정은 본인만 가능하고(profiles_update_self), 상대방은 읽기만
+-- 가능하다(profiles_select_self_or_partner) — 그래서 보내는 쪽 화면이 "상대가
+-- 아직 안 켰어요"를 미리 보여줄 수 있다.
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   couple_id uuid references public.couples (id) on delete set null,
   nickname text,
   avatar_url text,
+  poke_opt_in boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -257,6 +265,127 @@ create table public.push_subscriptions (
 
 create index push_subscriptions_user_id_idx on public.push_subscriptions (user_id);
 
+-- ------------------------------------------------------------
+-- pokes (콕 찌르기)
+-- 한쪽이 버튼을 눌러 상대방 기기를 울린 기록 하나가 한 row다.
+--
+-- 기록을 남기는 이유는 두 가지다. 하나는 연타 방지 — send_poke가 직전 발송
+-- 시각을 여기서 읽는다. 다른 하나는 나중에 "오늘 세 번 보고 싶다고 했어요"
+-- 같은 걸 보여줄 수 있게 하는 것이다. 그래서 발송 성공 여부가 아니라 "보내기로
+-- 했다"는 사실을 적는다 (상대가 기기를 꺼둬서 안 닿아도 보낸 건 보낸 거다).
+--
+-- 쓰기 정책이 없는 건 실수가 아니다. insert는 오직 send_poke(security
+-- definer)와 service role만 한다 — 클라이언트가 직접 넣을 수 있으면 쿨다운도
+-- 수신 동의도 우회된다.
+-- ------------------------------------------------------------
+create table public.pokes (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  sender_id uuid not null references public.profiles (id) on delete cascade,
+  recipient_id uuid not null references public.profiles (id) on delete cascade,
+  -- 종류는 3개 고정이다 (src/features/poke/kinds.ts의 POKE_KINDS와 같아야
+  -- 한다). text + check인 이유는 enum이면 종류를 늘릴 때마다 타입 변경
+  -- 마이그레이션이 필요하기 때문이다.
+  kind text not null check (kind in ('miss', 'kakao', 'call')),
+  created_at timestamptz not null default now()
+);
+
+-- 쿨다운 조회용. send_poke가 (sender_id, kind)로 가장 최근 한 건만 본다.
+create index pokes_sender_kind_created_idx
+  on public.pokes (sender_id, kind, created_at desc);
+
+-- 커플의 주고받은 기록 조회용.
+create index pokes_couple_created_idx on public.pokes (couple_id, created_at desc);
+
+-- ------------------------------------------------------------
+-- send_poke: 콕 찌르기 한 번을 원자적으로 처리한다.
+--
+-- 상대방 찾기 · 수신 동의 확인 · 쿨다운 확인 · 기록을 한 트랜잭션에 묶는 이유는
+-- join_couple과 같다. 이걸 api/poke.ts에서 여러 번의 조회로 나눠 하면, 두 요청이
+-- 겹쳤을 때 둘 다 "직전 발송 없음"을 보고 통과한다 — 버튼을 빠르게 두 번 누르는
+-- 것이 정확히 그 상황이라, 막으려는 바로 그 케이스에서 못 막는다.
+--
+-- 그 겹침을 확실히 막는 게 아래 advisory lock이다. 트랜잭션이 끝나면 자동으로
+-- 풀리고, (보낸 사람, 종류)별로만 잠그므로 다른 커플끼리는 서로 기다리지 않는다.
+--
+-- p_sender를 인자로 받고 auth.uid()를 쓰지 않는 이유: 이 함수는 사용자의 세션이
+-- 아니라 service role로 도는 api/poke.ts가 부른다 (상대방의 push_subscriptions를
+-- 읽어야 하는데 그건 RLS로 막혀 있다). 그래서 p_sender는 신뢰할 수 없는 값이고,
+-- 아래 grant로 authenticated/anon의 실행 권한을 아예 빼앗아 클라이언트가 남의
+-- id를 넣어 부를 수 없게 한다. 실제 신원 확인은 호출 전 access token 검증이
+-- 담당한다.
+-- ------------------------------------------------------------
+create or replace function public.send_poke(p_sender uuid, p_kind text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_couple public.couples;
+  v_couple_id uuid;
+  v_recipient uuid;
+  v_nickname text;
+begin
+  if p_kind not in ('miss', 'kakao', 'call') then
+    raise exception 'invalid_kind';
+  end if;
+
+  select couple_id, nickname into v_couple_id, v_nickname
+    from public.profiles where id = p_sender;
+
+  if v_couple_id is null then
+    raise exception 'no_couple';
+  end if;
+
+  -- 같은 사람이 같은 종류를 동시에 두 번 보내는 것만 직렬화한다.
+  perform pg_advisory_xact_lock(hashtext(p_sender::text || ':' || p_kind));
+
+  select * into v_couple from public.couples where id = v_couple_id;
+
+  -- 커플의 두 자리 중 보낸 사람이 아닌 쪽. 아직 상대가 안 붙었으면 null이다.
+  v_recipient := case when v_couple.user_a = p_sender
+                      then v_couple.user_b
+                      else v_couple.user_a end;
+
+  if v_recipient is null then
+    raise exception 'no_couple';
+  end if;
+
+  if not exists (
+    select 1 from public.profiles where id = v_recipient and poke_opt_in
+  ) then
+    raise exception 'not_opted_in';
+  end if;
+
+  -- 같은 종류는 1초에 한 번. 실수로 두 번 눌린 것을 거르는 게 목적이라 창이
+  -- 짧다 (하루 총량 제한은 두지 않는다).
+  insert into public.pokes (couple_id, sender_id, recipient_id, kind)
+  select v_couple_id, p_sender, v_recipient, p_kind
+  where not exists (
+    select 1 from public.pokes
+    where sender_id = p_sender
+      and kind = p_kind
+      and created_at > now() - interval '1 second'
+  );
+
+  if not found then
+    raise exception 'too_soon';
+  end if;
+
+  return jsonb_build_object(
+    'recipient_id', v_recipient,
+    'sender_nickname', v_nickname
+  );
+end;
+$$;
+
+-- 기본적으로 함수는 PUBLIC에 실행 권한이 열려 있다. 그대로 두면 로그인한
+-- 사용자가 supabase.rpc('send_poke', { p_sender: <남의 id> })로 남의 이름을
+-- 사칭해 알림을 보낼 수 있다.
+revoke execute on function public.send_poke(uuid, text) from public;
+grant execute on function public.send_poke(uuid, text) to service_role;
+
 -- ============================================================
 -- Row Level Security
 -- All tables are couple-scoped: a user may only read/write rows
@@ -282,6 +411,7 @@ alter table public.photos enable row level security;
 alter table public.travel_places enable row level security;
 alter table public.themes enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.pokes enable row level security;
 
 -- couples: only the two members can see/manage their own couple row
 create policy "couples_select_member"
@@ -416,6 +546,12 @@ create policy "push_subscriptions_update_self"
 create policy "push_subscriptions_delete_self"
   on public.push_subscriptions for delete
   using (user_id = auth.uid());
+
+-- pokes: 주고받은 기록은 둘 다 본다 (보낸 쪽은 보냈는지, 받는 쪽은 누가
+-- 불렀는지). insert/update/delete 정책은 일부러 없다 — 위 send_poke 주석 참고.
+create policy "pokes_select_couple"
+  on public.pokes for select
+  using (couple_id = public.current_couple_id());
 
 -- ============================================================
 -- Storage: profile avatars

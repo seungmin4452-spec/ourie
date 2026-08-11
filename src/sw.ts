@@ -73,10 +73,11 @@ async function personalizeNavigation(request: Request): Promise<Response> {
 }
 
 // ------------------------------------------------------------
-// 디데이 알림 (Web Push)
+// 알림 (Web Push)
 //
-// api/notify-dday.ts가 하루 한 번 보내는 알림을 여기서 받는다. 페이로드는
-// 그쪽이 만든 JSON 그대로다.
+// 두 곳에서 보낸다: api/notify-dday.ts(매일 아침 디데이)와 api/poke.ts(상대방이
+// 버튼을 눌러 보내는 콕 찌르기). 페이로드는 그쪽이 만든 JSON 그대로이고, 여기서
+// 종류를 구분하지 않는다 — 무엇을 어떤 이름으로 띄울지는 보내는 쪽이 정한다.
 //
 // iOS는 push 이벤트를 받고도 알림을 띄우지 않으면(silent push) 구독 자체를
 // 회수해버린다. 그래서 페이로드가 깨졌거나 비어 있어도 아래 기본 문구로 반드시
@@ -87,6 +88,21 @@ interface PushPayload {
   title: string
   body: string
   url?: string
+  /**
+   * 같은 이름의 알림은 쌓이지 않고 마지막 하나로 덮인다. 보내는 쪽이 정하는
+   * 이유는 종류마다 원하는 게 다르기 때문이다 — 디데이는 하나로 덮이면 되지만
+   * ("ourie-dday"), 콕 찌르기는 "보고싶어"가 "전화해줘"를 지우면 안 되므로
+   * 종류별로 다른 이름을 쓴다 (src/features/poke/message.ts).
+   */
+  tag?: string
+  /** 같은 tag로 덮어쓸 때도 소리·진동을 다시 낼지. */
+  renotify?: boolean
+}
+
+// TypeScript의 NotificationOptions에는 renotify가 없다. 표준에는 있고 실제
+// 브라우저도 지원하는데 타입 정의만 따라오지 않은 것이라, 여기서 얹어 쓴다.
+interface PushNotificationOptions extends NotificationOptions {
+  renotify?: boolean
 }
 
 const FALLBACK_PUSH: PushPayload = {
@@ -98,7 +114,13 @@ function readPushPayload(event: PushEvent): PushPayload {
   try {
     const data = event.data?.json() as Partial<PushPayload> | null
     if (!data?.title || !data.body) return FALLBACK_PUSH
-    return { title: data.title, body: data.body, url: data.url }
+    return {
+      title: data.title,
+      body: data.body,
+      url: data.url,
+      tag: data.tag,
+      renotify: data.renotify,
+    }
   } catch {
     // JSON이 아니면 서버가 보낸 게 아니거나 형식이 바뀐 것이다. 알림을
     // 거르는 대신 기본 문구로 띄운다 (위 silent push 문제).
@@ -109,19 +131,20 @@ function readPushPayload(event: PushEvent): PushPayload {
 self.addEventListener('push', (event) => {
   const payload = readPushPayload(event)
 
-  event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      // 안드로이드·데스크톱이 쓰는 값이다. iOS 홈 화면 앱은 이 값을 무시하고
-      // 홈 화면 아이콘을 그대로 쓴다.
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
-      // 하루 한 번이라 겹칠 일이 드물지만, 재발송이 있어도 알림이 쌓이지 않고
-      // 마지막 하나로 덮이게 한다.
-      tag: 'ourie-dday',
-      data: { url: payload.url ?? '/' },
-    }),
-  )
+  const options: PushNotificationOptions = {
+    body: payload.body,
+    // 안드로이드·데스크톱이 쓰는 값이다. iOS 홈 화면 앱은 이 값을 무시하고
+    // 홈 화면 아이콘을 그대로 쓴다.
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    // tag 없이 renotify를 주면 브라우저가 TypeError를 던진다. 보내는 쪽이
+    // tag를 빠뜨렸을 때를 대비해 여기서 같이 묶는다.
+    tag: payload.tag ?? 'ourie',
+    renotify: payload.renotify ?? false,
+    data: { url: payload.url ?? '/' },
+  }
+
+  event.waitUntil(self.registration.showNotification(payload.title, options))
 })
 
 self.addEventListener('notificationclick', (event) => {
