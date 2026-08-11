@@ -68,7 +68,12 @@ const FAILURES: Record<string, { status: number; message: string }> = {
 
 interface SendPokeResult {
   recipient_id: string
-  sender_nickname: string | null
+  /**
+   * 보낸 사람의 **사람 이름**(profiles.name)이다. profiles.app_name은
+   * 앱 이름("승민 ♥ 진선")이라 여기 쓰면 알림이 "승민 ♥ 진선님이 보고 싶대요"가
+   * 된다. 키 이름은 supabase/schema.sql의 send_poke 반환값과 같아야 한다.
+   */
+  sender_name: string | null
 }
 
 function failure(code: string): Response {
@@ -135,7 +140,7 @@ export async function POST(request: Request): Promise<Response> {
     return failure(code ?? sendError.message)
   }
 
-  const { recipient_id: recipientId, sender_nickname: senderNickname } =
+  const { recipient_id: recipientId, sender_name: senderName } =
     sendResult as SendPokeResult
 
   // 상대방이 켜둔 기기 전부. 아이폰과 노트북에서 각각 켰으면 둘 다 울린다.
@@ -150,7 +155,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const subscriptions = (subscriptionRows ?? []) as PushTarget[]
   const payload = {
-    ...buildPokeNotification(kind, senderNickname),
+    ...buildPokeNotification(kind, senderName),
     url: NOTIFICATION_URL,
   }
 

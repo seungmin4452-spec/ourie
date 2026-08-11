@@ -107,10 +107,25 @@ grant execute on function public.join_couple(text) to authenticated;
 -- 있다). 수정은 본인만 가능하고(profiles_update_self), 상대방은 읽기만
 -- 가능하다(profiles_select_self_or_partner) — 그래서 보내는 쪽 화면이 "상대가
 -- 아직 안 켰어요"를 미리 보여줄 수 있다.
+-- 이름이 둘이다. 컬럼 이름만 보고 구분되도록 name / app_name으로 갈라 두었다
+-- (예전에는 nickname / display_name이었는데, 어느 쪽이 사람인지 알 수 없어서
+-- 실제로 앱 이름을 알림에 실어 보낸 적이 있다).
+--
+--   name     = **사람 이름**. 상대방에게 내가 누구인지 보여줄 때 쓴다
+--              (콕 찌르기 알림의 "지영님이 보고 싶대요"). 회원가입에서 받는다.
+--   app_name = **앱 이름**. 커플이 정하는 우리 앱의 이름이고("승민 ♥ 진선"),
+--              홈 화면 아이콘 라벨(AppMetaSync)과 홈 상단의 큰 제목이 된다.
+--              커플 공용이 아니라 profiles에 있는 이유는 각자 자기 앱을 따로
+--              꾸미기 때문이다. 온보딩 "꾸미기"에서 받는다.
+--
+-- name이 nullable인 이유: 이 컬럼이 생기기 전에 가입한 계정이 있다. 비어
+-- 있으면 이름 없는 문구로 떨어진다 (src/features/poke/message.ts의
+-- pokeNameLabel).
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   couple_id uuid references public.couples (id) on delete set null,
-  nickname text,
+  name text,
+  app_name text,
   avatar_url text,
   poke_opt_in boolean not null default false,
   created_at timestamptz not null default now()
@@ -119,6 +134,12 @@ create table public.profiles (
 create index profiles_couple_id_idx on public.profiles (couple_id);
 
 -- automatically create a profile row whenever a new auth user signs up
+--
+-- 이름을 auth 메타데이터에서 꺼내오는 이유: 이메일 확인이 켜져 있으면 회원가입
+-- 직후에 세션이 없다. 세션이 없으면 RLS 때문에 클라이언트가 profiles에 쓸 수
+-- 없어서, 가입 폼에서 받은 이름을 저장할 방법이 이것뿐이다. 클라이언트는
+-- supabase.auth.signUp의 options.data로 넘긴다 (src/features/auth/api/auth.ts).
+-- 여기 쓰는 건 사람 이름(name)이다. 앱 이름은 온보딩에서 따로 받는다.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -126,8 +147,13 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id)
-  values (new.id);
+  insert into public.profiles (id, name)
+  values (
+    new.id,
+    -- 공백만 넣은 경우까지 null로 떨어뜨린다. "이름 없음"의 표현이 하나여야
+    -- 화면에서 분기가 갈라지지 않는다.
+    nullif(trim(new.raw_user_meta_data ->> 'name'), '')
+  );
   return new;
 end;
 $$;
@@ -325,13 +351,15 @@ declare
   v_couple public.couples;
   v_couple_id uuid;
   v_recipient uuid;
-  v_nickname text;
+  v_name text;
 begin
   if p_kind not in ('miss', 'kakao', 'call') then
     raise exception 'invalid_kind';
   end if;
 
-  select couple_id, nickname into v_couple_id, v_nickname
+  -- app_name이 아니라 name이다. app_name은 앱 이름이라 알림에 쓰면
+  -- "승민 ♥ 진선님이 보고 싶대요"가 된다 (profiles 위 주석 참고).
+  select couple_id, name into v_couple_id, v_name
     from public.profiles where id = p_sender;
 
   if v_couple_id is null then
@@ -375,7 +403,7 @@ begin
 
   return jsonb_build_object(
     'recipient_id', v_recipient,
-    'sender_nickname', v_nickname
+    'sender_name', v_name
   );
 end;
 $$;

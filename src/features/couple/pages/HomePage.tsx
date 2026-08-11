@@ -119,7 +119,7 @@ export function HomePage() {
             <DefaultAvatar className="size-full" />
           )}
         </span>
-        <Heading level={1}>{profile?.nickname || 'Ourie'}</Heading>
+        <Heading level={1}>{profile?.app_name || 'Ourie'}</Heading>
       </VStack>
 
       {widgets.length === 0 ? (
@@ -192,7 +192,7 @@ export function HomePage() {
             width="100%"
             onClick={() =>
               void openPwaInstallPage(
-                profile?.nickname?.trim() ?? '',
+                profile?.app_name?.trim() ?? '',
                 profile?.avatar_url ?? null,
               )
             }

@@ -116,7 +116,7 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
       {!canSend && !isPartnerLoading && (
         <Text type="supporting" justify="center">
           {partner
-            ? `${pokeNameLabel(partner.nickname)}이 아직 콕 찌르기 알림을 켜지 않았어요.`
+            ? `${pokeNameLabel(partner.name)}이 아직 콕 찌르기 알림을 켜지 않았어요.`
             : '커플이 연결되면 보낼 수 있어요.'}
         </Text>
       )}

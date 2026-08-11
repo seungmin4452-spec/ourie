@@ -10,7 +10,11 @@ import { supabase } from '@/lib/supabase'
  */
 export interface PokePartner {
   id: string
-  nickname: string | null
+  /**
+   * 상대방의 **사람 이름**(profiles.name). app_name은 앱 이름이라 여기 쓰면
+   * "승민 ♥ 진선님이 아직 켜지 않았어요"가 된다.
+   */
+  name: string | null
   poke_opt_in: boolean
 }
 
@@ -20,7 +24,7 @@ export async function getPokePartner(
 ): Promise<PokePartner | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, nickname, poke_opt_in')
+    .select('id, name, poke_opt_in')
     .eq('couple_id', coupleId)
     .neq('id', selfId)
     .maybeSingle()

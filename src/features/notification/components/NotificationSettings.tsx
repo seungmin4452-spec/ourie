@@ -107,7 +107,7 @@ export function NotificationSettings({ anniversaries }: NotificationSettingsProp
           variant="secondary"
           width="100%"
           onClick={() =>
-            void openPwaInstallPage(profile?.nickname?.trim() ?? '', profile?.avatar_url ?? null)
+            void openPwaInstallPage(profile?.app_name?.trim() ?? '', profile?.avatar_url ?? null)
           }
         />
       )}

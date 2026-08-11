@@ -39,7 +39,7 @@ export function CoupleInvitePage() {
   })
 
   const coupleId = profile?.couple_id ?? null
-  const nickname = profile?.nickname?.trim() ?? ''
+  const appName = profile?.app_name?.trim() ?? ''
   const avatarUrl = profile?.avatar_url ?? null
 
   useEffect(() => {
@@ -50,12 +50,12 @@ export function CoupleInvitePage() {
     // who arrived straight here from an invite link skipped customize, so send
     // them there instead -- installing without a name bakes "Ourie" onto the
     // home screen, which is exactly what api/pwa-install.ts exists to avoid.
-    if (!nickname) {
+    if (!appName) {
       navigate('/onboarding/customize', { replace: true })
     } else {
-      void openPwaInstallPage(nickname, avatarUrl)
+      void openPwaInstallPage(appName, avatarUrl)
     }
-  }, [coupleId, nickname, avatarUrl, navigate])
+  }, [coupleId, appName, avatarUrl, navigate])
 
   return (
     <PageShell gap={6} isCentered maxWidth={384}>

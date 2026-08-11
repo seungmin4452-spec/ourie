@@ -26,7 +26,7 @@ export function RequireOnboarding({ children }: { children: ReactNode }) {
     return <FullscreenLoader />
   }
 
-  if (!profile?.nickname?.trim()) {
+  if (!profile?.app_name?.trim()) {
     return <Navigate to="/onboarding/customize" replace />
   }
 

@@ -21,6 +21,7 @@ export function CustomizeForm() {
   const queryClient = useQueryClient()
   const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [typedAppName, setTypedAppName] = useState<string | null>(null)
   const [typedName, setTypedName] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -38,7 +39,12 @@ export function CustomizeForm() {
   // a name they already chose just to get back to the install step. Derived
   // rather than synced into state by an effect: null means "untouched, show
   // whatever is saved", and the first keystroke takes over for good.
-  const name = typedName ?? profile?.nickname ?? ''
+  const appName = typedAppName ?? profile?.app_name ?? ''
+
+  // 사람 이름. 원래 회원가입에서 받지만, 그 필드가 생기기 전에 가입한 사람은
+  // 채울 곳이 여기밖에 없다 (회원가입을 다시 할 수는 없다). 이름이 비어 있으면
+  // 상대방이 받는 콕 찌르기 알림에 "상대방이 보고 싶대요"로 나간다.
+  const name = typedName ?? profile?.name ?? ''
 
   // The locally cropped pick wins while it exists; otherwise show what's
   // already saved so reopening the form doesn't look like the photo is gone.
@@ -76,18 +82,20 @@ export function CustomizeForm() {
     try {
       const avatarUrl = imageFile ? await uploadAvatar(user.id, imageFile) : null
       await updateProfile(user.id, {
-        nickname: name.trim(),
+        app_name: appName.trim(),
+        name: name.trim() || null,
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       })
 
       const previousMeta = readCachedAppMeta()
-      const title = name.trim()
+      // 홈 화면 아이콘에 굽는 건 앱 이름이다. 사람 이름이 아니다.
+      const title = appName.trim()
       const icon = avatarUrl ?? profile?.avatar_url ?? previousMeta?.icon ?? ''
       cacheAppMeta(title, icon)
 
       // The next screen is reached by client-side navigation now, so the
       // cached profile has to catch up: RequireOnboarding reads this same
-      // query, and a stale row with no nickname would send them right back
+      // query, and a stale row with no app_name would send them right back
       // here.
       await queryClient.invalidateQueries({ queryKey: ['profile', user.id] })
 
@@ -147,8 +155,21 @@ export function CustomizeForm() {
         htmlName="app-name"
         placeholder="예: 승민 ♥ 진선"
         isRequired
+        value={appName}
+        onChange={setTypedAppName}
+        description="홈 화면 아이콘과 앱 상단에 표시돼요."
+      />
+
+      {/* 앱 이름 바로 아래 두고 description으로 쓰임을 갈라놓는다. 둘 다 그냥
+          "이름"이면 여기에도 커플 이름을 적게 되고, 그러면 상대방 알림이
+          "승민 ♥ 진선님이 보고 싶대요"가 된다 (실제로 그랬다). */}
+      <TextInput
+        label="내 이름"
+        htmlName="name"
+        placeholder="예: 승민"
         value={name}
         onChange={setTypedName}
+        description="상대방에게 보내는 알림에 표시돼요."
       />
 
       <Button

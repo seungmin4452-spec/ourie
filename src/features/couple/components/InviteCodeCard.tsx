@@ -73,12 +73,19 @@ export function InviteCodeCard() {
 
   async function handleShare() {
     if (!invite) return
+    // 앱 이름이 아니라 사람 이름을 싣는다. 이 링크의 미리보기는 "누가
+    // 초대했다"는 문장이고(api/invite.ts의 og:title과 description), 옆에 붙는
+    // 그림도 그 사람의 프로필 사진이다. 앱 이름을 쓰면 "승민 ♥ 진선이(가)
+    // 초대했어요"가 되는데, 초대를 보내는 시점엔 그 커플이 아직 없다.
+    //
+    // 이름이 비어 있으면(이 컬럼이 생기기 전에 가입한 계정) 아예 싣지 않는다.
+    // 받는 쪽 함수가 기본 제목으로 떨어뜨린다.
     const params = new URLSearchParams({ code: invite.invite_code })
-    if (profile?.nickname) params.set('title', profile.nickname)
+    if (profile?.name) params.set('title', profile.name)
     if (profile?.avatar_url) params.set('icon', profile.avatar_url)
     const shareUrl = `${window.location.origin}${INVITE_SHARE_FUNCTION_PATH}?${params.toString()}`
-    const shareTitle = profile?.nickname
-      ? `${profile.nickname}이(가) Ourie 커플 연결을 초대했어요`
+    const shareTitle = profile?.name
+      ? `${profile.name}이(가) Ourie 커플 연결을 초대했어요`
       : 'Ourie 커플 연결 초대'
 
     if (navigator.share) {

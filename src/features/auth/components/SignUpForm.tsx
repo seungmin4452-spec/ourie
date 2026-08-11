@@ -11,6 +11,7 @@ export function SignUpForm() {
   const location = useLocation()
   const from = (location.state as { from?: Location } | null)?.from
   const showToast = useToast()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +22,7 @@ export function SignUpForm() {
     setError(null)
     setIsSubmitting(true)
     try {
-      const { session } = await signUpWithEmail(email, password)
+      const { session } = await signUpWithEmail(email, password, name)
       if (session) {
         navigate(from ? `${from.pathname}${from.search}` : '/', { replace: true })
       } else {
@@ -36,6 +37,18 @@ export function SignUpForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {/* 앱 이름("승민 ♥ 진선")이 아니라 사람 이름이다. 상대방이 받는 알림에
+          이 이름이 그대로 뜨므로 그 쓰임을 description으로 밝혀둔다 — 안 그러면
+          여기에도 커플 이름을 적게 된다. */}
+      <TextInput
+        label="이름"
+        htmlName="name"
+        placeholder="예: 승민"
+        isRequired
+        value={name}
+        onChange={setName}
+        description="상대방에게 보내는 알림에 표시돼요."
+      />
       <TextInput
         label="이메일"
         type="email"

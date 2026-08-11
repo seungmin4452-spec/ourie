@@ -31,10 +31,22 @@ couples ◄───────┘ (couple_id로 연결)
 |---|---|---|
 | id | uuid (PK, FK → auth.users.id) | |
 | couple_id | uuid (FK → couples.id, nullable) | 연결 전에는 null |
-| nickname | text | |
+| name | text (nullable) | **사람 이름** — 상대방에게 보이는 이름 |
+| app_name | text | **앱 이름** — 사람 이름이 아니다 (아래 참고) |
 | avatar_url | text (nullable) | Storage 경로 또는 URL |
 | poke_opt_in | boolean | default false — 콕 찌르기 수신 동의 (§2.3.2) |
 | created_at | timestamptz | default now() |
+
+**이름이 두 개다.** 원래는 `nickname`(앱 이름) 하나뿐이었는데, 이름만 봐서는 사람 이름인지 알 수 없어 콕 찌르기 알림이 "승민 ♥ 진선님이 보고 싶대요"로 나간 적이 있다. 그래서 컬럼 이름만으로 구분되게 `name` / `app_name`으로 갈랐다 (`nickname` → `app_name` rename + `name` 신규).
+
+- `name` = **사람 이름**. 상대방에게 내가 누구인지 보여줄 때 쓴다. 회원가입 폼에서 받는다.
+- `app_name` = **앱 이름**. 커플이 정하는 우리 앱의 이름("승민 ♥ 진선")이고, 홈 화면 아이콘 라벨(`src/app/AppMetaSync.tsx`)과 홈 상단의 큰 제목이 된다. 커플 공용이 아니라 `profiles`에 있는 이유는 각자 자기 앱을 따로 꾸미기 때문이다. 온보딩 "꾸미기"에서 받는다.
+
+`name`을 회원가입에서 받으면서도 `profiles`에 직접 쓰지 않는 이유: 이메일 확인이 켜져 있으면 `signUp` 직후에 세션이 없고, 세션이 없으면 RLS 때문에 `profiles`에 쓸 수 없다. 그래서 클라이언트는 `supabase.auth.signUp`의 `options.data`로 넘기고, `handle_new_user` 트리거가 `raw_user_meta_data ->> 'name'`을 읽어 프로필 row를 만든다. 키 이름이 양쪽에서 같아야 하며, 바꾸면 이름이 조용히 사라진다.
+
+`name`이 nullable인 이유는 이 컬럼이 생기기 전에 가입한 계정이 있어서다. 비어 있으면 화면과 알림 모두 이름 없는 문구로 떨어진다(`pokeNameLabel`). 그 계정들은 회원가입을 다시 할 수 없으므로 온보딩 "꾸미기" 화면에서도 이 값을 채울 수 있게 해두었다.
+
+컬럼 rename 시 주의: Postgres는 함수 본문을 텍스트로 저장하므로 `send_poke`처럼 그 컬럼을 참조하는 함수는 rename을 따라오지 않는다. 같은 트랜잭션에서 `create or replace`로 다시 만들어야 한다 (`supabase/migrations/2026-08-11-names.sql` 참고).
 
 ### 2.2 `couples`
 커플 단위 엔티티. 모든 도메인 데이터의 격리 기준.

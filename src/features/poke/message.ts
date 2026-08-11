@@ -50,15 +50,19 @@ export interface PokeNotification {
 }
 
 /**
- * 사람을 부르는 말. 닉네임이 없는 계정도 있을 수 있어서(온보딩을 건너뛴 경우)
- * 그때는 이름 없이 자연스럽게 읽히는 쪽으로 떨어진다 — "상대방님이"가 되지
- * 않게 "님"까지 이 함수가 붙인다.
+ * 사람을 부르는 말. 넘기는 값은 반드시 `profiles.name`이어야 한다 —
+ * `profiles.app_name`은 앱 이름이라 넣으면 "승민 ♥ 진선님이 보고 싶대요"가
+ * 된다 (실제로 그렇게 나갔다).
+ *
+ * name이 생기기 전에 가입한 계정은 이 값이 비어 있다. 그때는 이름 없이
+ * 자연스럽게 읽히는 쪽으로 떨어진다 — "상대방님이"가 되지 않게 "님"까지 이
+ * 함수가 붙인다.
  *
  * 알림 문구(보낸 사람)와 화면 안내(상대방) 양쪽에서 쓴다.
  */
-export function pokeNameLabel(nickname: string | null | undefined): string {
-  const name = nickname?.trim()
-  return name ? `${name}님` : '상대방'
+export function pokeNameLabel(personName: string | null | undefined): string {
+  const trimmed = personName?.trim()
+  return trimmed ? `${trimmed}님` : '상대방'
 }
 
 const BODIES: Record<PokeKind, string> = {
@@ -82,10 +86,11 @@ const TITLES: Record<PokeKind, (who: string) => string> = {
  */
 export function buildPokeNotification(
   kind: PokeKind,
-  senderNickname: string | null | undefined,
+  /** 보낸 사람의 `profiles.name`. `app_name`이 아니다 — 위 주석 참고. */
+  senderName: string | null | undefined,
 ): PokeNotification {
   return {
-    title: TITLES[kind](pokeNameLabel(senderNickname)),
+    title: TITLES[kind](pokeNameLabel(senderName)),
     body: BODIES[kind],
     tag: `ourie-poke-${kind}`,
     renotify: true,
