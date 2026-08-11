@@ -24,7 +24,7 @@ import {
   sanitizeIconUrl,
   sanitizeSessionHandoff,
   SESSION_HANDOFF_PARAM,
-} from './_shared'
+} from './_shared.js'
 
 export const config = { runtime: 'edge' }
 

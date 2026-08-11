@@ -1,4 +1,6 @@
-import type { Anniversary, DateKey } from './types'
+// `.js` 확장자: 이 파일은 message.ts를 거쳐 Node 런타임 함수(api/notify-dday.ts)로
+// 딸려 들어가고, 그쪽은 번들 없이 ESM으로 실행된다. 자세한 이유는 그 파일의 주석에.
+import type { Anniversary, DateKey } from './types.js'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 

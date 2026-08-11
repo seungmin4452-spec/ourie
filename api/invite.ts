@@ -5,7 +5,7 @@
 // at the inviter's own app photo. This renders that, then forwards a human
 // visitor into the real app. Same reasoning as pwa-install.ts.
 
-import { DEFAULT_TITLE, escapeHtmlAttr, requestOrigin, sanitizeIconUrl } from './_shared'
+import { DEFAULT_TITLE, escapeHtmlAttr, requestOrigin, sanitizeIconUrl } from './_shared.js'
 
 export const config = { runtime: 'edge' }
 

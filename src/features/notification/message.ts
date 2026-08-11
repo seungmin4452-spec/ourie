@@ -5,9 +5,14 @@
 // 않는다. api/ 쪽은 tsconfig에서 경로 별칭(@/)을 쓸 수 없으므로 여기서도
 // 상대 경로로만 import한다 (Vercel이 api/의 tsconfig path mapping을 지원하지
 // 않는다).
+//
+// 아래 import의 `.js` 확장자도 서버 쪽 제약이다. 이 파일은 Node 런타임 함수로
+// 딸려 들어가는데 그쪽은 번들되지 않고 ESM으로 그대로 실행되므로, 확장자가
+// 없으면 런타임에 ERR_MODULE_NOT_FOUND가 난다 (api/notify-dday.ts의 주석 참고).
+// Vite는 `.js`를 `.ts`로 알아서 해석하므로 브라우저 빌드에는 영향이 없다.
 
-import { parseDateKey, toDateKey } from '../anniversary/dday'
-import type { DateKey } from '../anniversary/types'
+import { parseDateKey, toDateKey } from '../anniversary/dday.js'
+import type { DateKey } from '../anniversary/types.js'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 

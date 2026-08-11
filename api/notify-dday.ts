@@ -6,8 +6,19 @@
 //
 // 이 파일만 edge가 아니라 Node 런타임이다 (config를 두지 않으면 Node가
 // 기본값이다). web-push가 VAPID 서명과 페이로드 암호화에 Node의 crypto를 쓰기
-// 때문이다. 대신 Web 표준 시그니처(GET(request))를 그대로 쓸 수 있어서 다른
-// api/ 파일들과 모양은 같다.
+// 때문이다. 런타임이 달라도 Web 표준 시그니처(Request -> Response)는 그대로
+// 쓸 수 있어서 다른 api/ 파일들과 모양은 같다. 핸들러는 그 파일들과 똑같이
+// default export로 둔다.
+//
+// **아래 상대 import의 `.js` 확장자를 지우지 말 것.** edge 런타임 파일들(invite,
+// manifest, pwa-install)은 하나로 번들되므로 확장자가 없어도 되지만, Node 런타임
+// 함수는 번들되지 않고 파일별로 .js로 트랜스파일된 뒤 그대로 실행된다. 이
+// package.json은 `"type": "module"`이라 그 .js들은 ESM으로 로드되고, ESM은
+// 확장자 없는 상대 경로를 해석하지 못한다 -- 파일이 번들에 멀쩡히 들어 있어도
+// ERR_MODULE_NOT_FOUND로 죽는다 (요청이 코드에 닿기도 전에 나던
+// FUNCTION_INVOCATION_FAILED 500의 원인이었다). TypeScript 소스는 .ts지만 ESM
+// 규약대로 컴파일 결과의 확장자인 `.js`를 쓴다. 이 함수가 타고 들어가는
+// src/features/notification/message.ts에도 같은 규칙이 적용된다.
 
 import { createClient } from '@supabase/supabase-js'
 // 반드시 기본 임포트여야 한다. web-push는 CJS 모듈이고 `module.exports`에
@@ -17,8 +28,8 @@ import { createClient } from '@supabase/supabase-js'
 // 닿지도 못하고 FUNCTION_INVOCATION_FAILED가 났던 원인).
 import webpush from 'web-push'
 
-import { pickBaseAnniversary } from '../src/features/notification/baseAnniversary'
-import { buildDdayNotification } from '../src/features/notification/message'
+import { pickBaseAnniversary } from '../src/features/notification/baseAnniversary.js'
+import { buildDdayNotification } from '../src/features/notification/message.js'
 
 /** 알림이 향하는 화면. 눌러서 열면 오늘 숫자가 크게 보이는 홈이 맞다. */
 const NOTIFICATION_URL = '/'
@@ -82,7 +93,7 @@ function isAuthorized(request: Request): boolean {
   return request.headers.get('authorization') === `Bearer ${secret}`
 }
 
-export async function GET(request: Request): Promise<Response> {
+export default async function handler(request: Request): Promise<Response> {
   if (!isAuthorized(request)) {
     return new Response('Unauthorized', { status: 401 })
   }
