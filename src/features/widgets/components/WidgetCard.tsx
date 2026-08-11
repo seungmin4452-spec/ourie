@@ -3,23 +3,26 @@ import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { VStack } from '@astryxdesign/core/VStack'
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { DragControls } from 'framer-motion'
+import { GripVertical, X } from 'lucide-react'
+import type { KeyboardEvent, ReactNode } from 'react'
 
 import { widgetIcon } from '../catalog'
 import type { WidgetMeta } from '../types'
 
 interface WidgetCardProps {
   meta: WidgetMeta
-  /** 편집 모드에서만 삭제·순서 버튼이 뜨고 카드가 흔들린다. 평소엔 내용에 집중하게 둔다. */
+  /** 편집 모드에서만 손잡이·삭제 버튼이 뜨고 카드가 흔들린다. 평소엔 내용에 집중하게 둔다. */
   isEditing: boolean
   /** 홈에서 몇 번째인지. 흔들림 위상을 엇갈리게 하는 데 쓴다. */
   index: number
-  /** 맨 위/맨 아래면 그 방향 버튼을 눌러도 갈 곳이 없다. */
-  isFirst: boolean
-  isLast: boolean
-  onMoveUp: () => void
-  onMoveDown: () => void
+  /**
+   * 이 카드를 감싼 Reorder.Item의 드래그 스위치. 손잡이를 누를 때만 켜진다
+   * (WidgetList.tsx 참고).
+   */
+  dragControls: DragControls
+  /** 손잡이에 포커스를 두고 화살표 키를 눌렀을 때. 끝에서 더 밀면 무시된다. */
+  onMove: (direction: 'up' | 'down') => void
   onRemove: () => void
   children: ReactNode
 }
@@ -38,10 +41,8 @@ export function WidgetCard({
   meta,
   isEditing,
   index,
-  isFirst,
-  isLast,
-  onMoveUp,
-  onMoveDown,
+  dragControls,
+  onMove,
   onRemove,
   children,
 }: WidgetCardProps) {
@@ -49,44 +50,51 @@ export function WidgetCard({
     ? `widget-wiggle${index % 2 === 1 ? ' widget-wiggle-offset' : ''}`
     : undefined
 
+  function handleHandleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    // 기본 동작(페이지 스크롤)을 막지 않으면 순서를 바꿀 때마다 화면이 같이
+    // 튀어서 방금 옮긴 카드를 놓친다.
+    event.preventDefault()
+    onMove(event.key === 'ArrowUp' ? 'up' : 'down')
+  }
+
   return (
     <Card padding={5} variant="default" elevation="low" className={wiggleClass}>
       <VStack gap={3}>
         <HStack gap={2} hAlign="between" vAlign="center">
           <HStack gap={1.5} vAlign="center">
+            {isEditing && (
+              /* Astryx에는 드래그 손잡이에 해당하는 컴포넌트가 없다. IconButton은
+                 onClick만 받아서 포인터가 눌리는 순간(onPointerDown)을 잡을 수
+                 없는데, 드래그는 바로 그 순간에 시작해야 한다.
+
+                 touch-none이 이 손잡이의 핵심이다. 이것만 터치 제스처를 드래그로
+                 넘기고 카드의 나머지 부분은 그대로 페이지 스크롤에 쓰인다 —
+                 카드 전체를 드래그 가능하게 두면 편집 중에 홈을 스크롤할 방법이
+                 사라진다. 색·모서리·여백은 전부 토큰 기반 유틸리티다. */
+              <button
+                type="button"
+                aria-label={`${meta.title} 위젯 순서 바꾸기. 위/아래 화살표 키로도 옮길 수 있어요.`}
+                className="-m-1 flex cursor-grab touch-none items-center rounded-md border-0 bg-transparent p-1 text-secondary active:cursor-grabbing"
+                onPointerDown={(event) => dragControls.start(event)}
+                onKeyDown={handleHandleKeyDown}
+              >
+                <GripVertical className="size-4" />
+              </button>
+            )}
             {widgetIcon(meta.id)}
             <Heading level={2}>{meta.title}</Heading>
           </HStack>
 
           {isEditing && (
-            <HStack gap={0.5} vAlign="center">
-              <IconButton
-                label={`${meta.title} 위젯 위로 옮기기`}
-                tooltip="위로"
-                variant="ghost"
-                size="sm"
-                isDisabled={isFirst}
-                icon={<ChevronUp className="size-4" />}
-                onClick={onMoveUp}
-              />
-              <IconButton
-                label={`${meta.title} 위젯 아래로 옮기기`}
-                tooltip="아래로"
-                variant="ghost"
-                size="sm"
-                isDisabled={isLast}
-                icon={<ChevronDown className="size-4" />}
-                onClick={onMoveDown}
-              />
-              <IconButton
-                label={`${meta.title} 위젯 삭제`}
-                tooltip="위젯 삭제"
-                variant="ghost"
-                size="sm"
-                icon={<X className="size-4" />}
-                onClick={onRemove}
-              />
-            </HStack>
+            <IconButton
+              label={`${meta.title} 위젯 삭제`}
+              tooltip="위젯 삭제"
+              variant="ghost"
+              size="sm"
+              icon={<X className="size-4" />}
+              onClick={onRemove}
+            />
           )}
         </HStack>
 

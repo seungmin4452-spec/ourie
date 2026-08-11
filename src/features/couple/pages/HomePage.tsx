@@ -25,8 +25,7 @@ import { isStandalone, openPwaInstallPage } from '@/features/onboarding/pwaInsta
 import { PokeWidget } from '@/features/poke'
 import {
   useHomeWidgets,
-  widgetMeta,
-  WidgetCard,
+  WidgetList,
   WidgetPickerDialog,
   type WidgetId,
 } from '@/features/widgets'
@@ -36,7 +35,7 @@ export function HomePage() {
   const { user } = useAuth()
   const [isInstalled] = useState(isStandalone)
 
-  const { widgets, addWidget, removeWidget, moveWidget } = useHomeWidgets()
+  const { widgets, addWidget, removeWidget, moveWidget, reorderWidgets } = useHomeWidgets()
   const [isEditing, setIsEditing] = useState(false)
   const [isPickerOpen, setIsPickerOpen] = useState(false)
 
@@ -137,40 +136,43 @@ export function HomePage() {
           }
         />
       ) : (
-        widgets.map((id, index) => (
-          <WidgetCard
-            key={id}
-            meta={widgetMeta(id)}
-            isEditing={isEditing}
-            index={index}
-            isFirst={index === 0}
-            isLast={index === widgets.length - 1}
-            onMoveUp={() => moveWidget(id, 'up')}
-            onMoveDown={() => moveWidget(id, 'down')}
-            onRemove={() => removeWidget(id)}
-          >
-            {renderWidgetBody(id)}
-          </WidgetCard>
-        ))
+        <WidgetList
+          widgets={widgets}
+          isEditing={isEditing}
+          onReorder={reorderWidgets}
+          onMove={moveWidget}
+          onRemove={removeWidget}
+          renderBody={renderWidgetBody}
+        />
       )}
 
-      <HStack gap={2}>
-        <Button
-          label="위젯 추가"
-          variant="secondary"
-          icon={<Plus className="size-4" />}
-          width="100%"
-          onClick={() => setIsPickerOpen(true)}
-        />
-        {widgets.length > 0 && (
+      <VStack gap={2}>
+        <HStack gap={2}>
           <Button
-            label={isEditing ? '편집 완료' : '위젯 편집'}
-            variant="ghost"
+            label="위젯 추가"
+            variant="secondary"
+            icon={<Plus className="size-4" />}
             width="100%"
-            onClick={() => setIsEditing((editing) => !editing)}
+            onClick={() => setIsPickerOpen(true)}
           />
+          {widgets.length > 0 && (
+            <Button
+              label={isEditing ? '편집 완료' : '위젯 편집'}
+              variant="ghost"
+              width="100%"
+              onClick={() => setIsEditing((editing) => !editing)}
+            />
+          )}
+        </HStack>
+
+        {/* 손잡이 아이콘만으로는 끌 수 있다는 걸 알아채기 어렵다. 편집을 누른
+            사람에게만 한 줄로 알려준다. */}
+        {isEditing && (
+          <Text type="supporting" justify="center">
+            왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요.
+          </Text>
         )}
-      </HStack>
+      </VStack>
 
       <VStack gap={2}>
         <Text type="supporting" justify="center">

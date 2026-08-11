@@ -1,5 +1,6 @@
 export { ALL_WIDGETS, widgetIcon, widgetMeta } from './catalog'
 export { WidgetCard } from './components/WidgetCard'
+export { WidgetList } from './components/WidgetList'
 export { WidgetPickerDialog } from './components/WidgetPickerDialog'
 export { useHomeWidgets } from './useHomeWidgets'
 export { WIDGET_IDS } from './types'
