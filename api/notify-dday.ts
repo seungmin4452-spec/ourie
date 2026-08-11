@@ -6,9 +6,14 @@
 //
 // 이 파일만 edge가 아니라 Node 런타임이다 (config를 두지 않으면 Node가
 // 기본값이다). web-push가 VAPID 서명과 페이로드 암호화에 Node의 crypto를 쓰기
-// 때문이다. 런타임이 달라도 Web 표준 시그니처(Request -> Response)는 그대로
-// 쓸 수 있어서 다른 api/ 파일들과 모양은 같다. 핸들러는 그 파일들과 똑같이
-// default export로 둔다.
+// 때문이다.
+//
+// **핸들러를 `export default`로 바꾸지 말 것.** 다른 api/ 파일들은 default
+// export지만 이 파일은 HTTP 메서드 이름의 명명 export(`GET`)여야 한다. Vercel의
+// Node 런타임은 그 이름을 보고서야 Web 표준 시그니처(Request -> Response)로
+// 호출하고, default export면 Node 스타일 (req, res)로 부른다 -- 그러면 아래
+// isAuthorized에서 `request.headers.get is not a function`으로 죽는다
+// (실제로 겪었던 문제).
 //
 // **아래 상대 import의 `.js` 확장자를 지우지 말 것.** edge 런타임 파일들(invite,
 // manifest, pwa-install)은 하나로 번들되므로 확장자가 없어도 되지만, Node 런타임
@@ -93,7 +98,7 @@ function isAuthorized(request: Request): boolean {
   return request.headers.get('authorization') === `Bearer ${secret}`
 }
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   if (!isAuthorized(request)) {
     return new Response('Unauthorized', { status: 401 })
   }
