@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 
 import { widgetMeta } from '../catalog'
 import type { WidgetId } from '../types'
+import { useLongPress } from '../useLongPress'
 import { WidgetCard } from './WidgetCard'
 
 interface WidgetListProps {
@@ -13,6 +14,8 @@ interface WidgetListProps {
   /** 손잡이에서 화살표 키를 눌렀을 때의 한 칸 이동. */
   onMove: (id: WidgetId, direction: 'up' | 'down') => void
   onRemove: (id: WidgetId) => void
+  /** 위젯을 꾹 눌렀을 때 — 편집 모드로 들어가는 유일한 입구다. */
+  onLongPress: () => void
   /** 위젯 본문은 그 기능을 아는 쪽(HomePage)이 그린다. */
   renderBody: (id: WidgetId) => ReactNode
 }
@@ -35,6 +38,7 @@ export function WidgetList({
   onReorder,
   onMove,
   onRemove,
+  onLongPress,
   renderBody,
 }: WidgetListProps) {
   return (
@@ -52,6 +56,7 @@ export function WidgetList({
           isEditing={isEditing}
           onMove={(direction) => onMove(id, direction)}
           onRemove={() => onRemove(id)}
+          onLongPress={onLongPress}
         >
           {renderBody(id)}
         </SortableWidget>
@@ -66,6 +71,7 @@ interface SortableWidgetProps {
   isEditing: boolean
   onMove: (direction: 'up' | 'down') => void
   onRemove: () => void
+  onLongPress: () => void
   children: ReactNode
 }
 
@@ -75,16 +81,26 @@ function SortableWidget({
   isEditing,
   onMove,
   onRemove,
+  onLongPress,
   children,
 }: SortableWidgetProps) {
   const dragControls = useDragControls()
+  // 이미 편집 중이면 끈다. 순서를 바꾸려고 손잡이를 쥐고 있는 동안 다시
+  // 켜질 일도, 켤 이유도 없다.
+  const longPressProps = useLongPress(onLongPress, !isEditing)
 
   return (
     // dragListener={false}가 이 화면에서 제일 중요한 한 줄이다. 기본값이면
     // framer가 항목에 touch-action: pan-x를 걸어 세로 터치를 전부 드래그로
     // 가져가고, 그러면 편집 중에 홈을 스크롤할 수 없다. 드래그는 오직 카드의
     // 손잡이(WidgetCard.tsx)가 dragControls.start로 열어줄 때만 시작된다.
-    <Reorder.Item value={id} dragListener={false} dragControls={dragControls}>
+    <Reorder.Item
+      value={id}
+      dragListener={false}
+      dragControls={dragControls}
+      className="widget-longpress"
+      {...longPressProps}
+    >
       <WidgetCard
         meta={widgetMeta(id)}
         isEditing={isEditing}

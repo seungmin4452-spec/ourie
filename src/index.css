@@ -32,6 +32,18 @@
     padding-inline-end: calc(var(--spacing-4, 1rem) + env(safe-area-inset-right));
   }
 
+  /* 위젯을 꾹 눌러 편집 모드로 들어가는 제스처(useLongPress.ts)를 브라우저가
+     가로채지 않게 막는다. 이걸 빼면 iOS 사파리가 길게 누른 순간 텍스트를
+     선택하고 복사 말풍선을 띄워서, 손을 떼기도 전에 제스처가 죽는다.
+
+     둘 다 컴포넌트 prop으로는 표현할 수 없어 유틸리티로 둔다. 위젯 카드는
+     읽는 화면이지 글을 긁어 가는 화면이 아니라 선택을 막아도 잃는 게 없다.
+     WidgetList.tsx에서만 쓴다. */
+  .widget-longpress {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+
   /* 위젯 편집 모드에서 카드가 흔들린다. iOS 홈 화면에서 아이콘을 정리할 때와
      같은 신호다 — 지금 이 카드들은 옮기거나 뗄 수 있다는 뜻.
 

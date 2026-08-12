@@ -36,8 +36,13 @@ export function HomePage() {
   const [isInstalled] = useState(isStandalone)
 
   const { widgets, addWidget, removeWidget, moveWidget, reorderWidgets } = useHomeWidgets()
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditRequested, setIsEditRequested] = useState(false)
   const [isPickerOpen, setIsPickerOpen] = useState(false)
+
+  // 편집 모드로 들어가는 길은 위젯을 꾹 누르는 것 하나뿐이라, 마지막 위젯을
+  // 지우면 나갈 수도 다시 들어올 수도 없는 상태가 된다. 위젯이 없으면 편집도
+  // 없다고 보고 빈 화면 안내로 돌려보낸다.
+  const isEditing = isEditRequested && widgets.length > 0
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', user?.id],
@@ -136,43 +141,47 @@ export function HomePage() {
           }
         />
       ) : (
-        <WidgetList
-          widgets={widgets}
-          isEditing={isEditing}
-          onReorder={reorderWidgets}
-          onMove={moveWidget}
-          onRemove={removeWidget}
-          renderBody={renderWidgetBody}
-        />
-      )}
-
-      <VStack gap={2}>
-        <HStack gap={2}>
-          <Button
-            label="위젯 추가"
-            variant="secondary"
-            icon={<Plus className="size-4" />}
-            width="100%"
-            onClick={() => setIsPickerOpen(true)}
+        <VStack gap={3}>
+          <WidgetList
+            widgets={widgets}
+            isEditing={isEditing}
+            onReorder={reorderWidgets}
+            onMove={moveWidget}
+            onRemove={removeWidget}
+            onLongPress={() => setIsEditRequested(true)}
+            renderBody={renderWidgetBody}
           />
-          {widgets.length > 0 && (
-            <Button
-              label={isEditing ? '편집 완료' : '위젯 편집'}
-              variant="ghost"
-              width="100%"
-              onClick={() => setIsEditing((editing) => !editing)}
-            />
-          )}
-        </HStack>
 
-        {/* 손잡이 아이콘만으로는 끌 수 있다는 걸 알아채기 어렵다. 편집을 누른
-            사람에게만 한 줄로 알려준다. */}
-        {isEditing && (
-          <Text type="supporting" justify="center">
-            왼쪽 손잡이를 끌어 순서를 바꿀 수 있어요.
-          </Text>
-        )}
-      </VStack>
+          {/* 편집 도구는 편집 중일 때만 나온다. 평소의 홈은 위젯만 보이는
+              화면이어야 해서, 꾹 누르면 된다는 것만 한 줄로 알려준다. */}
+          {isEditing ? (
+            <VStack gap={2}>
+              <HStack gap={2}>
+                <Button
+                  label="위젯 추가"
+                  variant="secondary"
+                  icon={<Plus className="size-4" />}
+                  width="100%"
+                  onClick={() => setIsPickerOpen(true)}
+                />
+                <Button
+                  label="편집 완료"
+                  variant="primary"
+                  width="100%"
+                  onClick={() => setIsEditRequested(false)}
+                />
+              </HStack>
+              <Text type="supporting" justify="center">
+                왼쪽 손잡이를 끌어 순서를 바꾸고, ✕로 지울 수 있어요.
+              </Text>
+            </VStack>
+          ) : (
+            <Text type="supporting" justify="center">
+              위젯을 꾹 누르면 추가하거나 지울 수 있어요.
+            </Text>
+          )}
+        </VStack>
+      )}
 
       <VStack gap={2}>
         <Text type="supporting" justify="center">
