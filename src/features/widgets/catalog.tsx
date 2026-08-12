@@ -38,6 +38,30 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
   },
 }
 
+const HANGUL_FIRST = 0xac00
+const HANGUL_LAST = 0xd7a3
+
+/**
+ * 이름을 "누구와"로 만든다 — "진선" → "진선이와", "지수" → "지수와".
+ *
+ * 받침이 있는 이름에만 "이"를 끼운다. 한국어에서 이름을 부르는 자연스러운
+ * 방식이고, 이게 없으면 "진선와"가 된다.
+ *
+ * 한글이 아닌 이름(영문 등)은 받침을 셀 수 없으니 마지막 글자가 모음인지로
+ * 가른다 — "Anna와", "Kevin과". 완벽한 규칙은 아니지만 "Kevin와"보다는 낫다.
+ */
+function withCompanion(name: string): string {
+  const last = name[name.length - 1]
+  const code = name.charCodeAt(name.length - 1)
+
+  if (code >= HANGUL_FIRST && code <= HANGUL_LAST) {
+    const hasFinalConsonant = (code - HANGUL_FIRST) % 28 !== 0
+    return hasFinalConsonant ? `${name}이와` : `${name}와`
+  }
+
+  return /[aeiouAEIOU]/.test(last) ? `${name}와` : `${name}과`
+}
+
 const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   dday: <CalendarHeart className="size-4" />,
   poke: <Hand className="size-4" />,
@@ -45,8 +69,20 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   travel: <MapPin className="size-4" />,
 }
 
-export function widgetMeta(id: WidgetId): WidgetMeta {
-  return WIDGET_META[id]
+/**
+ * 위젯 하나의 이름·설명.
+ *
+ * 상대방 이름을 받으면 "우리가 다녀온 곳"이 "진선이와 다녀온 곳"이 된다.
+ * 커플 앱에서 "우리"는 누구든 될 수 있지만 이름은 이 둘뿐이라, 홈에 이름이
+ * 적혀 있는 편이 내 화면답다. 아직 커플이 연결되지 않았거나 상대가 이름을
+ * 넣지 않았으면 원래 제목으로 떨어진다.
+ */
+export function widgetMeta(id: WidgetId, partnerName?: string | null): WidgetMeta {
+  const meta = WIDGET_META[id]
+  if (id !== 'travel') return meta
+
+  const name = partnerName?.trim()
+  return name ? { ...meta, title: `${withCompanion(name)} 다녀온 곳` } : meta
 }
 
 export function widgetIcon(id: WidgetId): ReactNode {
@@ -54,4 +90,6 @@ export function widgetIcon(id: WidgetId): ReactNode {
 }
 
 /** 카탈로그 순서대로의 전체 위젯 목록. */
-export const ALL_WIDGETS: WidgetMeta[] = WIDGET_IDS.map(widgetMeta)
+export function allWidgets(partnerName?: string | null): WidgetMeta[] {
+  return WIDGET_IDS.map((id) => widgetMeta(id, partnerName))
+}

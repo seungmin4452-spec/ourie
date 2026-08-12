@@ -7,7 +7,7 @@ import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { List, ListItem } from '@astryxdesign/core/List'
 import { LayoutGrid } from 'lucide-react'
 
-import { ALL_WIDGETS, widgetIcon } from '../catalog'
+import { allWidgets, widgetIcon } from '../catalog'
 import type { WidgetId } from '../types'
 
 interface WidgetPickerDialogProps {
@@ -16,6 +16,8 @@ interface WidgetPickerDialogProps {
   /** 이미 홈에 올라가 있는 위젯. 목록에서 빠진다. */
   addedWidgets: WidgetId[]
   onAdd: (id: WidgetId) => void
+  /** 제목에 상대방 이름을 넣는 위젯이 있다 (catalog.tsx의 widgetMeta 참고). */
+  partnerName?: string | null
 }
 
 export function WidgetPickerDialog({
@@ -23,8 +25,9 @@ export function WidgetPickerDialog({
   onOpenChange,
   addedWidgets,
   onAdd,
+  partnerName,
 }: WidgetPickerDialogProps) {
-  const available = ALL_WIDGETS.filter((meta) => !addedWidgets.includes(meta.id))
+  const available = allWidgets(partnerName).filter((meta) => !addedWidgets.includes(meta.id))
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange} width={420}>

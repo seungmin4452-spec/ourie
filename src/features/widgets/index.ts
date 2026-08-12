@@ -1,4 +1,4 @@
-export { ALL_WIDGETS, widgetIcon, widgetMeta } from './catalog'
+export { allWidgets, widgetIcon, widgetMeta } from './catalog'
 export { WidgetCard } from './components/WidgetCard'
 export { WidgetList } from './components/WidgetList'
 export { WidgetPickerDialog } from './components/WidgetPickerDialog'

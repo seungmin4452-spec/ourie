@@ -18,6 +18,8 @@ interface WidgetListProps {
   onLongPress: () => void
   /** 위젯 본문은 그 기능을 아는 쪽(HomePage)이 그린다. */
   renderBody: (id: WidgetId) => ReactNode
+  /** 제목에 상대방 이름을 넣는 위젯이 있다 (catalog.tsx의 widgetMeta 참고). */
+  partnerName?: string | null
 }
 
 /**
@@ -40,6 +42,7 @@ export function WidgetList({
   onRemove,
   onLongPress,
   renderBody,
+  partnerName,
 }: WidgetListProps) {
   return (
     <Reorder.Group
@@ -57,6 +60,7 @@ export function WidgetList({
           onMove={(direction) => onMove(id, direction)}
           onRemove={() => onRemove(id)}
           onLongPress={onLongPress}
+          partnerName={partnerName}
         >
           {renderBody(id)}
         </SortableWidget>
@@ -72,6 +76,7 @@ interface SortableWidgetProps {
   onMove: (direction: 'up' | 'down') => void
   onRemove: () => void
   onLongPress: () => void
+  partnerName?: string | null
   children: ReactNode
 }
 
@@ -82,6 +87,7 @@ function SortableWidget({
   onMove,
   onRemove,
   onLongPress,
+  partnerName,
   children,
 }: SortableWidgetProps) {
   const dragControls = useDragControls()
@@ -102,7 +108,7 @@ function SortableWidget({
       {...longPressProps}
     >
       <WidgetCard
-        meta={widgetMeta(id)}
+        meta={widgetMeta(id, partnerName)}
         isEditing={isEditing}
         index={index}
         dragControls={dragControls}

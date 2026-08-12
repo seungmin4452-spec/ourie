@@ -4,14 +4,17 @@ import { Switch } from '@astryxdesign/core/Switch'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { Settings2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { useAuth } from '@/features/auth'
+// 배럴(@/features/couple)이 아니라 훅 파일을 직접 가리킨다 — 배럴에는 홈
+// 화면이 들어 있고, 그 홈이 다시 이 위젯을 가져오므로 순환 import가 된다.
+import { partnerQueryKey, usePartner } from '@/features/couple/hooks/usePartner'
 import { usePushNotifications, type PushState } from '@/features/notification'
 import type { Profile } from '@/features/onboarding/api/profile'
-import { getPokePartner, setPokeOptIn } from '../api/partner'
+import { setPokeOptIn } from '../api/partner'
 import { PokeError, sendPoke } from '../api/poke'
 import { pokeIcon } from '../catalog'
 import { usePokePresets } from '../hooks/usePokePresets'
@@ -59,11 +62,7 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false)
 
   const coupleId = profile?.couple_id
-  const { data: partner, isLoading: isPartnerLoading } = useQuery({
-    queryKey: ['poke-partner', coupleId],
-    queryFn: () => getPokePartner(coupleId!, profile!.id),
-    enabled: coupleId != null && profile != null,
-  })
+  const { data: partner, isLoading: isPartnerLoading } = usePartner(profile)
 
   const { data: presets } = usePokePresets(coupleId)
 
@@ -74,7 +73,7 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
   async function refreshProfiles() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['profile', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['poke-partner', coupleId] }),
+      queryClient.invalidateQueries({ queryKey: partnerQueryKey(coupleId) }),
     ])
   }
 

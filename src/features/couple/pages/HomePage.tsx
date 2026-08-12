@@ -1,6 +1,5 @@
 import { Button } from '@astryxdesign/core/Button'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
-import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Text } from '@astryxdesign/core/Text'
@@ -11,7 +10,6 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { setWidgetEditMode, useWidgetEditMode } from '@/app/widgetEditMode'
-import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
 import { PageShell } from '@/components/common/PageShell'
 import {
@@ -31,6 +29,7 @@ import {
   WidgetPickerDialog,
   type WidgetId,
 } from '@/features/widgets'
+import { usePartner } from '../hooks/usePartner'
 
 /**
  * 스크래치 지도 위젯만 따로 늦게 불러온다.
@@ -73,6 +72,10 @@ export function HomePage() {
     queryFn: () => getProfile(user!.id),
     enabled: user != null,
   })
+
+  // 위젯 제목에 상대방 이름을 넣는다 ("진선이와 다녀온 곳"). 콕 찌르기 위젯도
+  // 같은 훅을 쓰므로 조회는 한 번만 나간다.
+  const { data: partner } = usePartner(profile)
 
   const { data: anniversaries } = useAnniversaries(profile?.couple_id)
 
@@ -165,17 +168,8 @@ export function HomePage() {
         </HStack>
       )}
 
-      <VStack gap={3} hAlign="center" paddingBlock={4}>
-        <span className="size-20 overflow-hidden rounded-2xl border border-border">
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="" className="size-full object-cover" />
-          ) : (
-            <DefaultAvatar className="size-full" />
-          )}
-        </span>
-        <Heading level={1}>{profile?.app_name || 'Ourie'}</Heading>
-      </VStack>
-
+      {/* 앱 아이콘과 앱 이름은 홈 화면 아이콘과 상태바가 이미 말해준다. 위젯이
+          첫 화면의 주인공이 되도록 상단에서 뺐다. */}
       {widgets.length === 0 ? (
         <EmptyState
           icon={<LayoutGrid className="size-8" />}
@@ -200,6 +194,7 @@ export function HomePage() {
             onRemove={removeWidget}
             onLongPress={() => setWidgetEditMode(true)}
             renderBody={renderWidgetBody}
+            partnerName={partner?.name}
           />
 
           {/* 평소의 홈은 위젯만 보이는 화면이어야 해서, 꾹 누르면 된다는 것만
@@ -245,6 +240,7 @@ export function HomePage() {
         onOpenChange={setIsPickerOpen}
         addedWidgets={widgets}
         onAdd={addWidget}
+        partnerName={partner?.name}
       />
     </PageShell>
   )

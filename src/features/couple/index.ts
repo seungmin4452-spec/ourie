@@ -1,2 +1,5 @@
 export { HomePage } from './pages/HomePage'
 export { CoupleInvitePage } from './pages/CoupleInvitePage'
+export { getPartner } from './api/partner'
+export type { Partner } from './api/partner'
+export { usePartner, partnerQueryKey } from './hooks/usePartner'
