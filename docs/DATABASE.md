@@ -20,6 +20,7 @@ couples ◄───────┘ (couple_id로 연결)
     │    memory_photos   (추억 사진)
     ├──► travel_visits    (스크래치 지도 — 다녀온 시군구, PK가 couple_id+region_code)
     ├──► travel_maps      (스크래치 지도 배경 사진, 1:1)
+    ├──► travel_region_photos (사진 지도 — 시군구마다 사진 한 장, PK가 couple_id+region_code)
     ├──► memories.location ─► 핀 지도에서 활용 (별도 테이블 없이 memories 재사용)
     └──► couple_settings  (커스터마이징)
 ```
@@ -200,6 +201,24 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 | updated_by | uuid (FK → profiles.id, on delete set null) | |
 | updated_at | timestamptz | default now() |
 
+### 2.4.3 `travel_region_photos` (사진으로 채우는 지도)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| couple_id | uuid (FK → couples.id) | PK의 앞 컬럼 |
+| region_code | text | `travel_visits`와 같은 **시군구** 코드 5자리, 같은 형식 제약 |
+| photo_path | text | `travel-maps` 버킷의 `{couple_id}/regions/...`. **공개 URL이 아니다** |
+| updated_by | uuid (FK → profiles.id, on delete set null) | |
+| updated_at | timestamptz | default now() |
+
+기본키가 `(couple_id, region_code)`다 — **한 지역에 한 장**이라, 새로 올리는 것은 쌓는 게
+아니라 갈아 끼우는 것이다(`upsert` + 이전 파일 삭제). 조회 인덱스를 따로 두지 않는 이유는
+`travel_visits`와 같다.
+
+`travel_maps`에 컬럼을 붙이지 않은 이유: 그건 커플당 한 줄(1:1)이고 이건 커플 × 지역이다.
+`travel_visits`와 잇지 않은 이유: "사진을 걸었다"와 "다녀왔다"는 사용자가 따로 하는 말이라,
+사진을 빼는 것이 다녀온 기록까지 지우면 그건 시키지 않은 일이다 (`PRD.md` §3.4.1).
+
 ### 2.5 `memory_photos`
 
 | 컬럼 | 타입 | 설명 |
@@ -226,12 +245,24 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 |---|---|---|
 | `memory-photos` | 추억 사진 원본 | 커플 단위 RLS (해당 couple_id 소속 사용자만) |
 | `profile-avatars` | 프로필 이미지 | **공개 버킷.** 본인 폴더(`{user_id}/`)에만 쓰기 |
-| `travel-maps` | 스크래치 지도 배경 사진 | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |
+| `travel-maps` | 지도 사진 (두 위젯이 나눠 쓴다) | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |
 
 `travel-maps`만 비공개인 이유: 아바타는 어차피 상대에게 보여주려고 올리는 작은 썸네일이지만,
-스크래치 지도 배경은 "둘만의 공간"(`PRD.md` §1)의 핵심인 커플 사진 원본이다. URL만 알면
-누구나 열 수 있는 자리에 둘 이유가 없다. 대가는 URL이 만료된다는 것이고,
-`useTravelMapPhoto`가 만료(1시간)보다 짧은 주기로 다시 받아온다.
+지도에 걸리는 사진은 "둘만의 공간"(`PRD.md` §1)의 핵심인 커플 사진 원본이다. URL만 알면
+누구나 열 수 있는 자리에 둘 이유가 없다. 대가는 URL이 만료된다는 것이고, 훅이 만료보다 짧은
+주기로 다시 받아온다.
+
+한 버킷을 경로로 나눠 쓴다. 정책이 첫 칸(`{couple_id}`)만 보므로 하위 폴더가 늘어도 그대로
+맞고, 둘 다 성격이 같은 커플 사진 원본이라 버킷을 가를 이유가 없다.
+
+| 경로 | 쓰는 곳 | 서명 수명 |
+|---|---|---|
+| `{couple_id}/map-*.jpg` | 스크래치 지도 배경 (`travel_maps`) | 1시간 (`useTravelMapPhoto`) |
+| `{couple_id}/regions/{시군구코드}-*.jpg` | 지역별 사진 (`travel_region_photos`) | 6시간 (`useRegionPhotos`) |
+
+지역별 사진의 수명이 긴 이유는 장수다. 서명이 갱신되면 URL이 바뀌어 브라우저 캐시가 통째로
+무효가 되는데, 채운 만큼 늘어나는 사진을 짧은 주기로 다시 받으면 홈을 켜둔 것만으로 지도를
+반복해서 내려받게 된다. 목록도 장당 왕복이 아니라 `createSignedUrls`로 한 번에 받는다.
 
 ## 4. RLS (Row Level Security) 정책 원칙
 
@@ -264,7 +295,7 @@ create policy "couple members can insert"
 - `anniversaries(couple_id, date)` — 커플별 기념일 조회
 - `memories(couple_id, memory_date desc)` — 타임라인 조회 최적화
 - `memories(couple_id, latitude, longitude)` — 지도 조회 시 위치 있는 row만 필터링 (`where latitude is not null`)
-- `travel_visits`는 기본키 `(couple_id, region_code)`가 곧 조회 인덱스다 (§2.4.1)
+- `travel_visits`·`travel_region_photos`는 기본키 `(couple_id, region_code)`가 곧 조회 인덱스다 (§2.4.1, §2.4.3)
 - `couples(invite_code)` unique — 코드 조회 성능 및 중복 방지
 
 ## 6. 미결 사항

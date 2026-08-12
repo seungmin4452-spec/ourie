@@ -7,7 +7,7 @@ import { objectParticle } from '@/lib/korean'
 import { districtsOf } from '../districtIndex'
 import type { TravelDistrict } from '../districts'
 import type { TravelRegion } from '../regions'
-import { ScratchMap } from './ScratchMap'
+import { RegionMap } from './RegionMap'
 
 interface RegionScratchDialogProps {
   /** 열려 있는 시도. null이면 닫힌 상태다. */
@@ -26,7 +26,7 @@ interface RegionScratchDialogProps {
  * 누를 만해진다.
  *
  * 사진은 전국 지도와 같은 좌표계에 깔려 있어서, 여기서 보이는 것은 방금 홈에서
- * 보던 그 조각이 그대로 확대된 그림이다 (ScratchMap의 image 주석 참고).
+ * 보던 그 조각이 그대로 확대된 그림이다 (RegionMap의 image 주석 참고).
  */
 export function RegionScratchDialog({
   region,
@@ -46,12 +46,11 @@ export function RegionScratchDialog({
             <VStack gap={3}>
               <DialogHeader title={region.name} onOpenChange={onClose} />
 
-              <ScratchMap
+              <RegionMap
                 region={region}
-                photoUrl={photoUrl}
-                visitedCodes={visitedCodes}
+                reveal={{ kind: 'photo', url: photoUrl, revealedCodes: visitedCodes }}
                 isInteractive
-                onToggleDistrict={onToggleDistrict}
+                onSelectDistrict={onToggleDistrict}
               />
 
               <Text type="supporting" justify="center">

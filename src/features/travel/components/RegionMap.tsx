@@ -2,6 +2,7 @@ import { useId, useMemo, useState, type FocusEvent, type KeyboardEvent } from 'r
 
 import { districtsOf } from '../districtIndex'
 import { TRAVEL_DISTRICTS, type TravelDistrict } from '../districts'
+import { pathBounds } from '../pathBounds'
 import { MAP_HEIGHT, MAP_WIDTH, TRAVEL_INSETS, TRAVEL_REGIONS, type TravelRegion } from '../regions'
 
 /** 위젯 카드 안쪽 폭. 탭 목표가 44px에 못 미치는 구역을 고르는 기준이 된다. */
@@ -16,31 +17,47 @@ const LABEL_PX = 10
  */
 const KOREAN_GLYPH_RATIO = 0.95
 
-interface ScratchMapProps {
+/**
+ * 코팅 아래에 무엇이 있고, 어디가 드러나 있는지.
+ *
+ * 두 위젯이 같은 지도를 쓰지만 "드러남"의 뜻이 다르다:
+ *
+ * - `photo` — 사진 **한 장**이 지도 전체에 깔려 있고, 긁은 구역만 그 조각이
+ *   보인다 (우리가 다녀온 곳 · 스크래치 지도)
+ * - `mosaic` — 구역마다 **사진이 따로** 있고, 사진이 있다는 것이 곧 드러났다는
+ *   뜻이다 (사진으로 채우는 지도)
+ *
+ * 드러난 구역 목록을 밖에서 따로 받지 않고 각 갈래가 안고 있는 이유가 이것이다.
+ * mosaic에서 "사진은 없는데 드러난 구역" 같은 상태는 존재할 수 없어야 한다.
+ */
+export type RegionMapReveal =
+  | { kind: 'photo'; url: string | null; revealedCodes: ReadonlySet<string> }
+  | { kind: 'mosaic'; photos: ReadonlyMap<string, string> }
+
+interface RegionMapProps {
   /**
    * 그릴 범위. null이면 전국(시도를 눌러 상세로 들어간다), 시도가 오면 그
-   * 시도만 크게 보여준다(시군구를 눌러 긁는다).
+   * 시도만 크게 보여준다(시군구를 누른다).
    */
   region: TravelRegion | null
-  /** 지도 밑에 깔릴 사진. 아직 안 골랐으면 null이고 바탕색만 깔린다. */
-  photoUrl: string | null
-  /** 이미 긁어낸 시군구 코드. */
-  visitedCodes: ReadonlySet<string>
+  reveal: RegionMapReveal
+  /** 지금 고른 시군구. 사진 지도에서 "이 구역에 사진을 건다"를 가리킨다. */
+  selectedCode?: string | null
   /**
    * 위젯 편집 모드에서는 false. 카드를 옮기거나 떼는 중에 손가락이 스치면서
    * 지도가 열리거나 칠해지면 안 된다.
    */
   isInteractive: boolean
   onSelectRegion?: (region: TravelRegion) => void
-  onToggleDistrict?: (district: TravelDistrict) => void
+  onSelectDistrict?: (district: TravelDistrict) => void
 }
 
 /**
- * 사진을 대한민국 모양으로 깔고, **아직 안 다녀온 시군구만** 코팅으로 덮는다.
+ * 대한민국 지도를 그리고, **아직 드러나지 않은 시군구만** 코팅으로 덮는다.
  *
  * 층은 아래에서부터 이렇다:
- *   1. 사진 (시군구를 합친 실루엣으로 clip) — 없으면 바탕색
- *   2. 시군구 코팅. 다녀온 곳은 fill이 transparent가 되어 사진이 비친다
+ *   1. 사진 — 지도 전체에 깔린 한 장이거나(photo), 구역마다 한 장씩이거나(mosaic)
+ *   2. 시군구 코팅. 드러난 곳은 fill이 transparent가 되어 사진이 비친다
  *   3. 경계선 — 시군구는 가늘게, 시도는 굵게. 삽입도 상자도 여기서 그린다
  *   4. 탭 목표. 전국이면 시도, 상세면 시군구다
  *
@@ -51,14 +68,14 @@ interface ScratchMapProps {
  * Astryx에는 지도가 없어서 SVG를 직접 쓴다. 색은 전부 토큰 기반 유틸리티고
  * (fill-skeleton = "아직 안 드러난 자리"), 좌표만 뷰박스 단위의 숫자다.
  */
-export function ScratchMap({
+export function RegionMap({
   region,
-  photoUrl,
-  visitedCodes,
+  reveal,
+  selectedCode,
   isInteractive,
   onSelectRegion,
-  onToggleDistrict,
-}: ScratchMapProps) {
+  onSelectDistrict,
+}: RegionMapProps) {
   const outlineId = useId()
   const [focusedCode, setFocusedCode] = useState<string | null>(null)
 
@@ -68,6 +85,10 @@ export function ScratchMap({
 
   const districts = region ? districtsOf(region.code) : TRAVEL_DISTRICTS
 
+  function isRevealed(code: string): boolean {
+    return reveal.kind === 'mosaic' ? reveal.photos.has(code) : reveal.revealedCodes.has(code)
+  }
+
   /**
    * 사진을 오려낼 모양. **지금 그리는 구역만** 합친다.
    *
@@ -76,6 +97,18 @@ export function ScratchMap({
    * 것처럼 보인다.
    */
   const clipOutline = useMemo(() => districts.map((district) => district.path).join(''), [districts])
+
+  /**
+   * 사진이 걸린 구역과 그 사진이 앉을 자리. 화면에 지금 그리는 구역만 본다 —
+   * 상세 화면에서 옆 시도의 사진까지 받아올 이유가 없다.
+   */
+  const tiles = useMemo(() => {
+    if (reveal.kind !== 'mosaic') return []
+    return districts.flatMap((district) => {
+      const url = reveal.photos.get(district.code)
+      return url ? [{ district, url, box: pathBounds(district.path) }] : []
+    })
+  }, [districts, reveal])
 
   /**
    * 도형만으로는 손가락이 안 닿는 구역들. 가운데에 투명한 원을 하나 더 얹어
@@ -108,7 +141,7 @@ export function ScratchMap({
   }, [districts, region, vw])
 
   /**
-   * 상세 화면에만 시군구 이름을 적는다. 전국 지도에 256개를 적으면 글자가
+   * 상세 화면에만 시군구 이름을 적는다. 전국 지도에 191개를 적으면 글자가
    * 도형을 덮어서 지도가 아니라 글자 더미가 된다.
    *
    * 글자 크기는 뷰박스가 아니라 **화면**에서 일정해야 한다. 상세 화면의 프레임은
@@ -123,11 +156,12 @@ export function ScratchMap({
       .map((district) => ({ district, fontSize }))
   }, [districts, region, vw])
 
-  const focusedPath =
-    (region ? districts : TRAVEL_REGIONS).find((item) => item.code === focusedCode)?.path ?? null
+  const items: (TravelRegion | TravelDistrict)[] = region ? districts : TRAVEL_REGIONS
+  const focusedPath = items.find((item) => item.code === focusedCode)?.path ?? null
+  const selectedPath = items.find((item) => item.code === selectedCode)?.path ?? null
 
   function activate(item: TravelRegion | TravelDistrict) {
-    if (region) onToggleDistrict?.(item as TravelDistrict)
+    if (region) onSelectDistrict?.(item as TravelDistrict)
     else onSelectRegion?.(item as TravelRegion)
   }
 
@@ -152,42 +186,65 @@ export function ScratchMap({
       viewBox={`${vx} ${vy} ${vw} ${vh}`}
       className="w-full"
       role="group"
-      aria-label={region ? `${region.name} 지도` : '다녀온 곳 지도'}
+      aria-label={
+        region ? `${region.name} 지도` : reveal.kind === 'mosaic' ? '사진 지도' : '다녀온 곳 지도'
+      }
     >
       <defs>
         <clipPath id={outlineId}>
           <path d={clipOutline} />
         </clipPath>
+        {tiles.map(({ district }) => (
+          <clipPath key={district.code} id={`${outlineId}-${district.code}`}>
+            <path d={district.path} />
+          </clipPath>
+        ))}
       </defs>
 
-      {photoUrl ? (
-        // slice = object-fit: cover. 한반도는 세로로 길어서 어떤 사진을 넣어도
-        // 좌우가 잘리는데, 자르는 일을 여기서 해야 저장된 사진이 온전히 남는다
-        // (src/lib/image.ts의 downscaleImage 주석 참고).
-        //
-        // 상세 화면에서도 이 사각형은 전국 크기 그대로다. viewBox만 좁아지므로
-        // 사진이 같은 자리에서 확대되고, 전국 지도에서 보던 그 조각이 그대로
-        // 커진다.
+      {reveal.kind === 'photo' &&
+        (reveal.url ? (
+          // slice = object-fit: cover. 한반도는 세로로 길어서 어떤 사진을 넣어도
+          // 좌우가 잘리는데, 자르는 일을 여기서 해야 저장된 사진이 온전히 남는다
+          // (src/lib/image.ts의 downscaleImage 주석 참고).
+          //
+          // 상세 화면에서도 이 사각형은 전국 크기 그대로다. viewBox만 좁아지므로
+          // 사진이 같은 자리에서 확대되고, 전국 지도에서 보던 그 조각이 그대로
+          // 커진다.
+          <image
+            href={reveal.url}
+            x={0}
+            y={0}
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            preserveAspectRatio="xMidYMid slice"
+            clipPath={`url(#${outlineId})`}
+          />
+        ) : (
+          // 사진을 아직 안 골랐을 때의 바탕. 코팅(fill-skeleton)과 뚜렷이 달라야
+          // 한다 — 처음에 fill-muted(#f1f1f1)를 썼더니 코팅(#ebebeb)과 거의 같은
+          // 색이라, 긁어도 아무 일도 안 일어난 것처럼 보였다. fill-secondary는
+          // 라이트에서 중간 회색, 다크에서 밝은 회색이라 양쪽 모드 모두에서
+          // 코팅과 갈린다.
+          <path d={clipOutline} className="fill-secondary" />
+        ))}
+
+      {/* 구역마다 한 장씩. 사진은 그 구역의 경계 상자를 꽉 채우고(slice) 도형
+          모양으로 잘린다 — 지도가 사진 조각들로 이어붙여진다. */}
+      {tiles.map(({ district, url, box }) => (
         <image
-          href={photoUrl}
-          x={0}
-          y={0}
-          width={MAP_WIDTH}
-          height={MAP_HEIGHT}
+          key={district.code}
+          href={url}
+          x={box.x}
+          y={box.y}
+          width={box.width}
+          height={box.height}
           preserveAspectRatio="xMidYMid slice"
-          clipPath={`url(#${outlineId})`}
+          clipPath={`url(#${outlineId}-${district.code})`}
         />
-      ) : (
-        // 사진을 아직 안 골랐을 때의 바탕. 코팅(fill-skeleton)과 뚜렷이 달라야
-        // 한다 — 처음에 fill-muted(#f1f1f1)를 썼더니 코팅(#ebebeb)과 거의 같은
-        // 색이라, 긁어도 아무 일도 안 일어난 것처럼 보였다. fill-secondary는
-        // 라이트에서 중간 회색, 다크에서 밝은 회색이라 양쪽 모드 모두에서
-        // 코팅과 갈린다.
-        <path d={clipOutline} className="fill-secondary" />
-      )}
+      ))}
 
       {districts.map((district) => {
-        const isVisited = visitedCodes.has(district.code)
+        const revealed = isRevealed(district.code)
         return (
           <path
             key={district.code}
@@ -197,7 +254,7 @@ export function ScratchMap({
             // 머리카락만 한 틈으로 사진이 새어 나온다.
             strokeWidth={1}
             className={`pointer-events-none transition-colors ease-out ${
-              isVisited ? 'fill-transparent stroke-transparent' : 'fill-skeleton stroke-skeleton'
+              revealed ? 'fill-transparent stroke-transparent' : 'fill-skeleton stroke-skeleton'
             }`}
           />
         )
@@ -241,6 +298,16 @@ export function ScratchMap({
         </g>
       ))}
 
+      {/* 지금 고른 구역. 사진을 고르는 동안 화면 아래쪽 버튼이 어느 구역을
+          말하는지는 이 선 하나로 이어진다. */}
+      {selectedPath && (
+        <path
+          d={selectedPath}
+          className="pointer-events-none fill-none stroke-accent-bg"
+          strokeWidth={2}
+        />
+      )}
+
       {/* 키보드 포커스 표시. SVG path에는 outline 유틸리티가 브라우저마다 다르게
           먹어서, 포커스된 구역만 굵은 선으로 한 번 더 그린다. */}
       {focusedPath && (
@@ -252,12 +319,18 @@ export function ScratchMap({
       )}
 
       {/* 누르는 층. 전국이면 시도, 상세면 시군구다. */}
-      {(region ? districts : TRAVEL_REGIONS).map((item) => (
+      {items.map((item) => (
         <path
           key={item.code}
           d={item.path}
           role="button"
-          aria-pressed={region ? visitedCodes.has(item.code) : undefined}
+          aria-pressed={
+            region == null
+              ? undefined
+              : reveal.kind === 'mosaic'
+                ? item.code === selectedCode
+                : isRevealed(item.code)
+          }
           aria-label={region ? item.name : `${item.name} 자세히 보기`}
           tabIndex={isInteractive ? 0 : -1}
           // outline-none: 크롬은 SVG 도형에 포커스가 가면 도형이 아니라 그

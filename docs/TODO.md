@@ -57,6 +57,16 @@
       Supabase SQL 편집기에서 실행해야 저장이 된다
 - [ ] 행정구역이 바뀔 때 데이터 갱신 절차 (생성기 재실행 + 사라진 코드 처리) 문서화
 
+### 5a-2. 사진으로 채우는 지도 (완료)
+스크래치 지도의 다른 판 — 한 장을 긁어 드러내는 대신 지역마다 사진을 한 장씩 건다 (`PRD.md` §3.4.1).
+- [x] 지도 컴포넌트를 둘이 나눠 쓰게 정리 — `RegionMap`의 `reveal` prop (`photo` / `mosaic`)
+- [x] `travel_region_photos` 테이블 + RLS (`travel-maps` 버킷을 `regions/` 경로로 나눠 쓴다)
+- [x] 홈 위젯 + 시도 → 시군구 2단계, 고른 곳에 사진 걸기·바꾸기·빼기
+- [x] 서명 URL 일괄 발급(`createSignedUrls`) + 장수에 맞춘 긴 수명(6시간)
+- [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-12-travel-region-photos.sql`을
+      Supabase SQL 편집기에서 실행해야 저장이 된다
+- [ ] 많이 채웠을 때의 첫 화면 무게 재보기 (지금은 채운 수만큼 사진을 한꺼번에 받는다)
+
 ### 5b. 핀 지도 (미착수 — 추억 타임라인 이후)
 - [ ] 지도 API 벤더 선정 (Kakao/Naver/Mapbox 등)
 - [ ] 위치 정보 있는 `memories` 조회 쿼리

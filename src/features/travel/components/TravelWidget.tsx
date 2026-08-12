@@ -14,11 +14,10 @@ import { countKnownVisits, DISTRICT_COUNT } from '../districtIndex'
 import type { TravelDistrict } from '../districts'
 import { travelMapPhotoQueryKey, useTravelMapPhoto } from '../hooks/useTravelMapPhoto'
 import { useToggleTravelVisit, useTravelVisits } from '../hooks/useTravelVisits'
+import { photoFileProblem } from '../photoFile'
 import type { TravelRegion } from '../regions'
 import { RegionScratchDialog } from './RegionScratchDialog'
-import { ScratchMap } from './ScratchMap'
-
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+import { RegionMap } from './RegionMap'
 
 interface TravelWidgetProps {
   /** 홈이 이미 가져온 내 프로필. 같은 걸 또 조회하지 않으려고 받아 쓴다. */
@@ -77,12 +76,9 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
     event.target.value = ''
     if (!file || !coupleId || !user) return
 
-    if (!file.type.startsWith('image/')) {
-      showToast({ type: 'error', body: '이미지 파일만 올릴 수 있어요.' })
-      return
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      showToast({ type: 'error', body: '이미지 용량은 10MB 이하여야 해요.' })
+    const problem = photoFileProblem(file)
+    if (problem) {
+      showToast({ type: 'error', body: problem })
       return
     }
 
@@ -103,10 +99,9 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
 
   return (
     <VStack gap={3}>
-      <ScratchMap
+      <RegionMap
         region={null}
-        photoUrl={photoUrl ?? null}
-        visitedCodes={visitedCodes}
+        reveal={{ kind: 'photo', url: photoUrl ?? null, revealedCodes: visitedCodes }}
         isInteractive={canScratch}
         onSelectRegion={setOpenRegion}
       />

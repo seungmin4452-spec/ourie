@@ -1,4 +1,4 @@
-import { CalendarHeart, Hand, Images, MapPin } from 'lucide-react'
+import { CalendarHeart, Hand, Images, MapPin, MapPinned } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { WIDGET_IDS, type WidgetId, type WidgetMeta } from './types'
@@ -36,6 +36,12 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     description: '고른 사진을 지도로 덮어두고, 다녀온 지역을 긁어서 드러내요.',
     isReady: true,
   },
+  photomap: {
+    id: 'photomap',
+    title: '사진으로 채우는 지도',
+    description: '지역마다 사진을 한 장씩 걸어서 전국을 우리 사진으로 채워요.',
+    isReady: true,
+  },
 }
 
 const HANGUL_FIRST = 0xac00
@@ -67,6 +73,13 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   poke: <Hand className="size-4" />,
   memories: <Images className="size-4" />,
   travel: <MapPin className="size-4" />,
+  photomap: <MapPinned className="size-4" />,
+}
+
+/** 상대방 이름이 있을 때 쓰는 제목. "우리"를 그 사람 이름으로 바꾼다. */
+const TITLE_WITH_PARTNER: Partial<Record<WidgetId, (companion: string) => string>> = {
+  travel: (companion) => `${companion} 다녀온 곳`,
+  photomap: (companion) => `${companion} 채우는 지도`,
 }
 
 /**
@@ -79,10 +92,11 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
  */
 export function widgetMeta(id: WidgetId, partnerName?: string | null): WidgetMeta {
   const meta = WIDGET_META[id]
-  if (id !== 'travel') return meta
-
+  const title = TITLE_WITH_PARTNER[id]
   const name = partnerName?.trim()
-  return name ? { ...meta, title: `${withCompanion(name)} 다녀온 곳` } : meta
+  if (!title || !name) return meta
+
+  return { ...meta, title: title(withCompanion(name)) }
 }
 
 export function widgetIcon(id: WidgetId): ReactNode {

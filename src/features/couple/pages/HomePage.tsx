@@ -32,15 +32,30 @@ import {
 import { usePartner } from '../hooks/usePartner'
 
 /**
- * 스크래치 지도 위젯만 따로 늦게 불러온다.
+ * 지도 위젯 둘만 따로 늦게 불러온다.
  *
  * 시도·시군구 도형 데이터가 263KB다. 이 위젯을 홈에 올리지 않은 사람에게까지
  * 첫 화면에서 받게 하면 PWA가 무거워진다 (UI_GUIDE §1 "가벼움"). 정적으로
  * import하지 않아야 별도 청크로 갈라지므로, 배럴 전체를 동적으로 가져온다.
+ *
+ * 둘이 같은 배럴을 보므로 청크도 하나다 — 도형 데이터를 두 벌 받지 않는다.
  */
 const TravelWidget = lazy(async () => ({
   default: (await import('@/features/travel')).TravelWidget,
 }))
+
+const PhotoMapWidget = lazy(async () => ({
+  default: (await import('@/features/travel')).PhotoMapWidget,
+}))
+
+/** 도형 데이터 청크를 받는 동안 위젯 자리에 두는 한 줄. */
+function MapLoading() {
+  return (
+    <Text type="supporting" justify="center">
+      지도를 불러오는 중이에요.
+    </Text>
+  )
+}
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -133,14 +148,14 @@ export function HomePage() {
         )
       case 'travel':
         return (
-          <Suspense
-            fallback={
-              <Text type="supporting" justify="center">
-                지도를 불러오는 중이에요.
-              </Text>
-            }
-          >
+          <Suspense fallback={<MapLoading />}>
             <TravelWidget profile={profile} isEditing={isEditing} />
+          </Suspense>
+        )
+      case 'photomap':
+        return (
+          <Suspense fallback={<MapLoading />}>
+            <PhotoMapWidget profile={profile} isEditing={isEditing} />
           </Suspense>
         )
     }

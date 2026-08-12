@@ -5,7 +5,7 @@
  * localStorage에 남으므로(useHomeWidgets.ts) id는 한 번 정하면 바꾸지 않는다
  * — 이름이 바뀌면 기존 사용자의 홈에서 그 위젯이 조용히 사라진다.
  */
-export const WIDGET_IDS = ['dday', 'poke', 'memories', 'travel'] as const
+export const WIDGET_IDS = ['dday', 'poke', 'memories', 'travel', 'photomap'] as const
 
 export type WidgetId = (typeof WIDGET_IDS)[number]
 
