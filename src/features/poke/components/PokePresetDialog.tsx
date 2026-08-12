@@ -15,13 +15,14 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { ToggleButton } from '@astryxdesign/core/ToggleButton'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { HandHeart, Plus, Trash2 } from 'lucide-react'
+import { Check, HandHeart, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
-import { createPokePreset, deletePokePreset } from '../api/presets'
+import { createPokePreset, deletePokePreset, updatePokePreset } from '../api/presets'
 import { pokePresetsQueryKey } from '../hooks/usePokePresets'
 import {
   DEFAULT_POKE_ICON,
+  isPokeIconName,
   POKE_ICON_NAMES,
   pokeIconLabel,
   pokePresetIcon,
@@ -39,15 +40,19 @@ interface PokePresetDialogProps {
 }
 
 /**
- * 커플이 콕 찌르기 버튼을 만들고 지우는 화면.
+ * 커플이 콕 찌르기 버튼을 만들고 고치고 지우는 화면.
  *
- * 목록과 만드는 폼을 한 다이얼로그에 같이 둔다. 화면을 나누면 "만들고 → 돌아와
+ * 목록과 폼을 한 다이얼로그에 같이 둔다. 화면을 나누면 "만들고 → 돌아와
  * 확인하고 → 또 만들고"가 되는데, 여기서 만드는 건 짧은 문장 하나라 그만한
  * 무게가 아니다.
  *
  * 삭제에 확인 단계를 두지 않은 것도 같은 이유다. 버튼 하나는 몇 초면 다시
  * 만들 수 있고, 확인 다이얼로그를 이 다이얼로그 위에 겹치면 포커스가 서로
  * 다투기 시작한다.
+ *
+ * 고치기도 같은 폼을 쓴다 — 목록에서 연필을 누르면 아래 폼이 그 버튼의 값으로
+ * 채워지고 "고치는 중"이 된다. 폼을 하나 더 띄우지 않는 이유는 고치는 항목이
+ * 어떤 것인지 목록에서 바로 보여야 하기 때문이다 (그 줄이 선택 상태로 남는다).
  */
 export function PokePresetDialog({
   isOpen,
@@ -62,12 +67,17 @@ export function PokePresetDialog({
   const [icon, setIcon] = useState<PokeIconName>(DEFAULT_POKE_ICON)
   const [label, setLabel] = useState('')
   const [body, setBody] = useState('')
+  /** 고치는 중인 버튼의 id. null이면 새 버튼을 만드는 중이다. */
+  const [editingId, setEditingId] = useState<string | null>(null)
 
+  const isEditing = editingId != null
+  // 개수 제한은 새로 만들 때만 걸린다. 꽉 찬 상태에서도 이미 있는 버튼은
+  // 고칠 수 있어야 한다 (오히려 그때 고치고 싶어진다).
   const isFull = presets.length >= POKE_PRESET_MAX
   const trimmedLabel = label.trim()
   const trimmedBody = body.trim()
   const canSubmit =
-    !isFull &&
+    (isEditing || !isFull) &&
     trimmedLabel.length > 0 &&
     trimmedLabel.length <= POKE_PRESET_LIMITS.label &&
     trimmedBody.length > 0 &&
@@ -75,6 +85,24 @@ export function PokePresetDialog({
 
   async function refreshPresets() {
     await queryClient.invalidateQueries({ queryKey: pokePresetsQueryKey(coupleId) })
+  }
+
+  /** 폼을 "새 버튼" 상태로 되돌린다. */
+  function resetForm() {
+    setEditingId(null)
+    setLabel('')
+    setBody('')
+    setIcon(DEFAULT_POKE_ICON)
+  }
+
+  function startEditing(preset: PokePreset) {
+    setEditingId(preset.id)
+    // 목록에서 뺀 아이콘이 저장돼 있을 수 있다 (icons.tsx 주석 참고). 그때
+    // 화면에는 기본 아이콘이 보이므로 폼도 같은 것을 고른 상태로 시작한다 —
+    // 그대로 저장하면 보이는 대로 맞춰진다.
+    setIcon(isPokeIconName(preset.icon) ? preset.icon : DEFAULT_POKE_ICON)
+    setLabel(preset.label)
+    setBody(preset.body)
   }
 
   const creation = useMutation({
@@ -99,10 +127,29 @@ export function PokePresetDialog({
     },
   })
 
+  const edit = useMutation({
+    mutationFn: (id: string) =>
+      updatePokePreset(id, { icon, label: trimmedLabel, body: trimmedBody }),
+    onSuccess: async (preset) => {
+      await refreshPresets()
+      showToast({ type: 'info', body: `"${preset.label}" 버튼을 고쳤어요.` })
+      resetForm()
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof Error ? error.message : '버튼을 고치지 못했어요.',
+      })
+    },
+  })
+
   const deletion = useMutation({
     mutationFn: (preset: PokePreset) => deletePokePreset(preset.id),
     onSuccess: async (_data, preset) => {
       await refreshPresets()
+      // 고치던 버튼을 지운 경우. 폼을 그대로 두면 사라진 버튼을 계속 고치는
+      // 모양이 되고, 저장하면 아무 row도 안 맞아 에러가 난다.
+      if (editingId === preset.id) resetForm()
       showToast({ type: 'info', body: `"${preset.label}" 버튼을 지웠어요.` })
     },
     onError: (error) => {
@@ -113,18 +160,32 @@ export function PokePresetDialog({
     },
   })
 
+  /**
+   * 닫을 때 폼을 비운다. 이 컴포넌트는 위젯 안에 계속 붙어 있어서 상태가
+   * 남는데, 고치다 만 폼이 그대로 살아 있으면 다음에 열었을 때 "무엇을 고치는
+   * 중이었는지"를 다시 읽어야 한다.
+   */
+  function handleOpenChange(nextIsOpen: boolean) {
+    if (!nextIsOpen) resetForm()
+    onOpenChange(nextIsOpen)
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) return
+    if (editingId != null) {
+      edit.mutate(editingId)
+      return
+    }
     creation.mutate()
   }
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange} purpose="form" width={420}>
+    <Dialog isOpen={isOpen} onOpenChange={handleOpenChange} purpose="form" width={420}>
       <form onSubmit={handleSubmit}>
         <Layout
           header={
-            <DialogHeader title="콕 찌르기 만들기" onOpenChange={() => onOpenChange(false)} />
+            <DialogHeader title="콕 찌르기 만들기" onOpenChange={() => handleOpenChange(false)} />
           }
           content={
             <LayoutContent>
@@ -146,16 +207,28 @@ export function PokePresetDialog({
                           label={preset.label}
                           description={preset.body}
                           startContent={pokePresetIcon(preset.icon)}
+                          isSelected={editingId === preset.id}
                           endContent={
-                            <IconButton
-                              label={`${preset.label} 버튼 삭제`}
-                              tooltip="삭제"
-                              variant="ghost"
-                              size="sm"
-                              icon={<Trash2 className="size-4" />}
-                              isDisabled={deletion.isPending}
-                              onClick={() => deletion.mutate(preset)}
-                            />
+                            <HStack gap={0.5}>
+                              <IconButton
+                                label={`${preset.label} 버튼 고치기`}
+                                tooltip="고치기"
+                                variant="ghost"
+                                size="sm"
+                                icon={<Pencil className="size-4" />}
+                                isDisabled={edit.isPending || deletion.isPending}
+                                onClick={() => startEditing(preset)}
+                              />
+                              <IconButton
+                                label={`${preset.label} 버튼 삭제`}
+                                tooltip="삭제"
+                                variant="ghost"
+                                size="sm"
+                                icon={<Trash2 className="size-4" />}
+                                isDisabled={edit.isPending || deletion.isPending}
+                                onClick={() => deletion.mutate(preset)}
+                              />
+                            </HStack>
                           }
                         />
                       ))}
@@ -166,7 +239,18 @@ export function PokePresetDialog({
                 <Divider />
 
                 <VStack gap={4}>
-                  <Heading level={2}>새 버튼</Heading>
+                  <HStack gap={2} justify="between" align="center">
+                    <Heading level={2}>{isEditing ? '버튼 고치기' : '새 버튼'}</Heading>
+                    {isEditing && (
+                      <Button
+                        type="button"
+                        label="취소"
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetForm}
+                      />
+                    )}
+                  </HStack>
 
                   <VStack gap={2}>
                     <Text type="label">아이콘</Text>
@@ -235,7 +319,7 @@ export function PokePresetDialog({
                     <Text type="supporting">{trimmedBody || '알림 내용'}</Text>
                   </VStack>
 
-                  {isFull && (
+                  {isFull && !isEditing && (
                     <Text type="supporting">
                       버튼은 {POKE_PRESET_MAX}개까지 만들 수 있어요. 하나를 지우면 더
                       만들 수 있어요.
@@ -252,14 +336,16 @@ export function PokePresetDialog({
                   type="button"
                   label="닫기"
                   variant="secondary"
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => handleOpenChange(false)}
                 />
                 <Button
                   type="submit"
-                  label="버튼 만들기"
+                  label={isEditing ? '저장' : '버튼 만들기'}
                   variant="primary"
-                  icon={<Plus className="size-4" />}
-                  isLoading={creation.isPending}
+                  icon={
+                    isEditing ? <Check className="size-4" /> : <Plus className="size-4" />
+                  }
+                  isLoading={creation.isPending || edit.isPending}
                   isDisabled={!canSubmit}
                 />
               </HStack>

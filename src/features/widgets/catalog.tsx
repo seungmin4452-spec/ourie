@@ -1,4 +1,4 @@
-import { CalendarHeart, Hand, Images, MapPin, MapPinned } from 'lucide-react'
+import { CalendarHeart, Images, MapPin, MapPinned, Pointer } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { WIDGET_IDS, type WidgetId, type WidgetMeta } from './types'
@@ -70,7 +70,8 @@ function withCompanion(name: string): string {
 
 const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   dday: <CalendarHeart className="size-4" />,
-  poke: <Hand className="size-4" />,
+  // 펼친 손이 아니라 검지를 세운 손이다 — "콕" 찌르는 손가락.
+  poke: <Pointer className="size-4" />,
   memories: <Images className="size-4" />,
   travel: <MapPin className="size-4" />,
   photomap: <MapPinned className="size-4" />,
