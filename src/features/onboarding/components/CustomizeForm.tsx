@@ -12,10 +12,10 @@ import { useNavigate } from 'react-router-dom'
 
 import { cacheAppMeta, readCachedAppMeta } from '@/app/appMeta'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
-import { useAuth } from '@/features/auth'
+import { createSessionHandoffToken, useAuth } from '@/features/auth'
 import { cropImageToSquare } from '@/lib/image'
 import { getProfile, updateProfile, uploadAvatar } from '../api/profile'
-import { isIOS, isStandalone, openPwaInstallPage } from '../pwaInstall'
+import { buildPwaInstallUrl, isIOS, isStandalone, openPwaInstallPage } from '../pwaInstall'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
@@ -31,6 +31,9 @@ export function CustomizeForm() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isIconHelpOpen, setIsIconHelpOpen] = useState(false)
+  // 다이얼로그의 "Safari에서 열기"가 들고 갈 설치 페이지 주소. 세션 인계 토큰이
+  // 들어가므로 저장하는 순간에 만들어둬야 한다 (openPwaInstallPage와 같은 이유).
+  const [installUrl, setInstallUrl] = useState<string | null>(null)
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -120,7 +123,12 @@ export function CustomizeForm() {
         // 않는다: standalone에는 공유 버튼이 없어 그 페이지의 안내를 따를 수
         // 없고, 그 페이지는 standalone을 "아이콘으로 실행한 것"으로 보고 앱으로
         // 곧장 되돌려보낸다 (api/pwa-install.ts). 저장은 됐는데 화면만 홈으로
-        // 튀어 아이콘이 안 바뀐 것처럼 보이던 자리라, 지금 남은 일을 설명한다.
+        // 튀어 아이콘이 안 바뀐 것처럼 보이던 자리라, 지금 남은 일을 설명하고
+        // 브라우저로 나가는 링크까지 쥐여준다.
+        const handoff = await createSessionHandoffToken()
+        setInstallUrl(
+          new URL(buildPwaInstallUrl(title, icon, handoff), window.location.origin).toString(),
+        )
         setIsIconHelpOpen(true)
       } else {
         await openPwaInstallPage(title, icon)
@@ -138,28 +146,42 @@ export function CustomizeForm() {
   // 홈 화면 아이콘은 "추가하는 순간"에 구워지는 스냅샷이라, 앱 안에서 사진을
   // 바꿔도 이미 놓인 아이콘에는 닿지 않는다. 남은 절차가 플랫폼마다 달라 갈라
   // 적는다 — 안드로이드는 Chrome이 매니페스트를 다시 읽어 알아서 갱신하고
-  // (src/sw.ts), iOS는 사람이 지우고 다시 추가하는 수밖에 없다.
+  // (src/sw.ts), iOS는 사람이 다시 추가하는 수밖에 없다.
   //
-  // 지우는 건 항상 마지막이다. 먼저 지우라고 하면 이 안내를 띄우고 있는 앱을
+  // 절차를 단계로 늘어놓는 대신 버튼 하나로 줄였다. 아래 openInBrowser가 설치
+  // 페이지를 브라우저에서 바로 열어주고, 거기서부터는 그 페이지가 자기 안내를
+  // 갖고 있다 (지우는 건 그 안내의 마지막 단계다 — 먼저 지우라고 하면 이 앱을
   // 지우라는 말이 되고, iOS는 홈 화면 앱을 지울 때 그 앱만의 저장소 컨테이너까지
-  // 함께 버린다 (그 컨테이너 때문에 설치 시 세션 인계가 필요했다 — api/_shared.ts).
-  // 새로 추가하면 두 아이콘이 나란히 남는데, 사진이 서로 달라 어느 쪽이 예전
-  // 것인지 바로 구분된다.
-  const iconHelpSteps = isIOS()
-    ? [
-        'Safari로 이 앱을 열어주세요.',
-        '홈 화면의 "꾸미기 다시 하기" 아래 "홈 화면에 다시 추가하기"를 눌러주세요.',
-        '새 아이콘이 생기면, 예전 사진이 그대로인 아이콘을 꾹 눌러 삭제해주세요.',
-      ]
-    : [
-        '그대로 두면 하루 안에 Chrome이 새 사진으로 바꿔줘요.',
-        '바로 보고 싶다면 Chrome으로 이 앱을 열어 "홈 화면에 다시 추가하기"를 눌러주세요.',
-        '예전 아이콘이 남아 있다면 꾹 눌러 삭제해주세요.',
-      ]
+  // 함께 버린다).
+  const iconHelpLead = isIOS()
+    ? '아래 버튼을 누르면 Safari에서 추가 화면이 열려요. 새 아이콘을 만든 뒤 예전 것을 지우면 돼요.'
+    : '그대로 두면 하루 안에 Chrome이 새 사진으로 바꿔줘요. 지금 바로 바꾸고 싶다면 아래 버튼을 눌러주세요.'
 
   function closeIconHelp() {
     setIsIconHelpOpen(false)
     navigate('/')
+  }
+
+  // 홈 화면 앱 안에서 브라우저로 나가는 길.
+  //
+  // iOS: 설치 페이지는 스코프 안(/add-to-home)이라 평범한 링크로는 standalone
+  // 창에서 그대로 열리고, 그러면 공유 버튼이 없는 건 매한가지다. x-safari-https는
+  // 그 자리에서 진짜 Safari를 띄우는 스킴이다. 애플이 문서화한 것이 아니라
+  // 언젠가 조용히 막힐 수 있어서, 잠시 뒤에도 이 화면이 그대로 앞에 있으면
+  // (= 스킴이 먹지 않았으면) 새 창으로 한 번 더 시도한다. 스킴이 먹었다면 우리
+  // 화면은 뒤로 밀려 visible이 아니게 되므로 창이 두 개 열리지 않는다.
+  //
+  // 안드로이드: 새 창을 여는 것만으로 브라우저로 나간다.
+  function openInBrowser() {
+    if (!installUrl) return
+    if (!isIOS()) {
+      window.open(installUrl, '_blank')
+      return
+    }
+    window.setTimeout(() => {
+      if (document.visibilityState === 'visible') window.open(installUrl, '_blank')
+    }, 1500)
+    window.location.href = installUrl.replace(/^https:/, 'x-safari-https:')
   }
 
   return (
@@ -231,12 +253,21 @@ export function CustomizeForm() {
                   앱 안은 바로 바뀌었어요. 홈 화면 아이콘은 추가할 때 사진이 한 번
                   구워지는 거라, 지금 놓여 있는 아이콘은 아직 예전 사진이에요.
                 </Text>
+                <Text>{iconHelpLead}</Text>
                 <VStack gap={2}>
-                  {iconHelpSteps.map((step, index) => (
-                    <Text key={step}>{`${index + 1}. ${step}`}</Text>
-                  ))}
+                  <Button
+                    label={isIOS() ? 'Safari에서 열기' : '브라우저에서 열기'}
+                    variant="primary"
+                    width="100%"
+                    onClick={openInBrowser}
+                  />
+                  <Button
+                    label="나중에 하기"
+                    variant="ghost"
+                    width="100%"
+                    onClick={closeIconHelp}
+                  />
                 </VStack>
-                <Button label="확인" variant="primary" width="100%" onClick={closeIconHelp} />
               </VStack>
             </LayoutContent>
           }
