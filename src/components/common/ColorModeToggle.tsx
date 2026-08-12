@@ -2,10 +2,16 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { Moon, Sun } from 'lucide-react'
 
 import { useColorMode } from '@/app/useColorMode'
+import { useWidgetEditMode } from '@/app/widgetEditMode'
 
 export function ColorModeToggle() {
   const { mode, toggle } = useColorMode()
+  const isWidgetEditMode = useWidgetEditMode()
   const isLight = mode === 'light'
+
+  // 위젯을 편집하는 동안엔 화면 맨 위가 편집 도구 막대의 자리다. 이 버튼은
+  // 페이지와 상관없이 그 오른쪽 끝에 고정되어 있어서 "완료"와 정확히 겹친다.
+  if (isWidgetEditMode) return null
 
   return (
     <IconButton

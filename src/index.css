@@ -32,6 +32,26 @@
     padding-inline-end: calc(var(--spacing-4, 1rem) + env(safe-area-inset-right));
   }
 
+  /* 위젯 편집 도구 막대(+ · 완료). 화면 맨 위에 붙어 스크롤을 따라다닌다 —
+     위젯 서너 개만 있어도 홈은 한 화면을 넘기고, 그때 "완료"가 위로 사라져
+     버리면 편집을 끝내려고 다시 맨 위까지 올라가야 한다.
+
+     margin-block-start의 음수 값이 이 규칙의 핵심이다. PageShell이 준 위쪽
+     여백(--spacing-4 + 안전 영역)을 되돌려 막대를 컨테이너 맨 위 끝까지
+     끌어올리고, 같은 크기를 자기 padding으로 다시 받는다. 그래야 sticky로
+     붙었을 때 막대의 배경이 상태바 아래까지 덮어서, 뒤로 지나가는 위젯이
+     상태바 자리에 비쳐 보이지 않는다. env()는 토큰으로 표현할 수 없어
+     유틸리티로 둔다. HomePage.tsx에서만 쓴다. */
+  .widget-edit-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    margin-block-start: calc(-1 * (var(--spacing-4, 1rem) + env(safe-area-inset-top)));
+    padding-block-start: calc(var(--spacing-4, 1rem) + env(safe-area-inset-top));
+    padding-block-end: var(--spacing-3, 0.75rem);
+    background-color: var(--color-background-body);
+  }
+
   /* 위젯을 꾹 눌러 편집 모드로 들어가는 제스처(useLongPress.ts)를 브라우저가
      가로채지 않게 막는다. 이걸 빼면 iOS 사파리가 길게 누른 순간 텍스트를
      선택하고 복사 말풍선을 띄워서, 손을 떼기도 전에 제스처가 죽는다.

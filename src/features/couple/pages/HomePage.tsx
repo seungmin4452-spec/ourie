@@ -2,13 +2,15 @@ import { Button } from '@astryxdesign/core/Button'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
+import { IconButton } from '@astryxdesign/core/IconButton'
 import { Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarHeart, LayoutGrid, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { setWidgetEditMode, useWidgetEditMode } from '@/app/widgetEditMode'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
 import { PageShell } from '@/components/common/PageShell'
@@ -36,13 +38,24 @@ export function HomePage() {
   const [isInstalled] = useState(isStandalone)
 
   const { widgets, addWidget, removeWidget, moveWidget, reorderWidgets } = useHomeWidgets()
-  const [isEditRequested, setIsEditRequested] = useState(false)
+  const isEditRequested = useWidgetEditMode()
   const [isPickerOpen, setIsPickerOpen] = useState(false)
+
+  // 마지막 위젯을 지우는 순간까지 편집 도구가 한 프레임 남지 않도록 렌더에서
+  // 바로 거른다. 아래 effect는 그 뒤에 스토어를 맞춰준다.
+  const isEditing = isEditRequested && widgets.length > 0
 
   // 편집 모드로 들어가는 길은 위젯을 꾹 누르는 것 하나뿐이라, 마지막 위젯을
   // 지우면 나갈 수도 다시 들어올 수도 없는 상태가 된다. 위젯이 없으면 편집도
   // 없다고 보고 빈 화면 안내로 돌려보낸다.
-  const isEditing = isEditRequested && widgets.length > 0
+  useEffect(() => {
+    if (widgets.length === 0) setWidgetEditMode(false)
+  }, [widgets.length])
+
+  // 편집 상태는 컴포넌트 밖(모듈)에 산다. 홈을 떠날 때 꺼주지 않으면 다른
+  // 화면에서도 라이트/다크 버튼이 계속 숨고, 홈으로 돌아왔을 때 흔들리는
+  // 카드로 열린다.
+  useEffect(() => () => setWidgetEditMode(false), [])
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', user?.id],
@@ -115,6 +128,26 @@ export function HomePage() {
 
   return (
     <PageShell gap={5}>
+      {/* 편집 도구는 iOS 홈 화면 정리 모드와 같은 자리에 둔다 — 왼쪽 위에
+          추가, 오른쪽 위에 완료. PageShell의 첫 자식이어야 위쪽 여백을
+          되돌려 화면 맨 위에 붙을 수 있다 (index.css의 .widget-edit-bar). */}
+      {isEditing && (
+        <HStack className="widget-edit-bar" hAlign="between" vAlign="center">
+          <IconButton
+            label="위젯 추가"
+            tooltip="위젯 추가"
+            variant="secondary"
+            icon={<Plus className="size-5" />}
+            onClick={() => setIsPickerOpen(true)}
+          />
+          <Button
+            label="완료"
+            variant="primary"
+            onClick={() => setWidgetEditMode(false)}
+          />
+        </HStack>
+      )}
+
       <VStack gap={3} hAlign="center" paddingBlock={4}>
         <span className="size-20 overflow-hidden rounded-2xl border border-border">
           {profile?.avatar_url ? (
@@ -148,38 +181,17 @@ export function HomePage() {
             onReorder={reorderWidgets}
             onMove={moveWidget}
             onRemove={removeWidget}
-            onLongPress={() => setIsEditRequested(true)}
+            onLongPress={() => setWidgetEditMode(true)}
             renderBody={renderWidgetBody}
           />
 
-          {/* 편집 도구는 편집 중일 때만 나온다. 평소의 홈은 위젯만 보이는
-              화면이어야 해서, 꾹 누르면 된다는 것만 한 줄로 알려준다. */}
-          {isEditing ? (
-            <VStack gap={2}>
-              <HStack gap={2}>
-                <Button
-                  label="위젯 추가"
-                  variant="secondary"
-                  icon={<Plus className="size-4" />}
-                  width="100%"
-                  onClick={() => setIsPickerOpen(true)}
-                />
-                <Button
-                  label="편집 완료"
-                  variant="primary"
-                  width="100%"
-                  onClick={() => setIsEditRequested(false)}
-                />
-              </HStack>
-              <Text type="supporting" justify="center">
-                왼쪽 손잡이를 끌어 순서를 바꾸고, ✕로 지울 수 있어요.
-              </Text>
-            </VStack>
-          ) : (
-            <Text type="supporting" justify="center">
-              위젯을 꾹 누르면 추가하거나 지울 수 있어요.
-            </Text>
-          )}
+          {/* 평소의 홈은 위젯만 보이는 화면이어야 해서, 꾹 누르면 된다는 것만
+              한 줄로 알려준다. 편집 중에는 지금 할 수 있는 일로 바뀐다. */}
+          <Text type="supporting" justify="center">
+            {isEditing
+              ? '왼쪽 손잡이를 끌어 순서를 바꾸고, ✕로 지울 수 있어요.'
+              : '위젯을 꾹 누르면 추가하거나 지울 수 있어요.'}
+          </Text>
         </VStack>
       )}
 
