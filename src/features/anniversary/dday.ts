@@ -95,21 +95,16 @@ export function summarize(anniversary: Anniversary, today: Date): DdaySummary {
 }
 
 /**
- * 홈 화면이 읽는 순서대로 정렬한다. 가장 먼저 다가오는 것부터, 그 뒤에 이미
- * 지나간 일회성 기념일을 최근 순으로 — 오래된 항목이 사라지지 않고 뒤로만
- * 밀리게.
+ * 받은 순서를 그대로 지킨다 — 목록에 뜨는 순서는 등록 순이고, 그 정렬은
+ * 조회하는 쪽이 한다 (`api/anniversary.ts`).
+ *
+ * 한때 여기서 "가장 먼저 다가오는 것"부터로 다시 정렬했다. 그러면 기념일을
+ * 하나 추가할 때마다 목록 순서가 통째로 흔들려서 방금 넣은 것을 눈으로 찾아야
+ * 했고, 무엇보다 `pickHighlight`가 "배열의 앞쪽"이라는 암묵적 약속에 기대게
+ * 됐다. 지금은 그 함수가 스스로 고른다.
  */
 export function summarizeAll(anniversaries: Anniversary[], today: Date): DdaySummary[] {
-  return anniversaries
-    .map((anniversary) => summarize(anniversary, today))
-    .sort((a, b) => {
-      if (a.daysUntil == null && b.daysUntil == null) {
-        return b.anniversary.date.localeCompare(a.anniversary.date)
-      }
-      if (a.daysUntil == null) return 1
-      if (b.daysUntil == null) return -1
-      return a.daysUntil - b.daysUntil
-    })
+  return anniversaries.map((anniversary) => summarize(anniversary, today))
 }
 
 /**
@@ -124,12 +119,28 @@ export function summarizeAll(anniversaries: Anniversary[], today: Date): DdaySum
  * 것. 등록된 기념일이 있는데 위젯이 비어 보이는 게 더 이상하다.
  */
 export function pickHighlight(summaries: DdaySummary[]): DdaySummary | null {
-  return (
-    summaries.find((summary) => summary.anniversary.is_primary) ??
-    summaries.find((summary) => summary.daysUntil != null) ??
-    summaries[0] ??
-    null
-  )
+  const chosen = summaries.find((summary) => summary.anniversary.is_primary)
+  if (chosen) return chosen
+
+  // 가장 가까이 다가온 것. 목록이 등록 순으로 오므로 여기서 직접 고른다.
+  let nearest: DdaySummary | null = null
+  for (const summary of summaries) {
+    if (summary.daysUntil == null) continue
+    if (nearest?.daysUntil == null || summary.daysUntil < nearest.daysUntil) {
+      nearest = summary
+    }
+  }
+  if (nearest) return nearest
+
+  // 다가오는 게 하나도 없는 경우 (반복하지 않는 기념일만 있고 전부 지났다).
+  // 그중 가장 최근 것 — 등록된 기념일이 있는데 위젯이 비어 보이면 더 이상하다.
+  let latest: DdaySummary | null = null
+  for (const summary of summaries) {
+    if (latest == null || summary.anniversary.date > latest.anniversary.date) {
+      latest = summary
+    }
+  }
+  return latest
 }
 
 /**

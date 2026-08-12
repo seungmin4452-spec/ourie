@@ -5,13 +5,17 @@ const COLUMNS =
   'id, couple_id, created_by, title, date, repeat_yearly, is_primary, created_at'
 
 export async function listAnniversaries(coupleId: string): Promise<Anniversary[]> {
+  // 등록한 순서 그대로다. 날짜순이나 D-day순으로 정렬하면 방금 추가한 기념일이
+  // 목록 어딘가로 사라져서, 제대로 저장됐는지 눈으로 찾아야 한다. 새로 만든 건
+  // 언제나 맨 아래에 붙는다.
+  //
   // RLS가 이미 호출자의 커플로 범위를 좁히지만, 명시적 필터가 있어야
-  // anniversaries_couple_id_date_idx 인덱스를 탄다.
+  // anniversaries_couple_id_date_idx 인덱스로 행을 추려낸다.
   const { data, error } = await supabase
     .from('anniversaries')
     .select(COLUMNS)
     .eq('couple_id', coupleId)
-    .order('date', { ascending: true })
+    .order('created_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }
