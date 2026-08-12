@@ -45,7 +45,7 @@ Ourie는 생산성 툴이 아니라 "감정을 기록하는 공간"이다. UI는
 
 구현 상태 (`src/features/couple/pages/HomePage.tsx`):
 - 디데이 강조는 `DdayHighlight` (Astryx `Card variant="muted"` + `Heading type="display-2"`). 숫자 크기는 §3의 32~40px를 px로 박지 않고 display 타입 스케일 토큰을 쓴다
-- 어떤 기념일을 크게 띄울지는 `pickHighlight` — 등록된 기념일 중 **가장 가까이 다가온 것** 하나 (PRD §3.2). 기준일이 이미 지났으면 "함께한 지 N일째"(한국식으로 기준일이 1일째)를 아래에 덧붙인다
+- 어떤 기념일을 크게 띄울지는 `pickHighlight` — 커플이 기념일 화면의 라디오로 **직접 고른 것**(`is_primary`)이 우선이고, 고른 적이 없으면 가장 가까이 다가온 것으로 떨어진다. 기준일이 이미 지났으면 "함께한 지 N일째"(한국식으로 기준일이 1일째)를 아래에 덧붙인다
 - 기념일이 하나도 없으면 `EmptyState`로 `/anniversaries` 등록을 유도한다
 - 최근 추억 영역은 타임라인(PRD §3.3) 구현 전까지 `EmptyState` 자리표시자다
 

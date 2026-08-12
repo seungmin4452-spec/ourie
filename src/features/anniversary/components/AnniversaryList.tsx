@@ -1,7 +1,7 @@
 import { Badge } from '@astryxdesign/core/Badge'
 import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
-import { List, ListItem } from '@astryxdesign/core/List'
+import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList'
 import { Pencil, Trash2 } from 'lucide-react'
 
 import {
@@ -15,13 +15,41 @@ import type { Anniversary } from '../types'
 
 interface AnniversaryListProps {
   summaries: DdaySummary[]
+  /** 지금 홈에 크게 떠 있는 기념일. 고른 적이 없으면 자동으로 뽑힌 것이 온다. */
+  primaryId: string | undefined
+  onSelectPrimary: (anniversary: Anniversary) => void
   onEdit: (anniversary: Anniversary) => void
   onDelete: (anniversary: Anniversary) => void
 }
 
-export function AnniversaryList({ summaries, onEdit, onDelete }: AnniversaryListProps) {
+/**
+ * 기념일 목록. 각 줄의 라디오가 "홈에 크게 뜰 기념일"을 고르는 스위치다.
+ *
+ * `List`가 아니라 `RadioList`인 이유는 하나만 켜지는 것을 컴포넌트가 보장하기
+ * 때문이다. 줄마다 켜고 끄는 스위치를 두면 둘 다 켜거나 둘 다 끈 상태가
+ * 만들어지는데, 홈에 크게 뜨는 자리는 하나뿐이라 그런 상태가 존재할 수 없다.
+ *
+ * 라디오는 왼쪽에 붙는다 (`RadioListItem`이 그렇게 그린다). 오른쪽에는 D+N과
+ * 수정·삭제가 이미 줄지어 있어서, 고르는 동그라미까지 그쪽에 밀어 넣으면 무엇을
+ * 누르는 건지 알아보기 어려워진다.
+ */
+export function AnniversaryList({
+  summaries,
+  primaryId,
+  onSelectPrimary,
+  onEdit,
+  onDelete,
+}: AnniversaryListProps) {
   return (
-    <List hasDividers>
+    <RadioList
+      label="홈에 크게 보여줄 기념일"
+      description="고른 하나가 홈 화면 위젯에 큰 숫자로 떠요."
+      value={primaryId ?? ''}
+      onChange={(id) => {
+        const picked = summaries.find((summary) => summary.anniversary.id === id)
+        if (picked) onSelectPrimary(picked.anniversary)
+      }}
+    >
       {summaries.map((summary) => (
         <AnniversaryRow
           key={summary.anniversary.id}
@@ -30,7 +58,7 @@ export function AnniversaryList({ summaries, onEdit, onDelete }: AnniversaryList
           onDelete={onDelete}
         />
       ))}
-    </List>
+    </RadioList>
   )
 }
 
@@ -48,7 +76,8 @@ function AnniversaryRow({
     milestone && daysUntil != null ? `${milestone} ${formatDday(daysUntil)}` : null
 
   return (
-    <ListItem
+    <RadioListItem
+      value={anniversary.id}
       label={anniversary.title}
       description={[formatDateKey(anniversary.date), upcoming].filter(Boolean).join(' · ')}
       endContent={

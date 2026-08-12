@@ -113,12 +113,23 @@ export function summarizeAll(anniversaries: Anniversary[], today: Date): DdaySum
 }
 
 /**
- * 홈 위젯이 큰 글씨로 보여줄 기념일 — 가장 가까이 다가온 것. 다가오는 게
- * 하나도 없으면(반복하지 않는 기념일만 등록했고 전부 지난 경우) 그중 가장
- * 최근 것을 쓴다. 등록된 기념일이 있는데 위젯이 비어 보이는 게 더 이상하다.
+ * 홈 위젯이 큰 글씨로 보여줄 기념일.
+ *
+ * 커플이 기념일 화면에서 직접 고른 것(`is_primary`)이 항상 이긴다. 자동으로
+ * 고르던 때는 생일을 하나 등록하는 순간 그게 늘 가장 가까운 기념일이 되어,
+ * 정작 보고 싶던 "처음 만난 날"을 밀어냈다.
+ *
+ * 아무것도 고르지 않았으면 예전 규칙 그대로다 — 가장 가까이 다가온 것, 다가오는
+ * 게 하나도 없으면(반복하지 않는 기념일만 있고 전부 지난 경우) 그중 가장 최근
+ * 것. 등록된 기념일이 있는데 위젯이 비어 보이는 게 더 이상하다.
  */
 export function pickHighlight(summaries: DdaySummary[]): DdaySummary | null {
-  return summaries.find((summary) => summary.daysUntil != null) ?? summaries[0] ?? null
+  return (
+    summaries.find((summary) => summary.anniversary.is_primary) ??
+    summaries.find((summary) => summary.daysUntil != null) ??
+    summaries[0] ??
+    null
+  )
 }
 
 /**

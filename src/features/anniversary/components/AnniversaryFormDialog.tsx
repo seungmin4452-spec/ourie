@@ -1,5 +1,4 @@
 import { Button } from '@astryxdesign/core/Button'
-import { DateInput } from '@astryxdesign/core/DateInput'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
@@ -14,6 +13,7 @@ import { createAnniversary, updateAnniversary } from '../api/anniversary'
 import { startOfToday, toDateKey } from '../dday'
 import { anniversariesQueryKey } from '../hooks/useAnniversaries'
 import type { Anniversary, AnniversaryInput, DateKey } from '../types'
+import { DatePartsInput } from './DatePartsInput'
 
 interface AnniversaryFormDialogProps {
   isOpen: boolean
@@ -64,9 +64,7 @@ function AnniversaryForm({
   const showToast = useToast()
 
   const [title, setTitle] = useState(anniversary?.title ?? '')
-  const [date, setDate] = useState<DateKey | undefined>(
-    anniversary?.date ?? toDateKey(startOfToday()),
-  )
+  const [date, setDate] = useState<DateKey>(anniversary?.date ?? toDateKey(startOfToday()))
   const [repeatYearly, setRepeatYearly] = useState(anniversary?.repeat_yearly ?? true)
 
   const mutation = useMutation({
@@ -92,7 +90,6 @@ function AnniversaryForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!date) return
     mutation.mutate({ title: title.trim(), date, repeat_yearly: repeatYearly })
   }
 
@@ -116,14 +113,7 @@ function AnniversaryForm({
                 value={title}
                 onChange={setTitle}
               />
-              <DateInput
-                label="날짜"
-                isRequired
-                value={date}
-                onChange={setDate}
-                format="date_long"
-                width="100%"
-              />
+              <DatePartsInput value={date} onChange={setDate} />
               <Switch
                 label="매년 반복"
                 description="생일이나 사귄 날처럼 해마다 돌아오는 기념일이면 켜두세요."
@@ -151,7 +141,7 @@ function AnniversaryForm({
                 label="저장"
                 variant="primary"
                 isLoading={mutation.isPending}
-                isDisabled={!title.trim() || !date}
+                isDisabled={!title.trim()}
               />
             </HStack>
           </LayoutFooter>

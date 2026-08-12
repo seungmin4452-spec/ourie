@@ -14,9 +14,9 @@ export interface BaseAnniversaryCandidate {
  * "사귄 날"이 보통 가장 오래된 날이고, 그게 곧 "우리가 며칠째인지"를 세는
  * 기준이기 때문이다.
  *
- * 홈 위젯의 큰 숫자(`pickHighlight`)는 이와 달리 "가장 가까이 다가온" 기념일을
- * 고른다. 위젯은 다음에 뭐가 오는지를 알려주는 자리이고, 알림은 오늘이
- * 며칠째인지를 알려주는 자리라 기준이 다르다.
+ * 홈 위젯의 큰 숫자(`pickHighlight`)는 이와 달리 커플이 기념일 화면에서 직접
+ * 고른 것을 따른다. 위젯은 커플이 보고 싶다고 정한 날을 띄우는 자리이고,
+ * 알림은 둘이 며칠째인지를 알려주는 자리라 기준이 다르다.
  */
 export function pickBaseAnniversary<T extends BaseAnniversaryCandidate>(
   anniversaries: T[],

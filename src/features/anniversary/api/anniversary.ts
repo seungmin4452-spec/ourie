@@ -1,7 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import type { Anniversary, AnniversaryInput } from '../types'
 
-const COLUMNS = 'id, couple_id, created_by, title, date, repeat_yearly, created_at'
+const COLUMNS =
+  'id, couple_id, created_by, title, date, repeat_yearly, is_primary, created_at'
 
 export async function listAnniversaries(coupleId: string): Promise<Anniversary[]> {
   // RLS가 이미 호출자의 커플로 범위를 좁히지만, 명시적 필터가 있어야
@@ -41,6 +42,18 @@ export async function updateAnniversary(
     .single()
   if (error) throw error
   return data
+}
+
+/**
+ * 홈 위젯에 크게 띄울 기념일을 이걸로 바꾼다. 나머지는 자동으로 내려간다.
+ *
+ * `updateAnniversary`로 `is_primary`를 켜지 않는 이유: 그러면 "이전 것을 끄는"
+ * 두 번째 요청이 따로 필요하고, 그 사이에 실패하면 메인이 둘이 된다. 서버
+ * 함수가 한 문장으로 처리한다 (supabase/schema.sql의 set_primary_anniversary).
+ */
+export async function setPrimaryAnniversary(id: string): Promise<void> {
+  const { error } = await supabase.rpc('set_primary_anniversary', { p_id: id })
+  if (error) throw error
 }
 
 export async function deleteAnniversary(id: string): Promise<void> {

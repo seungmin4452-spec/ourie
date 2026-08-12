@@ -15,10 +15,10 @@ import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
 import { NotificationSettings } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
-import { deleteAnniversary } from '../api/anniversary'
+import { deleteAnniversary, setPrimaryAnniversary } from '../api/anniversary'
 import { AnniversaryFormDialog } from '../components/AnniversaryFormDialog'
 import { AnniversaryList } from '../components/AnniversaryList'
-import { startOfToday, summarizeAll } from '../dday'
+import { pickHighlight, startOfToday, summarizeAll } from '../dday'
 import { anniversariesQueryKey, useAnniversaries } from '../hooks/useAnniversaries'
 import type { Anniversary } from '../types'
 
@@ -47,6 +47,24 @@ export function AnniversaryPage() {
     () => summarizeAll(anniversaries ?? [], startOfToday()),
     [anniversaries],
   )
+
+  // 목록의 라디오가 가리킬 곳. 커플이 고른 적이 없으면 홈이 자동으로 뽑는 것과
+  // 같은 규칙으로 떨어지므로, 라디오는 언제나 "지금 홈에 떠 있는 그것"을 켠 채로
+  // 열린다 — 비어 있는 라디오 그룹을 보여주지 않으려는 것이다.
+  const primaryId = pickHighlight(summaries)?.anniversary.id
+
+  const primarySelection = useMutation({
+    mutationFn: (anniversary: Anniversary) => setPrimaryAnniversary(anniversary.id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: anniversariesQueryKey(coupleId) })
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof Error ? error.message : '변경하지 못했어요.',
+      })
+    },
+  })
 
   const deletion = useMutation({
     mutationFn: (anniversary: Anniversary) => deleteAnniversary(anniversary.id),
@@ -84,7 +102,7 @@ export function AnniversaryPage() {
       <VStack gap={1}>
         <Heading level={1}>기념일</Heading>
         <Text type="supporting">
-          등록한 기념일 중 가장 가까운 하나가 홈 화면에 크게 표시돼요.
+          홈 화면에 크게 띄울 기념일을 골라두세요. 나머지는 여기서만 보여요.
         </Text>
       </VStack>
 
@@ -114,6 +132,8 @@ export function AnniversaryPage() {
         <>
           <AnniversaryList
             summaries={summaries}
+            primaryId={primaryId}
+            onSelectPrimary={primarySelection.mutate}
             onEdit={openEdit}
             onDelete={setPendingDelete}
           />

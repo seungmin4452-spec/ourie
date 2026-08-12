@@ -178,6 +178,11 @@ create table public.anniversaries (
   title text not null,
   date date not null,
   repeat_yearly boolean not null default true,
+  -- 홈 위젯이 크게 보여줄 기념일. 커플당 최대 하나이며, 고르는 일은
+  -- set_primary_anniversary가 한 문장으로 처리한다 (아래 그 함수 주석 참고).
+  -- 하나도 켜지 않은 커플이 정상 상태다 — 그때는 화면이 가장 가까운 기념일로
+  -- 떨어진다 (src/features/anniversary/dday.ts의 pickHighlight).
+  is_primary boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -616,6 +621,51 @@ create policy "anniversaries_update_couple"
 create policy "anniversaries_delete_couple"
   on public.anniversaries for delete
   using (couple_id = public.current_couple_id());
+
+-- ------------------------------------------------------------
+-- set_primary_anniversary: 홈 위젯에 크게 뜰 기념일 하나를 고른다.
+--
+-- **한 문장인 것이 핵심이다.** "전부 끄고 → 하나를 켠다"로 나누면 그 사이에
+-- 메인이 없는 순간이 생기고, 두 번째가 실패하면 커플의 홈이 조용히 다른
+-- 기념일로 바뀐 채 남는다. `set is_primary = (id = p_id)`는 한 번의 스캔으로
+-- 고른 것만 켜고 나머지를 끈다.
+--
+-- 부분 유니크 인덱스(`unique (couple_id) where is_primary`)로 강제하지 않는
+-- 이유: 유니크 검사는 한 문장 안에서도 행 단위로 일어나서, 옛 메인 행보다 새
+-- 메인 행이 먼저 갱신되면 잠깐 둘이 되어 위반으로 죽는다. 불변식은 이 함수가
+-- 지킨다.
+--
+-- send_poke와 달리 authenticated의 실행 권한을 회수하지 않는다. 이 함수는
+-- 신원을 인자로 받지 않고 auth.uid()에서 직접 읽으므로(current_couple_id),
+-- 남의 커플을 건드릴 방법이 없다.
+-- ------------------------------------------------------------
+create or replace function public.set_primary_anniversary(p_id uuid)
+returns void
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_couple_id uuid;
+begin
+  v_couple_id := public.current_couple_id();
+  if v_couple_id is null then
+    raise exception 'no_couple';
+  end if;
+
+  -- 남의 커플 기념일 id를 넣었을 때 우리 커플 것을 전부 꺼버리지 않도록 먼저
+  -- 확인한다. RLS가 update를 막아주긴 하지만, 그 경우 "아무 일도 안 일어남"이
+  -- 아니라 "메인만 사라짐"이 되기 때문에 여기서 끊는다.
+  if not exists (
+    select 1 from public.anniversaries where id = p_id and couple_id = v_couple_id
+  ) then
+    raise exception 'not_found';
+  end if;
+
+  update public.anniversaries
+     set is_primary = (id = p_id)
+   where couple_id = v_couple_id;
+end;
+$$;
 
 -- memories: couple-scoped
 create policy "memories_select_couple"

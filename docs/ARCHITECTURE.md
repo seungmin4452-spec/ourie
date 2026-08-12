@@ -126,7 +126,7 @@ api/notify-dday.ts  ── service role ──►  Supabase
 - **한 번에 보내는 개수**: cron이 함수를 깨우는 건 하루 한 번이지만, 그게 한 실행이 보내는 알림 수는 아니다. 한 번 깨어난 함수가 구독 전부를 순회하며 각자에게 보내므로, 커플 두 사람이 각각 켜두면 같은 실행에서 둘 다 받는다.
 - **일시정지 주의**: pg_cron은 DB 안에서 돌기 때문에 Supabase Free 프로젝트가 일시정지되면(활동 없이 7일) 같이 멈춘다. 다만 Vercel Cron으로 돌려도 결과는 같다 — 그 함수가 하는 첫 일이 Supabase에서 `push_subscriptions`를 읽는 것이라 DB가 자면 어차피 못 보낸다. 대신 이 잡이 만드는 왕복(pg_net → Vercel → PostgREST 조회·갱신)이 매일 사용자 요청으로 잡히므로 그 자체가 일시정지를 늦춘다.
 - **중복 방지**: `push_subscriptions.last_notified_on`. cron 재시도나 수동 호출로 같은 날 두 번 울리지 않는다.
-- **기준 기념일**: 여러 기념일 중 **기준일이 가장 이른 것** 하나 (`src/features/notification/baseAnniversary.ts`). 홈 위젯의 큰 숫자(`pickHighlight`)는 "가장 가까이 다가온" 기념일이라 기준이 다르다 — 위젯은 다음에 뭐가 오는지, 알림은 오늘이 며칠째인지를 말하는 자리다.
+- **기준 기념일**: 여러 기념일 중 **기준일이 가장 이른 것** 하나 (`src/features/notification/baseAnniversary.ts`). 홈 위젯의 큰 숫자(`pickHighlight`)는 커플이 직접 고른 것(`anniversaries.is_primary`)을 따르므로 기준이 다르다 — 위젯은 커플이 보고 싶다고 정한 날을, 알림은 둘이 함께한 날수를 말하는 자리다.
 - **문구**: `src/features/notification/message.ts`. 브라우저(설정 화면의 미리보기)와 서버가 같은 함수를 쓴다. 그래서 이 파일은 DOM·Supabase에 손대지 않는 순수 함수만 두고, `api/`에서 상대 경로로 import한다 (Vercel은 `api/`의 tsconfig path mapping을 지원하지 않아 `@/` 별칭을 쓸 수 없다).
 - **iOS 제약**: 홈 화면에 추가한 앱에서만 Web Push가 동작한다 (Safari 탭에는 `PushManager`가 없다). 설정 화면은 이 경우를 "지원 안 함"이 아니라 "홈 화면에 추가하면 켤 수 있어요"로 구분해 안내한다. 또 iOS는 알림을 띄우지 않는 push를 받으면 구독을 회수하므로, 서비스워커는 페이로드가 깨져도 기본 문구로 반드시 하나를 띄운다.
 - **환경변수**: `VITE_VAPID_PUBLIC_KEY`(클라이언트) / `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`·`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·`CRON_SECRET`(서버). `.env.example` 참고. service role 키에는 절대 `VITE_` 접두사를 붙이지 않는다.
