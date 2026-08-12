@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, PhoneCall } from 'lucide-react'
+import { Heart, MessageCircle, MessageCircleQuestion, PhoneCall } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import type { PokeKind } from './message'
@@ -12,6 +12,7 @@ const POKE_ICONS: Record<PokeKind, ReactNode> = {
   miss: <Heart className="size-4" />,
   kakao: <MessageCircle className="size-4" />,
   call: <PhoneCall className="size-4" />,
+  doing: <MessageCircleQuestion className="size-4" />,
 }
 
 export function pokeIcon(kind: PokeKind): ReactNode {

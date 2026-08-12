@@ -51,7 +51,7 @@ interface PokeWidgetProps {
  *
  * 실제 차단은 서버가 한다 (supabase/schema.sql의 send_poke). 여기 잠금은 안내다.
  *
- * 버튼은 기본으로 주는 세 개 뒤에 커플이 만든 것들이 붙는다. 새로 만든 게
+ * 버튼은 기본으로 주는 것들 뒤에 커플이 만든 것들이 붙는다. 새로 만든 게
  * 아래에 쌓여야 이미 손에 익은 버튼의 자리가 흔들리지 않는다.
  */
 export function PokeWidget({ profile }: PokeWidgetProps) {
@@ -168,7 +168,6 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
             coupleId={coupleId}
             userId={user.id}
             presets={presets ?? []}
-            senderName={profile?.name}
           />
         </>
       )}

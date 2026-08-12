@@ -391,16 +391,16 @@ create table public.pokes (
   couple_id uuid not null references public.couples (id) on delete cascade,
   sender_id uuid not null references public.profiles (id) on delete cascade,
   recipient_id uuid not null references public.profiles (id) on delete cascade,
-  -- 기본으로 주는 세 개(src/features/poke/message.ts의 POKE_KINDS와 같아야
-  -- 한다)와, 커플이 만든 버튼을 가리키는 'custom'. text + check인 이유는
+  -- 기본으로 주는 것들(src/features/poke/message.ts의 POKE_KINDS와 같아야
+  -- 한다)과, 커플이 만든 버튼을 가리키는 'custom'. text + check인 이유는
   -- enum이면 종류를 늘릴 때마다 타입 변경 마이그레이션이 필요하기 때문이다.
-  kind text not null check (kind in ('miss', 'kakao', 'call', 'custom')),
+  kind text not null check (kind in ('miss', 'kakao', 'call', 'doing', 'custom')),
   -- 커플이 만든 버튼이었다면 어떤 것이었는지. 버튼을 지우면 그 기록도 같이
   -- 사라진다 — 문구를 잃은 기록은 나중에 뭘 보여줄 수도 없다.
   preset_id uuid references public.poke_presets (id) on delete cascade,
   created_at timestamptz not null default now(),
 
-  -- 'custom'이면 어떤 버튼이었는지가 반드시 있어야 하고, 반대로 기본 세 개는
+  -- 'custom'이면 어떤 버튼이었는지가 반드시 있어야 하고, 반대로 기본 버튼은
   -- preset_id를 가질 수 없다. 이 짝이 어긋나면 알림 문구를 만들 수가 없다.
   constraint pokes_preset_matches_kind
     check ((kind = 'custom') = (preset_id is not null))
@@ -459,7 +459,7 @@ begin
   end if;
 
   if p_preset is null then
-    if p_kind not in ('miss', 'kakao', 'call') then
+    if p_kind not in ('miss', 'kakao', 'call', 'doing') then
       raise exception 'invalid_kind';
     end if;
     v_kind := p_kind;
@@ -478,7 +478,7 @@ begin
     v_kind := 'custom';
   end if;
 
-  -- 같은 사람이 같은 버튼을 동시에 두 번 누르는 것만 직렬화한다. 기본 세 개는
+  -- 같은 사람이 같은 버튼을 동시에 두 번 누르는 것만 직렬화한다. 기본 버튼은
   -- 종류로, 커플이 만든 버튼은 그 id로 구분한다.
   perform pg_advisory_xact_lock(
     hashtext(p_sender::text || ':' || coalesce(p_preset::text, v_kind))
@@ -518,7 +518,7 @@ begin
     raise exception 'too_soon';
   end if;
 
-  -- preset_label / preset_body는 기본 세 개일 때 null이다 (v_preset이 비어 있다).
+  -- preset_label / preset_body는 기본 버튼일 때 null이다 (v_preset이 비어 있다).
   -- 그때의 문구는 코드가 들고 있다 (src/features/poke/message.ts).
   return jsonb_build_object(
     'recipient_id', v_recipient,

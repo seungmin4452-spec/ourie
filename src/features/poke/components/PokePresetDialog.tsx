@@ -27,7 +27,7 @@ import {
   pokePresetIcon,
   type PokeIconName,
 } from '../icons'
-import { POKE_PRESET_LIMITS, POKE_PRESET_MAX, pokeNameLabel } from '../message'
+import { POKE_PRESET_LIMITS, POKE_PRESET_MAX } from '../message'
 import type { PokePreset } from '../types'
 
 interface PokePresetDialogProps {
@@ -36,8 +36,6 @@ interface PokePresetDialogProps {
   coupleId: string
   userId: string
   presets: PokePreset[]
-  /** 알림 미리보기에 쓸 내 이름 (`profiles.name`). */
-  senderName: string | null | undefined
 }
 
 /**
@@ -57,7 +55,6 @@ export function PokePresetDialog({
   coupleId,
   userId,
   presets,
-  senderName,
 }: PokePresetDialogProps) {
   const queryClient = useQueryClient()
   const showToast = useToast()
@@ -234,9 +231,7 @@ export function PokePresetDialog({
                       (message.ts의 "문구를 무작위로 고르지 않는다" 주석 참고) */}
                   <VStack gap={0.5}>
                     <Text type="supporting">상대방에게는 이렇게 떠요</Text>
-                    <Text weight="medium">
-                      {`${pokeNameLabel(senderName)}: ${trimmedLabel || '제목'}`}
-                    </Text>
+                    <Text weight="medium">{trimmedLabel || '제목'}</Text>
                     <Text type="supporting">{trimmedBody || '알림 내용'}</Text>
                   </VStack>
 

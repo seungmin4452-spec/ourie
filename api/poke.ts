@@ -79,7 +79,7 @@ interface SendPokeResult {
    */
   sender_name: string | null
   /**
-   * 커플이 만든 버튼이었다면 그 버튼의 문구. 기본 세 개일 때는 둘 다 null이고,
+   * 커플이 만든 버튼이었다면 그 버튼의 문구. 기본 버튼일 때는 둘 다 null이고,
    * 그때 문구는 코드(message.ts)가 들고 있다.
    *
    * **이 값이 요청 본문이 아니라 여기서 오는 것이 중요하다.** 클라이언트가 보낸
@@ -127,7 +127,7 @@ export async function POST(request: Request): Promise<Response> {
     | { kind?: unknown; presetId?: unknown }
     | null
 
-  // 기본 세 개(kind)이거나 커플이 만든 버튼(presetId)이거나, 둘 중 정확히
+  // 기본 버튼(kind)이거나 커플이 만든 버튼(presetId)이거나, 둘 중 정확히
   // 하나여야 한다. 둘 다 오면 무엇을 보내려는 건지 알 수 없다.
   const kind = isPokeKind(body?.kind) ? body.kind : null
   const presetId =
@@ -202,7 +202,7 @@ export async function POST(request: Request): Promise<Response> {
     // 커플이 만든 버튼의 문구는 요청 본문이 아니라 위 send_poke 반환값에서
     // 온다 — SendPokeResult 주석 참고.
     ...(presetId
-      ? buildCustomPokeNotification(presetId, presetLabel!, presetBody!, senderName)
+      ? buildCustomPokeNotification(presetId, presetLabel!, presetBody!)
       : buildPokeNotification(kind!, senderName)),
     url: NOTIFICATION_URL,
   }

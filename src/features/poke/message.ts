@@ -11,7 +11,7 @@
 // 확장자를 챙겨야 한다.
 
 /**
- * 기본으로 주는 세 가지. 이 문자열은 DB의 pokes.kind check 제약과 같아야 한다
+ * 기본으로 주는 네 가지. 이 문자열은 DB의 pokes.kind check 제약과 같아야 한다
  * (supabase/schema.sql). 한쪽만 늘리면 발송이 invalid_kind로 막힌다.
  *
  * 커플이 직접 만든 버튼은 여기 없다 — 그건 poke_presets 테이블에 있고
@@ -20,7 +20,7 @@
  *
  * 배열 순서가 화면에 버튼이 놓이는 순서다.
  */
-export const POKE_KINDS = ['miss', 'kakao', 'call'] as const
+export const POKE_KINDS = ['miss', 'kakao', 'call', 'doing'] as const
 
 export type PokeKind = (typeof POKE_KINDS)[number]
 
@@ -33,6 +33,7 @@ export const POKE_LABELS: Record<PokeKind, string> = {
   miss: '보고싶어',
   kakao: '카톡 확인해줘',
   call: '전화해줘',
+  doing: '뭐해?',
 }
 
 export interface PokeNotification {
@@ -70,15 +71,17 @@ export function pokeNameLabel(personName: string | null | undefined): string {
 }
 
 const BODIES: Record<PokeKind, string> = {
-  miss: '지금 당신 생각을 하고 있대요.',
-  kakao: '메시지를 보내두고 기다리고 있어요.',
-  call: '목소리가 듣고 싶대요.',
+  miss: '지금 당신 생각을 하고 있대요!',
+  kakao: '메시지를 보내두고 기다리고 있어요!',
+  call: '목소리가 듣고 싶대요!',
+  doing: '지금 뭐 하고 있는지 궁금하대요!',
 }
 
 const TITLES: Record<PokeKind, (who: string) => string> = {
   miss: (who) => `${who}이 보고 싶대요`,
   kakao: (who) => `${who}이 카톡을 기다려요`,
   call: (who) => `${who}이 전화를 기다려요`,
+  doing: (who) => `${who}이 뭐 하냐고 물어요`,
 }
 
 /**
@@ -113,9 +116,11 @@ export const POKE_PRESET_MAX = 12
 /**
  * 커플이 직접 만든 버튼으로 나가는 알림.
  *
- * 제목에 보낸 사람을 앞세우는 이유는 기본 세 개("승민님이 보고 싶대요")와 같다 —
- * 잠금화면에서 제목 한 줄만 보고도 누가 불렀는지 알아야 한다. 사용자가 적은
- * 말은 그 뒤에 그대로 붙는다.
+ * 제목은 사용자가 적은 말 그대로다. 한때 "승민님: 밥 먹자"처럼 보낸 사람을
+ * 앞세웠지만, 이 앱에서 알림을 보낼 수 있는 사람은 어차피 한 명뿐이라 이름은
+ * 잠금화면에서 매번 같은 자리를 차지하기만 했다. 기본 버튼들이 이름을 문장
+ * 안에 품는 것("승민님이 보고 싶대요")과 달리, 여기서는 커플이 적은 문구가
+ * 통째로 제목이므로 앞에 뭘 붙이면 그 문구가 잘려 보인다.
  *
  * label과 body는 반드시 **DB에서 읽은 값**이어야 한다. 보내는 쪽 화면이 넘긴
  * 값을 그대로 쓰면 상대방 잠금화면에 아무 말이나 띄울 수 있다 (그래서
@@ -125,10 +130,9 @@ export function buildCustomPokeNotification(
   presetId: string,
   label: string,
   body: string,
-  senderName: string | null | undefined,
 ): PokeNotification {
   return {
-    title: `${pokeNameLabel(senderName)}: ${label}`,
+    title: label,
     body,
     // 버튼마다 tag가 달라야 서로를 덮지 않는다. "밥 먹자"가 "잘 자"를 지우면
     // 안 되는 건 "보고싶어"가 "전화해줘"를 지우면 안 되는 것과 같은 이유다.

@@ -132,19 +132,19 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 | couple_id | uuid (FK → couples.id) | |
 | sender_id | uuid (FK → profiles.id) | 버튼을 누른 사람 |
 | recipient_id | uuid (FK → profiles.id) | 알림을 받은 사람 |
-| kind | text | `miss` / `kakao` / `call` / `custom` (check 제약) |
+| kind | text | `miss` / `kakao` / `call` / `doing` / `custom` (check 제약) |
 | preset_id | uuid (FK → poke_presets.id, nullable) | `custom`일 때만. on delete cascade |
 | created_at | timestamptz | default now() |
 
-`kind`의 앞 세 개는 `src/features/poke/message.ts`의 `POKE_KINDS`와 같아야 한다. 한쪽만 늘리면 발송이 `invalid_kind`로 막힌다. 커플이 만든 버튼은 종류를 늘리지 않고 `custom` 하나로 기록되며, 어떤 버튼이었는지는 `preset_id`에 남는다.
+`kind`에서 `custom`을 뺀 나머지는 `src/features/poke/message.ts`의 `POKE_KINDS`와 같아야 한다. 한쪽만 늘리면 발송이 `invalid_kind`로 막힌다. 커플이 만든 버튼은 종류를 늘리지 않고 `custom` 하나로 기록되며, 어떤 버튼이었는지는 `preset_id`에 남는다.
 
-`pokes_preset_matches_kind` check가 이 둘의 짝을 강제한다 — `custom`이면 `preset_id`가 반드시 있고, 기본 세 개는 가질 수 없다. 짝이 어긋난 row는 알림 문구를 만들 수 없는 row다. 버튼을 지우면 그 버튼으로 보낸 기록도 함께 사라진다(cascade) — 문구를 잃은 기록은 나중에 보여줄 수도 없다.
+`pokes_preset_matches_kind` check가 이 둘의 짝을 강제한다 — `custom`이면 `preset_id`가 반드시 있고, 기본 버튼은 가질 수 없다. 짝이 어긋난 row는 알림 문구를 만들 수 없는 row다. 버튼을 지우면 그 버튼으로 보낸 기록도 함께 사라진다(cascade) — 문구를 잃은 기록은 나중에 보여줄 수도 없다.
 
 **수신 동의가 전제다.** 이 기능만은 내가 아니라 상대방이 내 기기를 울리므로, `profiles.poke_opt_in`(기본 `false`)을 켠 사람에게만 간다. 매일 디데이 알림과 별개의 스위치인 이유이기도 하다 — 디데이는 받고 콕 찌르기는 안 받고 싶을 수 있다. 수정은 본인만(`profiles_update_self`), 읽기는 커플 상대방도 가능하다(`profiles_select_self_or_partner`) — 그래서 보내는 쪽 화면이 눌러보기 전에 "상대가 아직 안 켰어요"를 보여줄 수 있다.
 
 **쓰기 정책이 없다.** insert는 `public.send_poke(p_sender, p_kind, p_preset)`(security definer)와 service role만 한다. 클라이언트가 직접 넣을 수 있으면 쿨다운도 수신 동의도 우회된다. 그 함수는 `authenticated`/`anon`의 실행 권한을 revoke해 두었고(남의 id를 넣어 사칭하는 것을 막는다), 실제 신원 확인은 `api/poke.ts`가 access token을 검증해 한다. `p_preset`이 오면 그 버튼이 **보내는 사람의 커플 것인지** 함수 안에서 확인하고, 알림 문구도 그때 읽은 값만 돌려준다.
 
-**연타 방지**는 같은 버튼 1초 1회다 (하루 총량 제한은 없다). 직전 발송 조회와 insert가 `send_poke` 한 트랜잭션 안에 있고, `pg_advisory_xact_lock(sender, 버튼)`으로 동시에 들어온 두 요청을 직렬화한다 — 여러 조회로 나누면 버튼 연타가 정확히 그 검사를 빠져나간다. 여기서 "버튼"은 기본 세 개면 `kind`, 커플이 만든 것이면 `preset_id`다. 서로 다른 버튼끼리는 쿨다운을 공유하지 않는다.
+**연타 방지**는 같은 버튼 1초 1회다 (하루 총량 제한은 없다). 직전 발송 조회와 insert가 `send_poke` 한 트랜잭션 안에 있고, `pg_advisory_xact_lock(sender, 버튼)`으로 동시에 들어온 두 요청을 직렬화한다 — 여러 조회로 나누면 버튼 연타가 정확히 그 검사를 빠져나간다. 여기서 "버튼"은 기본 버튼이면 `kind`, 커플이 만든 것이면 `preset_id`다. 서로 다른 버튼끼리는 쿨다운을 공유하지 않는다.
 
 기록을 남기는 건 쿨다운 때문만은 아니다. 나중에 "오늘 세 번 보고 싶다고 했어요" 같은 화면을 붙일 수 있게 하려는 것이라, 발송 성공 여부가 아니라 "보내기로 했다"는 사실을 적는다.
 
