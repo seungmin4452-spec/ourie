@@ -8,8 +8,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { cacheAppMeta, readCachedAppMeta } from '@/app/appMeta'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
-import { ImageCropDialog } from '@/components/common/ImageCropDialog'
 import { useAuth } from '@/features/auth'
+import { cropImageToSquare } from '@/lib/cropImageToSquare'
 import { getProfile, updateProfile, uploadAvatar } from '../api/profile'
 import { openPwaInstallPage } from '../pwaInstall'
 
@@ -25,7 +25,6 @@ export function CustomizeForm() {
   const [typedName, setTypedName] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [pendingCropFile, setPendingCropFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { data: profile } = useQuery({
@@ -50,7 +49,7 @@ export function CustomizeForm() {
   // already saved so reopening the form doesn't look like the photo is gone.
   const displayedAvatarUrl = previewUrl ?? profile?.avatar_url ?? null
 
-  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
@@ -64,14 +63,20 @@ export function CustomizeForm() {
       return
     }
 
-    setPendingCropFile(file)
-  }
-
-  function handleCropConfirm(blob: Blob) {
-    const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
-    setImageFile(croppedFile)
-    setPreviewUrl(URL.createObjectURL(blob))
-    setPendingCropFile(null)
+    // 위치/확대를 직접 맞추게 하지 않고 가운데 정사각형으로 알아서 자른다.
+    try {
+      const blob = await cropImageToSquare(file)
+      setImageFile(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(blob)
+      })
+    } catch (err) {
+      showToast({
+        type: 'error',
+        body: err instanceof Error ? err.message : '이미지를 처리하지 못했어요.',
+      })
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -142,11 +147,6 @@ export function CustomizeForm() {
           accept="image/*"
           className="hidden"
           onChange={handleImageChange}
-        />
-        <ImageCropDialog
-          file={pendingCropFile}
-          onCancel={() => setPendingCropFile(null)}
-          onConfirm={handleCropConfirm}
         />
       </div>
 

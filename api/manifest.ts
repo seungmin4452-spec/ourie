@@ -47,7 +47,7 @@ export default function handler(request: Request): Response {
   ]
 
   // Only describe the couple's photo when there actually is one. It comes out
-  // of ImageCropDialog as a 512px square JPEG, so these values are accurate
+  // of cropImageToSquare as a 512px square JPEG, so these values are accurate
   // rather than hopeful -- but the fallback is a PNG of another size, and
   // mislabelling that would be worse than leaving it to the defaults above.
   if (icon !== defaultIconUrl(origin)) {
