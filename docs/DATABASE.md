@@ -101,7 +101,7 @@ couples ◄───────┘ (couple_id로 연결)
 
 `last_notified_on`이 "1일 1알림"을 지키는 자물쇠다. cron이 재시도되거나 엔드포인트를 손으로 한 번 더 불러도, 이 값이 이미 오늘이면 건너뛴다. 발송은 `api/notify-dday.ts`가 하며 service role 키로 RLS를 우회한다 (모두를 대신해 도는 작업이라 특정 사용자의 세션이 없다).
 
-그 엔드포인트를 매일 KST 오전 8시에 깨우는 것도 이 DB다 — `pg_cron` 잡 `notify-dday`가 `pg_net`으로 호출한다 (`supabase/migrations/2026-08-12-notify-cron.sql`). 스케줄이 애플리케이션이 아니라 DB에 사는 이유는 `ARCHITECTURE.md` §6.1 참고.
+그 엔드포인트를 매일 KST 오전 9시에 깨우는 것도 이 DB다 — `pg_cron` 잡 `notify-dday`가 `pg_net`으로 호출한다 (`supabase/migrations/2026-08-12-notify-cron.sql`). 스케줄이 애플리케이션이 아니라 DB에 사는 이유는 `ARCHITECTURE.md` §6.1 참고.
 
 ### 2.3.2 `poke_presets` (커플이 만든 콕 찌르기 버튼)
 

@@ -973,7 +973,7 @@ create policy "travel_maps_couple_delete"
 -- ============================================================
 -- 매일 디데이 알림을 깨우는 스케줄
 --
--- 발송 자체는 api/notify-dday.ts가 한다. 여기서 하는 일은 "매일 KST 오전 8시에
+-- 발송 자체는 api/notify-dday.ts가 한다. 여기서 하는 일은 "매일 KST 오전 9시에
 -- 그 엔드포인트를 부른다"뿐이다 (web-push의 VAPID 서명은 Postgres에서 할 수
 -- 있는 일이 아니다).
 --
@@ -994,11 +994,11 @@ create policy "travel_maps_couple_delete"
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- 스케줄은 UTC다. KST 08:00 = 전날 UTC 23:00 (날짜가 밀린 게 아니라 맞다 —
--- 함수의 todayKey()가 +9시간 해서 읽으므로 KST 달력의 오늘이 나온다).
+-- 스케줄은 UTC다. KST 09:00 = 같은 날 UTC 00:00 (함수의 todayKey()가 +9시간 해서
+-- 읽으므로 언제 깨어나도 KST 달력의 오늘이 나온다).
 select cron.schedule(
   'notify-dday',
-  '0 23 * * *',
+  '0 0 * * *',
   $$
   select net.http_get(
     url := 'https://ourie.vercel.app/api/notify-dday',

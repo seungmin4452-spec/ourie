@@ -16,7 +16,8 @@ export interface Anniversary {
   date: DateKey
   repeat_yearly: boolean
   /**
-   * 홈 위젯이 크게 보여줄 기념일로 커플이 직접 고른 것. 커플당 최대 하나이고,
+   * 홈 위젯이 크게 보여줄 기념일로 커플이 직접 고른 것. 매일 오는 디데이 알림도
+   * 이걸 기준으로 센다 (`notification/baseAnniversary.ts`). 커플당 최대 하나이고,
    * 아무것도 고르지 않은 상태가 정상이다 — 그때는 가장 가까운 기념일이 뜬다
    * (`dday.ts`의 `pickHighlight`).
    *

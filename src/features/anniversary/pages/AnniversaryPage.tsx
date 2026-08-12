@@ -102,7 +102,8 @@ export function AnniversaryPage() {
       <VStack gap={1}>
         <Heading level={1}>기념일</Heading>
         <Text type="supporting">
-          홈 화면에 크게 띄울 기념일을 골라두세요. 나머지는 여기서만 보여요.
+          홈 화면에 크게 띄우고 매일 알림으로 받을 기념일을 골라두세요. 나머지는
+          여기서만 보여요.
         </Text>
       </VStack>
 

@@ -1,8 +1,8 @@
 // 하루 한 번, 알림을 켠 사람들에게 "오늘 며칠째"를 보내는 함수.
 //
 // **부르는 쪽은 Vercel Cron이 아니라 Supabase의 pg_cron이다**
-// (supabase/migrations/2026-08-12-notify-cron.sql). 매일 UTC 23:00 = KST 오전
-// 8시에 pg_net이 이 엔드포인트를 GET으로 친다. Vercel Cron을 걷어낸 이유는 그
+// (supabase/migrations/2026-08-12-notify-cron.sql). 매일 UTC 00:00 = KST 오전
+// 9시에 pg_net이 이 엔드포인트를 GET으로 친다. Vercel Cron을 걷어낸 이유는 그
 // cron이 현재 프로덕션 배포에 묶여서, 발동 구간에 배포가 올라가면 그날 몫이
 // 통째로 유실되기 때문이다 (2026-08-12에 실제로 겪었다). 발송 시각을 바꾸려면
 // 그 마이그레이션의 cron.schedule 하나만 고치면 된다 — 이 파일은 자기가 몇 시에
@@ -46,9 +46,10 @@ const NOTIFICATION_URL = '/'
 /**
  * 커플이 사는 달력. 발송 시각이 KST 아침으로 고정이라 날짜 기준도 KST다.
  *
- * cron이 UTC 23:00에 깨우므로 서버가 보는 날짜는 아직 "어제"지만, 절대 시각에
- * 9시간을 더해 읽으면 사용자가 맞이하는 오늘이 나온다. 발송 시각을 옮겨도 이
- * 값은 그대로 둔다 — 이건 "몇 시에 보내나"가 아니라 "누구의 달력인가"다.
+ * 서버는 UTC로 도니 그대로 읽으면 KST 새벽·아침 시간대에 어제 날짜가 나올 수
+ * 있다. 절대 시각에 9시간을 더해 읽으면 언제 깨어나도 사용자가 맞이하는 오늘이
+ * 나온다. 발송 시각을 옮겨도 이 값은 그대로 둔다 — 이건 "몇 시에 보내나"가
+ * 아니라 "누구의 달력인가"다.
  *
  * (사용자별 타임존을 지원하려면 구독마다 타임존을 저장하고 cron을 매시간
  * 돌려야 한다. pg_cron으로 옮겨 왔으니 이제 플랜 제약은 없다.)
@@ -71,6 +72,8 @@ interface AnniversaryRow {
   couple_id: string
   title: string
   date: string
+  /** 커플이 직접 고른 기준. pickBaseAnniversary가 이걸 가장 먼저 본다. */
+  is_primary: boolean
 }
 
 /** 커플의 달력 기준 오늘 (YYYY-MM-DD). */
@@ -137,7 +140,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const { data: anniversaryRows, error: anniversaryError } = await supabase
     .from('anniversaries')
-    .select('couple_id, title, date')
+    .select('couple_id, title, date, is_primary')
     .in('couple_id', coupleIds)
 
   if (anniversaryError) {

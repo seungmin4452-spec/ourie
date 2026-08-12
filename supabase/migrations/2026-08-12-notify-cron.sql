@@ -69,18 +69,19 @@
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- 2. 매일 KST 오전 8시 --------------------------------------------
--- pg_cron의 스케줄은 **UTC 기준**이다. KST 08:00 = 전날 UTC 23:00이라 날짜가
--- 하루 밀린 것처럼 보이지만 맞다. 함수 쪽 날짜 계산은 이 어긋남을 이미 견딘다 —
--- todayKey()가 절대 시각에 +9시간을 해서 읽으므로, UTC 23:00에 깨어나도 KST
--- 달력의 "내일"(= 사용자가 맞이하는 오늘)이 나온다.
+-- 2. 매일 KST 오전 9시 --------------------------------------------
+-- pg_cron의 스케줄은 **UTC 기준**이다. KST 09:00 = 같은 날 UTC 00:00이다.
+-- 함수 쪽 날짜 계산은 시각이 어떻든 견딘다 — todayKey()가 절대 시각에 +9시간을
+-- 해서 읽으므로 언제 깨어나도 KST 달력의 오늘이 나온다.
 --
--- 시각을 바꿀 땐 여기 하나만 고치면 된다. api/notify-dday.ts는 자기가 몇 시에
--- 불리는지 모르고, KST_OFFSET_MINUTES는 시각이 아니라 "커플이 사는 달력"이라
--- 같이 고칠 필요가 없다.
+-- 시각을 바꿀 땐 여기 하나만 고치고 **이 파일을 다시 실행하면 된다**
+-- (cron.schedule은 잡 이름이 같으면 갈아끼운다). api/notify-dday.ts는 자기가 몇
+-- 시에 불리는지 모르고, KST_OFFSET_MINUTES는 시각이 아니라 "커플이 사는 달력"이라
+-- 같이 고칠 필요가 없다. 설정 화면의 안내 문구(NotificationSettings.tsx)만 함께
+-- 고친다.
 select cron.schedule(
   'notify-dday',
-  '0 23 * * *',
+  '0 0 * * *',
   $$
   select net.http_get(
     url := 'https://ourie.vercel.app/api/notify-dday',
