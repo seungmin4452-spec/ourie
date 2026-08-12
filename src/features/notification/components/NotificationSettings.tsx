@@ -17,11 +17,11 @@ import { buildDdayNotification } from '../message'
 /** 상태별로 스위치 아래에 붙는 한 줄. */
 const DESCRIPTIONS: Record<PushState, string> = {
   loading: '알림을 켤 수 있는지 확인하고 있어요.',
-  // "9시쯤"인 이유: Vercel Hobby 플랜은 cron 실행 시각을 ±59분까지만 보장한다
-  // (9시 정각에 걸어도 9시 59분에 갈 수 있다). 분 단위로 맞추려면 Pro 플랜이
-  // 필요하다 — ARCHITECTURE.md §6.1 참고.
-  on: '매일 아침 9시쯤 오늘이 며칠째인지 알려드려요.',
-  off: '매일 아침 9시쯤 오늘이 며칠째인지 알려드려요.',
+  // "쯤"이 빠진 이유: 예전엔 Vercel Hobby cron이라 실행 시각이 ±59분까지
+  // 흔들렸는데, pg_cron으로 옮기면서 정각에 돈다. 시각을 바꾸면 여기 문구도
+  // 같이 고쳐야 한다 (스케줄은 ARCHITECTURE.md §6.1 참고).
+  on: '매일 아침 8시에 오늘이 며칠째인지 알려드려요.',
+  off: '매일 아침 8시에 오늘이 며칠째인지 알려드려요.',
   blocked: '기기 설정에서 이 앱의 알림을 허용한 뒤 다시 시도해주세요.',
   'needs-install': '홈 화면에 추가한 앱에서만 알림을 받을 수 있어요.',
   unsupported: '이 브라우저는 알림을 지원하지 않아요.',

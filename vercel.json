@@ -13,12 +13,6 @@
       "destination": "/index.html"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/notify-dday",
-      "schedule": "0 0 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/sw.js",

@@ -31,7 +31,7 @@
 - [x] 디데이 등록/수정/삭제 UI (`/anniversaries`)
 - [x] D+N/D-N 계산 로직 (유틸 함수) — `src/features/anniversary/dday.ts`
 - [x] 홈 화면에 다가오는 디데이 강조 표시
-- [x] 매일 디데이 알림 (Web Push) — `push_subscriptions` 테이블, `/anniversaries`의 알림 스위치, `api/notify-dday.ts` + Vercel Cron
+- [x] 매일 디데이 알림 (Web Push) — `push_subscriptions` 테이블, `/anniversaries`의 알림 스위치, `api/notify-dday.ts` + Supabase pg_cron
 - [x] 마일스톤 문구 (100일 단위 · 주년 · D-3 예고) — `src/features/notification/message.ts`
 - [x] 콕 찌르기 — `pokes` 테이블 + `send_poke` RPC, `api/poke.ts`, 홈 위젯 `src/features/poke`
 - [x] 콕 찌르기를 커플이 직접 만들기 — `poke_presets` 테이블, 위젯의 "콕 찌르기 만들기" 다이얼로그

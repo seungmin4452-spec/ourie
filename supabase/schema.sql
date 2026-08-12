@@ -846,3 +846,46 @@ create policy "travel_maps_couple_delete"
     bucket_id = 'travel-maps'
     and (storage.foldername(name))[1] = public.current_couple_id()::text
   );
+
+-- ============================================================
+-- 매일 디데이 알림을 깨우는 스케줄
+--
+-- 발송 자체는 api/notify-dday.ts가 한다. 여기서 하는 일은 "매일 KST 오전 8시에
+-- 그 엔드포인트를 부른다"뿐이다 (web-push의 VAPID 서명은 Postgres에서 할 수
+-- 있는 일이 아니다).
+--
+-- Vercel Cron이 아니라 pg_cron인 이유: Vercel의 cron은 현재 프로덕션 배포에
+-- 묶여서, 발동 구간에 새 배포가 올라가면 그날 몫이 유실된다. Hobby 플랜은
+-- 실행 시각 정밀도도 ±59분이다. 자세한 경위는
+-- supabase/migrations/2026-08-12-notify-cron.sql 참고.
+--
+-- **선행 조건**: Vault에 'cron_secret'이 들어 있어야 한다. 비밀값이라 이 파일에
+-- 담지 않는다 — 위 마이그레이션 파일 머리말의 vault.create_secret 참고.
+-- ============================================================
+
+-- 확장은 Dashboard → Database → Extensions에서 켜는 쪽이 안전하다. 그리고
+-- cron 스키마에 grant를 직접 하지 않는다 — Supabase의 after-create 스크립트가
+-- 권한을 이미 세팅하고, 거기에 `grant all ... to postgres`를 덧대면 그 스크립트의
+-- `revoke all on table cron.job from postgres`가 다음번에 죽는다. 자세한 건
+-- supabase/migrations/2026-08-12-notify-cron.sql 참고.
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+-- 스케줄은 UTC다. KST 08:00 = 전날 UTC 23:00 (날짜가 밀린 게 아니라 맞다 —
+-- 함수의 todayKey()가 +9시간 해서 읽으므로 KST 달력의 오늘이 나온다).
+select cron.schedule(
+  'notify-dday',
+  '0 23 * * *',
+  $$
+  select net.http_get(
+    url := 'https://ourie.vercel.app/api/notify-dday',
+    headers := jsonb_build_object(
+      'Authorization',
+      'Bearer ' || (
+        select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret'
+      )
+    ),
+    timeout_milliseconds := 60000
+  );
+  $$
+);

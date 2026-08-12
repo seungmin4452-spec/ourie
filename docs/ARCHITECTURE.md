@@ -105,8 +105,8 @@ features/<name>/
 하루 한 번 "오늘 며칠째"를 보내고, 100일 단위·주년에는 다른 문구를 보낸다.
 
 ```
-Vercel Cron (매일 UTC 00:00 = KST 09:00)
-        │
+Supabase pg_cron (매일 UTC 23:00 = KST 08:00)
+        │ pg_net (GET + Bearer, 비밀값은 Vault)
         ▼
 api/notify-dday.ts  ── service role ──►  Supabase
    (Node 런타임)                          push_subscriptions + profiles + anniversaries
@@ -120,8 +120,11 @@ api/notify-dday.ts  ── service role ──►  Supabase
 ```
 
 - **런타임**: 이 함수는 edge가 아니라 Node다. `web-push`가 Node의 crypto를 쓴다. 시그니처는 Web 표준(`GET(request)`)이라 다른 `api/` 파일과 모양은 같다. 실제 발송(VAPID 설정, 전송, 죽은 구독 수거)은 §6.2의 콕 찌르기와 공유하는 `api/_push.ts`가 맡는다.
-- **발송 시각**: KST 오전 9시 고정. Hobby 플랜의 cron 제약이 두 가지 걸린다 — (1) 하루 1회만 실행 가능하고(`0 * * * *` 같은 식은 배포 자체가 실패한다), (2) 실행 시각 정밀도가 ±59분이라 실제 발송은 09:00~09:59 사이다. 그래서 설정 화면도 "9시"가 아니라 "9시쯤"이라고 안내한다. 사용자별 시각/타임존을 지원하려면 구독마다 타임존을 저장하고 cron을 매시간 돌려야 하며, 둘 다 Pro 플랜이 필요하다.
-- **한 번에 보내는 개수**: 하루 1회 제약은 *cron이 함수를 깨우는 횟수*지 한 실행이 보내는 알림 수가 아니다. 한 번 깨어난 함수가 구독 전부를 순회하며 각자에게 보내므로, 커플 두 사람이 각각 켜두면 같은 실행에서 둘 다 받는다.
+- **트리거**: Vercel Cron이 아니라 **Supabase의 pg_cron**이다 (`supabase/migrations/2026-08-12-notify-cron.sql`). Vercel의 cron은 *현재 프로덕션 배포에 묶여* 있어서, 발동 구간에 새 배포가 올라가면 cron이 새 배포 기준으로 다시 등록되고 아직 안 돈 그날 몫은 유실된다. 2026-08-12에 실제로 이걸로 알림이 안 갔다 — 09:13/09:49/09:52에 main을 푸시했고 그 배포들이 09:00~09:59 발동 구간을 덮어썼다. pg_cron은 DB 안에서 도니 배포와 무관하다.
+- **발송 시각**: KST 오전 8시 정각. 스케줄(`0 23 * * *`)은 **UTC 기준**이라 KST 08:00 = 전날 UTC 23:00이다. 날짜가 하루 밀린 것처럼 보이지만 맞다 — 함수의 `todayKey()`가 절대 시각에 +9시간을 해서 읽으므로 사용자가 맞이하는 오늘이 나온다. 시각을 바꿀 땐 마이그레이션의 `cron.schedule` 하나와 설정 화면 문구만 고치면 된다. `KST_OFFSET_MINUTES`는 시각이 아니라 "누구의 달력인가"라 무관하다.
+- **호출 방식**: `pg_net`이 엔드포인트를 GET으로 친다(`GET`만 export한다). `CRON_SECRET`은 SQL에 박지 않고 **Supabase Vault**의 `cron_secret`에서 실행할 때마다 꺼내 쓴다 — 값을 바꿔도 잡을 다시 만들 필요가 없고, 마이그레이션 파일에 비밀값이 남지 않는다.
+- **한 번에 보내는 개수**: cron이 함수를 깨우는 건 하루 한 번이지만, 그게 한 실행이 보내는 알림 수는 아니다. 한 번 깨어난 함수가 구독 전부를 순회하며 각자에게 보내므로, 커플 두 사람이 각각 켜두면 같은 실행에서 둘 다 받는다.
+- **일시정지 주의**: pg_cron은 DB 안에서 돌기 때문에 Supabase Free 프로젝트가 일시정지되면(활동 없이 7일) 같이 멈춘다. 다만 Vercel Cron으로 돌려도 결과는 같다 — 그 함수가 하는 첫 일이 Supabase에서 `push_subscriptions`를 읽는 것이라 DB가 자면 어차피 못 보낸다. 대신 이 잡이 만드는 왕복(pg_net → Vercel → PostgREST 조회·갱신)이 매일 사용자 요청으로 잡히므로 그 자체가 일시정지를 늦춘다.
 - **중복 방지**: `push_subscriptions.last_notified_on`. cron 재시도나 수동 호출로 같은 날 두 번 울리지 않는다.
 - **기준 기념일**: 여러 기념일 중 **기준일이 가장 이른 것** 하나 (`src/features/notification/baseAnniversary.ts`). 홈 위젯의 큰 숫자(`pickHighlight`)는 "가장 가까이 다가온" 기념일이라 기준이 다르다 — 위젯은 다음에 뭐가 오는지, 알림은 오늘이 며칠째인지를 말하는 자리다.
 - **문구**: `src/features/notification/message.ts`. 브라우저(설정 화면의 미리보기)와 서버가 같은 함수를 쓴다. 그래서 이 파일은 DOM·Supabase에 손대지 않는 순수 함수만 두고, `api/`에서 상대 경로로 import한다 (Vercel은 `api/`의 tsconfig path mapping을 지원하지 않아 `@/` 별칭을 쓸 수 없다).
