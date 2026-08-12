@@ -141,6 +141,10 @@ create index profiles_couple_id_idx on public.profiles (couple_id);
 -- 없어서, 가입 폼에서 받은 이름을 저장할 방법이 이것뿐이다. 클라이언트는
 -- supabase.auth.signUp의 options.data로 넘긴다 (src/features/auth/api/auth.ts).
 -- 여기 쓰는 건 사람 이름(name)이다. 앱 이름은 온보딩에서 따로 받는다.
+--
+-- 소셜 가입(구글·카카오)에서는 같은 자리를 제공자가 채우는데 키 이름이
+-- 제각각이라 아래처럼 coalesce로 받는다. 이름이 비면 상대방이 받는 콕 찌르기
+-- 알림이 "상대방이 보고 싶대요"로 나간다 (send_poke의 sender_name).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -148,12 +152,24 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, name)
+  insert into public.profiles (id, name, avatar_url)
   values (
     new.id,
-    -- 공백만 넣은 경우까지 null로 떨어뜨린다. "이름 없음"의 표현이 하나여야
-    -- 화면에서 분기가 갈라지지 않는다.
-    nullif(trim(new.raw_user_meta_data ->> 'name'), '')
+    -- 순서가 곧 우선순위다. 'name'이 맨 앞인 이유는 이메일 가입에서 우리가 직접
+    -- 넣는 키가 그것이고, 사람이 적어 넣은 이름이 제공자가 준 것보다 먼저여야
+    -- 하기 때문이다. 공백만 넣은 경우까지 null로 떨어뜨린다 — "이름 없음"의
+    -- 표현이 하나여야 화면에서 분기가 갈라지지 않는다.
+    coalesce(
+      nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
+      nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
+      nullif(trim(new.raw_user_meta_data ->> 'preferred_username'), '')
+    ),
+    -- 소셜 프로필 사진. 온보딩 "꾸미기"에서 바꿀 수 있지만 기본값이 있는 편이
+    -- 첫 화면이 덜 비어 보인다. 이메일 가입이면 둘 다 없어서 그냥 null이다.
+    coalesce(
+      nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''),
+      nullif(trim(new.raw_user_meta_data ->> 'picture'), '')
+    )
   );
   return new;
 end;
