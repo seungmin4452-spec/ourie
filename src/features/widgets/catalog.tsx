@@ -32,9 +32,9 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
   },
   travel: {
     id: 'travel',
-    title: '여행 지도',
-    description: '둘이 다녀온 곳을 지도 위에 모아서 보여줘요.',
-    isReady: false,
+    title: '우리가 다녀온 곳',
+    description: '고른 사진을 지도로 덮어두고, 다녀온 지역을 긁어서 드러내요.',
+    isReady: true,
   },
 }
 

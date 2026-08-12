@@ -11,7 +11,7 @@
 | 라우팅 | react-router | 미도입 |
 | 서버 상태 | @tanstack/react-query | 미도입, Supabase 쿼리 캐싱용 |
 | 클라이언트 상태 | zustand (필요 시) | 전역 상태 최소화 지향 |
-| 지도 | 미정 (Kakao Map / Naver Map / Mapbox / Leaflet 중 선택 필요) | 여행 지도 기능용 |
+| 지도 | 없음 (SVG 직접 렌더) | 스크래치 지도는 벤더가 필요 없다 — §6.3 참고. 핀 지도를 만들 때 재검토 |
 | PWA | vite-plugin-pwa | 미도입 |
 | 배포 | Vercel (권장) | Supabase와 환경변수 연동 용이 |
 
@@ -52,7 +52,7 @@ src/
         HomePage.tsx
       index.ts              # feature의 public export
     memory/                 # 추억 타임라인 — 준비된 껍데기, 구현 예정
-    travel/                  # 여행 지도 — 준비된 껍데기, 구현 예정
+    travel/                  # 스크래치 지도 (§6.3) — regions/districts는 생성물, README.md 참고
   hooks/                    # 여러 feature가 공유하는 커스텀 훅
   lib/
     supabase.ts             # Supabase 클라이언트 싱글턴
@@ -75,7 +75,7 @@ features/<name>/
   index.ts       # 외부(다른 feature, app/router)에 노출할 public export
 ```
 
-`couple/`이 위 컨벤션을 따르는 첫 예시다. `auth`/`memory`/`travel`은 현재 `index.ts` 배럴만 있는 빈 껍데기이며, 기능 구현 시 동일한 패턴으로 채워 넣는다. 새 기능(디데이, 커스터마이징 등)이 필요해지면 `features/` 아래 같은 패턴으로 폴더를 추가하면 된다.
+`couple/`이 위 컨벤션을 따르는 첫 예시다. `memory`는 아직 `index.ts` 배럴만 있는 빈 껍데기이며, 기능 구현 시 동일한 패턴으로 채워 넣는다. `travel/`은 여기에 더해 생성물(`regions.ts`, `districts.ts`)과 그 배경을 적은 `README.md`를 갖는다 — feature가 커밋된 생성 데이터를 들고 있으면 재생성 방법을 그 옆에 둔다. 새 기능(디데이, 커스터마이징 등)이 필요해지면 `features/` 아래 같은 패턴으로 폴더를 추가하면 된다.
 
 라우트 진입점(페이지)은 각 feature의 `pages/` 아래에 두고, 별도 최상위 `pages/` 디렉터리는 두지 않는다. `app/router.tsx`는 각 feature의 `pages/` 컴포넌트를 import해 라우트에 연결하는 역할만 한다.
 
@@ -158,6 +158,36 @@ api/_push.ts → 푸시 서비스 → src/sw.ts의 push 리스너
 - **문구**: `src/features/poke/message.ts`. §6.1의 `message.ts`와 같은 이유로 순수 모듈이고, import를 하나도 하지 않아 서버 쪽 `.js` 확장자 규칙을 애초에 만들지 않는다.
 - **보낸 사람 이름**: `profiles.name`이다. `profiles.app_name`은 **앱 이름**이라 쓰면 "승민 ♥ 진선님이 보고 싶대요"가 된다 (실제로 그렇게 나갔던 버그다 — `DATABASE.md` §2.1 참고). 이름이 비어 있는 계정은 "상대방이 보고 싶대요"로 떨어진다.
 
+### 6.3 스크래치 지도 (지도 벤더 없이)
+
+홈 위젯 "우리가 다녀온 곳"은 Kakao/Naver/Mapbox 같은 지도 API를 **쓰지 않는다.**
+
+```
+행정동 경계 GeoJSON (34MB, 통계청 SGIS)
+        │  scripts/gen-travel-regions.mjs — 빌드 전에 사람이 한 번 돌린다
+        │  (행정동 3,558개 → 시도 16 + 시군구 191로 합치고, 투영·단순화)
+        ▼
+src/features/travel/{regions,districts}.ts  (292KB, 저장소에 커밋)
+        │
+        ▼
+  <svg> 한 장 — 사진을 clipPath로 오려 깔고 그 위에 시군구 코팅
+```
+
+- **왜 벤더가 필요 없나**: 이 지도가 하는 일은 "행정구역을 색칠하기"뿐이다. 타일도, 좌표
+  변환도, 지오코딩도 필요 없다. 벤더를 쓰면 API 키·요금·오프라인 동작이 전부 걸리는데,
+  PWA에서 그걸 떠안을 이유가 없다. 나중에 **핀 지도**(`docs/PRD.md` §3.4.1)를 만들 때는
+  실제 좌표 위에 마커를 얹어야 하므로 그때 다시 고른다.
+- **경계 데이터는 두 단계가 어긋나면 지도에 구멍이 뚫린다.** 시도는 따로 합치지 않고 살아남은 시군구를 다시 합쳐 만들고, 다른 구역과 맞닿은 조각은 크기와 무관하게 남긴다. 실제로 이 규칙이 없어서 대구 한가운데가 뚫렸던 적이 있다 (자세한 사정은 feature README).
+- **데이터는 생성물**이고 원본은 커밋하지 않는다. 출처·라이선스(SGIS 공공누리 1유형 +
+  CC BY 4.0)와 재생성 방법은 `src/features/travel/README.md`에 있다.
+- **행정구역은 바뀐다.** 2026년 7월 광주·전남이 합쳐져 시도가 17→16이 됐고, 2023년에는
+  군위군이 경북에서 대구로 넘어갔다. 그래서 `travel_visits.region_code`에는 코드 허용
+  목록을 걸지 않고 형식만 본다 — 목록을 걸면 구역이 바뀔 때마다 마이그레이션이 필요하고,
+  무엇보다 이미 저장된 옛 코드가 제약에 걸려 사라진다. 대신 화면이 모르는 코드를 그리지도
+  세지도 않는다.
+- **사진은 비공개 버킷**(`travel-maps`) + 서명 URL이다. 아바타(`profile-avatars`, 공개)와
+  다른 이유는 이쪽이 커플 사진 원본이기 때문이다.
+
 ## 7. 배포 구조
 
 - 프론트엔드: Vercel (main 브랜치 자동 배포)
@@ -165,6 +195,6 @@ api/_push.ts → 푸시 서비스 → src/sw.ts의 push 리스너
 - 환경변수: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — Vercel 프로젝트 설정에 등록, 로컬은 `.env.local`
 
 ## 8. 미결 사항
-- 지도 API 벤더 선정 (국내 서비스 고려 시 Kakao/Naver, 글로벌 고려 시 Mapbox)
+- 핀 지도(`docs/PRD.md` §3.4.1)용 지도 API 벤더 선정 (국내 Kakao/Naver, 글로벌 Mapbox). 스크래치 지도는 §6.3대로 벤더 없이 끝났다
 - 이미지 최적화/리사이징 전략 (Supabase Storage transform 사용 여부)
 - 개발/운영 Supabase 프로젝트 분리 여부

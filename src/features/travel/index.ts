@@ -1,1 +1,11 @@
-export {}
+export { RegionScratchDialog } from './components/RegionScratchDialog'
+export { ScratchMap } from './components/ScratchMap'
+export { TravelWidget } from './components/TravelWidget'
+export { countKnownVisits, districtsOf, DISTRICT_COUNT } from './districtIndex'
+export { useTravelVisits, useToggleTravelVisit, travelVisitsQueryKey } from './hooks/useTravelVisits'
+export { useTravelMapPhoto, travelMapPhotoQueryKey } from './hooks/useTravelMapPhoto'
+export { TRAVEL_DISTRICTS } from './districts'
+export type { TravelDistrict } from './districts'
+export { TRAVEL_REGIONS, TRAVEL_INSETS, MAP_WIDTH, MAP_HEIGHT } from './regions'
+export type { TravelRegion, TravelInset } from './regions'
+export type { TravelVisit } from './api/visits'

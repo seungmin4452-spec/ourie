@@ -18,7 +18,9 @@ couples ◄───────┘ (couple_id로 연결)
     │        │ 1:N
     │        ▼
     │    memory_photos   (추억 사진)
-    ├──► memories.location ─► travel map에서 활용 (별도 테이블 없이 memories 재사용)
+    ├──► travel_visits    (스크래치 지도 — 다녀온 시군구, PK가 couple_id+region_code)
+    ├──► travel_maps      (스크래치 지도 배경 사진, 1:1)
+    ├──► memories.location ─► 핀 지도에서 활용 (별도 테이블 없이 memories 재사용)
     └──► couple_settings  (커스터마이징)
 ```
 
@@ -162,6 +164,40 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 | created_at | timestamptz | default now() |
 | updated_at | timestamptz | default now() |
 
+### 2.4.1 `travel_visits` (스크래치 지도)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| couple_id | uuid (FK → couples.id) | PK의 앞 컬럼 |
+| region_code | text | 행정안전부 **시군구** 코드 5자리. `src/features/travel/districts.ts`의 `code` |
+| visited_on | date (nullable) | 실제로 다녀온 날. 지금 화면은 안 채운다 |
+| memory_id | uuid (FK → memories.id, on delete set null) | 나중에 추억과 잇는 자리 |
+| created_by | uuid (FK → profiles.id) | |
+| created_at | timestamptz | default now() |
+
+기본키가 `(couple_id, region_code)`다. 한 커플이 같은 지역을 두 번 칠할 수 없고, 이게 곧
+"긁힘" 여부라서 **켜고 끄는 것이 insert/delete**가 된다. 위젯은 커플의 칠해진 지역을 통째로
+읽는데 선두 컬럼이 `couple_id`인 이 인덱스가 그대로 쓰이므로 조회용 인덱스를 따로 두지 않는다.
+
+**허용 목록을 걸지 않고 형식(`^[0-9]{5}$`)만 본다.** 행정구역은 실제로 바뀐다 — 2023년
+군위군이 경북에서 대구로 넘어갔고, 2026년 7월 광주와 전남이 합쳐져 시도가 17→16이 됐다.
+191개 코드를 `check`에 적으면 그때마다 마이그레이션이 필요하고, 무엇보다 **이미 저장된 옛
+코드가 제약에 걸려 사라진다.** 코드를 아는 쪽은 화면이고(모르는 코드는 그리지도 세지도
+않는다 — `districtIndex.ts`), DB는 형식만 지킨다.
+
+`travel_places`(위·경도 핀)와 별개인 이유는 묻는 것이 다르기 때문이다. 스크래치는 "어디에
+점을 찍었나"가 아니라 "이 지역을 밟았나"를 묻는다. 좌표를 저장했다가 매번 구역을 역산하면
+경계에 걸친 지점 하나 때문에 칠해진 지역이 달라질 수 있다.
+
+### 2.4.2 `travel_maps` (스크래치 지도 배경 사진)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| couple_id | uuid (PK, FK → couples.id) | 1:1 — 둘이 같은 지도를 본다 |
+| photo_path | text (nullable) | `travel-maps` 버킷 안의 경로. **공개 URL이 아니다** |
+| updated_by | uuid (FK → profiles.id, on delete set null) | |
+| updated_at | timestamptz | default now() |
+
 ### 2.5 `memory_photos`
 
 | 컬럼 | 타입 | 설명 |
@@ -187,7 +223,13 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 | 버킷명 | 용도 | 접근 정책 |
 |---|---|---|
 | `memory-photos` | 추억 사진 원본 | 커플 단위 RLS (해당 couple_id 소속 사용자만) |
-| `profile-avatars` | 프로필 이미지 | 본인만 쓰기, 커플 상대방은 읽기 허용 검토 |
+| `profile-avatars` | 프로필 이미지 | **공개 버킷.** 본인 폴더(`{user_id}/`)에만 쓰기 |
+| `travel-maps` | 스크래치 지도 배경 사진 | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |
+
+`travel-maps`만 비공개인 이유: 아바타는 어차피 상대에게 보여주려고 올리는 작은 썸네일이지만,
+스크래치 지도 배경은 "둘만의 공간"(`PRD.md` §1)의 핵심인 커플 사진 원본이다. URL만 알면
+누구나 열 수 있는 자리에 둘 이유가 없다. 대가는 URL이 만료된다는 것이고,
+`useTravelMapPhoto`가 만료(1시간)보다 짧은 주기로 다시 받아온다.
 
 ## 4. RLS (Row Level Security) 정책 원칙
 
@@ -220,6 +262,7 @@ create policy "couple members can insert"
 - `anniversaries(couple_id, date)` — 커플별 기념일 조회
 - `memories(couple_id, memory_date desc)` — 타임라인 조회 최적화
 - `memories(couple_id, latitude, longitude)` — 지도 조회 시 위치 있는 row만 필터링 (`where latitude is not null`)
+- `travel_visits`는 기본키 `(couple_id, region_code)`가 곧 조회 인덱스다 (§2.4.1)
 - `couples(invite_code)` unique — 코드 조회 성능 및 중복 방지
 
 ## 6. 미결 사항

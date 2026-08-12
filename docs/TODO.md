@@ -44,11 +44,25 @@
 - [ ] 타임라인 목록 뷰 (날짜순, 무한 스크롤 또는 페이지네이션)
 - [ ] 추억 상세/수정/삭제
 
-## Phase 5 — 여행 지도
+## Phase 5 — 지도
+
+### 5a. 스크래치 지도 (완료)
+- [x] 지도 벤더 없이 SVG 직접 렌더로 결정 — `docs/ARCHITECTURE.md` §6.3
+- [x] 행정동 경계(2026-07-01) → 시도 16 + 시군구 191 생성기 — `scripts/gen-travel-regions.mjs`
+- [x] 울릉도·독도 확대 삽입도
+- [x] `travel_visits` / `travel_maps` 테이블 + RLS, `travel-maps` 비공개 버킷
+- [x] 홈 위젯 + 시도 → 시군구 2단계 긁기 — `src/features/travel/`
+- [x] 배경 사진 업로드 (비율 유지 축소 + SVG cover)
+- [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-12-travel-scratch.sql`을
+      Supabase SQL 편집기에서 실행해야 저장이 된다
+- [ ] 행정구역이 바뀔 때 데이터 갱신 절차 (생성기 재실행 + 사라진 코드 처리) 문서화
+
+### 5b. 핀 지도 (미착수 — 추억 타임라인 이후)
 - [ ] 지도 API 벤더 선정 (Kakao/Naver/Mapbox 등)
 - [ ] 위치 정보 있는 `memories` 조회 쿼리
 - [ ] 지도 위 핀 렌더링 + 클러스터링(핀 많아질 경우) 검토
 - [ ] 핀 클릭 → 해당 추억 상세로 이동
+- [ ] `travel_visits.memory_id`로 스크래치 지도와 연동
 
 ## Phase 6 — 커스터마이징
 - [ ] `couple_settings` 테이블 생성 + RLS 정책

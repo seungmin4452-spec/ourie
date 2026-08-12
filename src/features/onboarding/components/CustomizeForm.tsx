@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { cacheAppMeta, readCachedAppMeta } from '@/app/appMeta'
 import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { useAuth } from '@/features/auth'
-import { cropImageToSquare } from '@/lib/cropImageToSquare'
+import { cropImageToSquare } from '@/lib/image'
 import { getProfile, updateProfile, uploadAvatar } from '../api/profile'
 import { openPwaInstallPage } from '../pwaInstall'
 
