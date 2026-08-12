@@ -1,6 +1,10 @@
 import { Button } from '@astryxdesign/core/Button'
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
+import { Text } from '@astryxdesign/core/Text'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
+import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Camera } from 'lucide-react'
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
@@ -11,7 +15,7 @@ import { DefaultAvatar } from '@/components/common/DefaultAvatar'
 import { useAuth } from '@/features/auth'
 import { cropImageToSquare } from '@/lib/image'
 import { getProfile, updateProfile, uploadAvatar } from '../api/profile'
-import { openPwaInstallPage } from '../pwaInstall'
+import { isIOS, isStandalone, openPwaInstallPage } from '../pwaInstall'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
@@ -26,6 +30,7 @@ export function CustomizeForm() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isIconHelpOpen, setIsIconHelpOpen] = useState(false)
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -110,6 +115,13 @@ export function CustomizeForm() {
       // install page so the new name can be baked onto the icon.
       if (!profile?.couple_id) {
         navigate('/onboarding/couple')
+      } else if (isStandalone()) {
+        // 이미 홈 화면 앱 안이면 설치 페이지로 보내봐야 아무 일도 일어나지
+        // 않는다: standalone에는 공유 버튼이 없어 그 페이지의 안내를 따를 수
+        // 없고, 그 페이지는 standalone을 "아이콘으로 실행한 것"으로 보고 앱으로
+        // 곧장 되돌려보낸다 (api/pwa-install.ts). 저장은 됐는데 화면만 홈으로
+        // 튀어 아이콘이 안 바뀐 것처럼 보이던 자리라, 지금 남은 일을 설명한다.
+        setIsIconHelpOpen(true)
       } else {
         await openPwaInstallPage(title, icon)
       }
@@ -123,62 +135,113 @@ export function CustomizeForm() {
     }
   }
 
+  // 홈 화면 아이콘은 "추가하는 순간"에 구워지는 스냅샷이라, 앱 안에서 사진을
+  // 바꿔도 이미 놓인 아이콘에는 닿지 않는다. 남은 절차가 플랫폼마다 달라 갈라
+  // 적는다 — 안드로이드는 Chrome이 매니페스트를 다시 읽어 알아서 갱신하고
+  // (src/sw.ts), iOS는 사람이 지우고 다시 추가하는 수밖에 없다.
+  //
+  // 지우는 건 항상 마지막이다. 먼저 지우라고 하면 이 안내를 띄우고 있는 앱을
+  // 지우라는 말이 되고, iOS는 홈 화면 앱을 지울 때 그 앱만의 저장소 컨테이너까지
+  // 함께 버린다 (그 컨테이너 때문에 설치 시 세션 인계가 필요했다 — api/_shared.ts).
+  // 새로 추가하면 두 아이콘이 나란히 남는데, 사진이 서로 달라 어느 쪽이 예전
+  // 것인지 바로 구분된다.
+  const iconHelpSteps = isIOS()
+    ? [
+        'Safari로 이 앱을 열어주세요.',
+        '홈 화면의 "꾸미기 다시 하기" 아래 "홈 화면에 다시 추가하기"를 눌러주세요.',
+        '새 아이콘이 생기면, 예전 사진이 그대로인 아이콘을 꾹 눌러 삭제해주세요.',
+      ]
+    : [
+        '그대로 두면 하루 안에 Chrome이 새 사진으로 바꿔줘요.',
+        '바로 보고 싶다면 Chrome으로 이 앱을 열어 "홈 화면에 다시 추가하기"를 눌러주세요.',
+        '예전 아이콘이 남아 있다면 꾹 눌러 삭제해주세요.',
+      ]
+
+  function closeIconHelp() {
+    setIsIconHelpOpen(false)
+    navigate('/')
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className="flex flex-col items-center gap-3">
-        <button
-          type="button"
-          aria-label="프로필 이미지 선택"
-          onClick={() => fileInputRef.current?.click()}
-          className="relative flex size-24 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface"
-        >
-          {displayedAvatarUrl ? (
-            <img src={displayedAvatarUrl} alt="" className="size-full object-cover" />
-          ) : (
-            <DefaultAvatar className="size-full" />
-          )}
-          <span className="absolute right-1 bottom-1 flex size-6 items-center justify-center rounded-full bg-accent text-on-accent">
-            <Camera className="size-3.5" />
-          </span>
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleImageChange}
+    <>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="flex flex-col items-center gap-3">
+          <button
+            type="button"
+            aria-label="프로필 이미지 선택"
+            onClick={() => fileInputRef.current?.click()}
+            className="relative flex size-24 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface"
+          >
+            {displayedAvatarUrl ? (
+              <img src={displayedAvatarUrl} alt="" className="size-full object-cover" />
+            ) : (
+              <DefaultAvatar className="size-full" />
+            )}
+            <span className="absolute right-1 bottom-1 flex size-6 items-center justify-center rounded-full bg-accent text-on-accent">
+              <Camera className="size-3.5" />
+            </span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageChange}
+          />
+        </div>
+
+        <TextInput
+          label="앱 이름"
+          htmlName="app-name"
+          placeholder="예: 승민 ♥ 진선"
+          isRequired
+          value={appName}
+          onChange={setTypedAppName}
+          description="홈 화면 아이콘과 앱 상단에 표시돼요."
         />
-      </div>
 
-      <TextInput
-        label="앱 이름"
-        htmlName="app-name"
-        placeholder="예: 승민 ♥ 진선"
-        isRequired
-        value={appName}
-        onChange={setTypedAppName}
-        description="홈 화면 아이콘과 앱 상단에 표시돼요."
-      />
+        {/* 앱 이름 바로 아래 두고 description으로 쓰임을 갈라놓는다. 둘 다 그냥
+            "이름"이면 여기에도 커플 이름을 적게 되고, 그러면 상대방 알림이
+            "승민 ♥ 진선님이 보고 싶대요"가 된다 (실제로 그랬다). */}
+        <TextInput
+          label="내 이름"
+          htmlName="name"
+          placeholder="예: 승민"
+          value={name}
+          onChange={setTypedName}
+          description="상대방에게 보내는 알림에 표시돼요."
+        />
 
-      {/* 앱 이름 바로 아래 두고 description으로 쓰임을 갈라놓는다. 둘 다 그냥
-          "이름"이면 여기에도 커플 이름을 적게 되고, 그러면 상대방 알림이
-          "승민 ♥ 진선님이 보고 싶대요"가 된다 (실제로 그랬다). */}
-      <TextInput
-        label="내 이름"
-        htmlName="name"
-        placeholder="예: 승민"
-        value={name}
-        onChange={setTypedName}
-        description="상대방에게 보내는 알림에 표시돼요."
-      />
+        <Button
+          type="submit"
+          label={isSubmitting ? '저장 중...' : '다음'}
+          variant="primary"
+          isLoading={isSubmitting}
+          width="100%"
+        />
+      </form>
 
-      <Button
-        type="submit"
-        label={isSubmitting ? '저장 중...' : '다음'}
-        variant="primary"
-        isLoading={isSubmitting}
-        width="100%"
-      />
-    </form>
+      <Dialog isOpen={isIconHelpOpen} onOpenChange={closeIconHelp} width={400}>
+        <Layout
+          header={<DialogHeader title="저장했어요" onOpenChange={closeIconHelp} />}
+          content={
+            <LayoutContent>
+              <VStack gap={4}>
+                <Text type="supporting">
+                  앱 안은 바로 바뀌었어요. 홈 화면 아이콘은 추가할 때 사진이 한 번
+                  구워지는 거라, 지금 놓여 있는 아이콘은 아직 예전 사진이에요.
+                </Text>
+                <VStack gap={2}>
+                  {iconHelpSteps.map((step, index) => (
+                    <Text key={step}>{`${index + 1}. ${step}`}</Text>
+                  ))}
+                </VStack>
+                <Button label="확인" variant="primary" width="100%" onClick={closeIconHelp} />
+              </VStack>
+            </LayoutContent>
+          }
+        />
+      </Dialog>
+    </>
   )
 }

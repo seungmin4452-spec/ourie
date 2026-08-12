@@ -65,6 +65,24 @@ async function personalizeNavigation(request: Request): Promise<Response> {
     )
   }
 
+  // 안드로이드 쪽 문제를 여기서 같이 막는다. Chrome은 설치된 앱의 이름·아이콘을
+  // start_url("/")에서 매니페스트를 주기적으로 다시 읽어 갱신하는데, 빌드된
+  // index.html에 박혀 나가는 링크는 vite-plugin-pwa가 만든 정적
+  // /manifest.webmanifest다 -- 이름이 "Ourie"이고 아이콘이 기본 아이콘인 그것.
+  // 두 매니페스트의 id가 양쪽 다 "/"라 Chrome은 같은 앱으로 보므로, 커플 사진으로
+  // 설치한 앱이 다음 갱신 때 조용히 기본 아이콘으로 되돌아간다. 커플의 값을 실은
+  // /api/manifest로 바꿔 끼워, 갱신이 반대 방향으로 -- 방금 꾸민 대로 -- 일어나게
+  // 한다. (iOS는 설치된 아이콘을 갱신하지 않으므로 이 줄과 무관하다.)
+  const manifestParams = new URLSearchParams()
+  if (meta.title) manifestParams.set('title', meta.title)
+  // https만 쿼리스트링에 싣는다: 오프라인 폴백 아이콘은 수십 KB짜리 data URL이라
+  // URL에 담을 수 없다 (pwaInstall.ts의 buildPwaInstallUrl과 같은 규칙).
+  if (meta.icon?.startsWith('https://')) manifestParams.set('icon', meta.icon)
+  html = html.replace(
+    /<link\s+rel="manifest"\s+href="[^"]*"\s*\/?>/i,
+    `<link rel="manifest" href="/api/manifest?${escapeHtmlAttr(manifestParams.toString())}" />`,
+  )
+
   return new Response(html, {
     status: response.status,
     statusText: response.statusText,

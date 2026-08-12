@@ -22,6 +22,17 @@ export function isStandalone(): boolean {
   )
 }
 
+// 설치가 끝난 뒤 "아이콘을 바꾸려면 어떻게 해야 하는지"가 플랫폼마다 다르기
+// 때문에 앱 쪽에도 판별이 필요해졌다 (CustomizeForm.tsx). 설치 *전* 안내는
+// 여전히 설치 페이지가 자기 자리에서 갈라 보여준다.
+// iPadOS는 맥 UA를 보내므로 터치 개수로 한 번 더 거른다.
+export function isIOS(): boolean {
+  const ua = navigator.userAgent
+  return (
+    /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  )
+}
+
 // Root-relative on purpose: same-origin keeps an already-installed PWA inside
 // its scope, and leaving scope on iOS drops it into an in-app browser with no
 // way back.
