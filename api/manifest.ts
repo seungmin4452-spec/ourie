@@ -32,6 +32,14 @@ interface ManifestIcon {
   src: string
   sizes: string
   type?: string
+  purpose?: string
+}
+
+function defaultIcons(origin: string): ManifestIcon[] {
+  return [
+    { src: `${origin}/pwa-192x192.png`, sizes: '192x192', type: 'image/png' },
+    { src: `${origin}/pwa-512x512.png`, sizes: '512x512', type: 'image/png' },
+  ]
 }
 
 export default function handler(request: Request): Response {
@@ -41,18 +49,29 @@ export default function handler(request: Request): Response {
   const icon = sanitizeIconUrl(url.searchParams.get('icon'), origin)
   const handoff = sanitizeSessionHandoff(url.searchParams.get(SESSION_HANDOFF_PARAM))
 
-  const icons: ManifestIcon[] = [
-    { src: `${origin}/pwa-192x192.png`, sizes: '192x192', type: 'image/png' },
-    { src: `${origin}/pwa-512x512.png`, sizes: '512x512', type: 'image/png' },
-  ]
-
-  // Only describe the couple's photo when there actually is one. It comes out
-  // of cropImageToSquare as a 512px square JPEG, so these values are accurate
-  // rather than hopeful -- but the fallback is a PNG of another size, and
-  // mislabelling that would be worse than leaving it to the defaults above.
-  if (icon !== defaultIconUrl(origin)) {
-    icons.unshift({ src: icon, sizes: '512x512', type: 'image/jpeg' })
-  }
+  // 커플 사진이 있으면 기본 아이콘은 아예 후보에서 뺀다. 목록에 남겨두면
+  // 안드로이드에서 사진이 아니라 그 기본 아이콘이 설치된다 -- iOS는
+  // apple-touch-icon 하나만 보는 반면, Chrome은 이 배열에서 런처에 쓸 하나를
+  // 직접 고르고, 그 기준이 "순서"가 아니라 "이상적인 크기(48dp × 화면 배율)에
+  // 가장 가까운 것"이기 때문이다. 배율 3배 기기의 이상 크기는 144px이라
+  // pwa-192x192.png(+48)가 512px 사진(+368)을 이기고, 4배 기기에서는 192px가
+  // 정확히 일치해 그 자리에서 채택된다. 사진을 배열 맨 앞에 놓아도 소용없다.
+  //
+  // 그래서 사진이 있을 때는 사진만 내보내고, 없을 때만 기본 아이콘을 쓴다.
+  // 대신 사진 URL이 죽으면 설치 가능 조건을 만족할 아이콘이 하나도 없게 되는데,
+  // 그 사진은 앱 안과 설치 페이지에도 같이 걸리는 것이라 조용히 묻히지 않는다.
+  //
+  // 크기·타입은 cropImageToSquare가 내놓는 그대로(512px 정사각 JPEG)라 정확하다.
+  // maskable을 같이 선언하는 이유: 이게 없으면 Android O+가 사진을 흰 배경 위에
+  // 축소해 얹어서, 아이콘을 꽉 채우는 iOS 쪽과 달라진다. 어느 쪽 purpose를
+  // 고르든 같은 사진이 나오도록 두 항목 모두 같은 src를 가리킨다.
+  const icons: ManifestIcon[] =
+    icon === defaultIconUrl(origin)
+      ? defaultIcons(origin)
+      : [
+          { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'maskable' },
+          { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
+        ]
 
   const manifest = {
     // start_url은 바뀌어도 id는 고정이다: 재설치가 옆에 아이콘을 하나 더 만드는
