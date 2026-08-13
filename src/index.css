@@ -131,9 +131,15 @@
      남았고, 폰이 좁을수록 뱃지가 여러 줄로 접혀 더 벌어졌다.
 
      그래서 높이는 컴포넌트가 **지금 보이는 면의 것으로 직접 지정한다**
-     (PhotoMapWidget이 두 면을 재서 framer-motion으로 애니메이션한다). 여기서는
-     그 높이가 넘칠 때 안 보이게만 해둔다 — 뒤에 있는 큰 면이 카드 밖으로
-     삐져나오면 안 된다. */
+     (PhotoMapWidget이 두 면을 재서 framer-motion으로 애니메이션한다).
+
+     **.flip-card에 overflow를 주지 말 것.** 큰 면이 삐져나올까 봐
+     `overflow: hidden`을 넣었다가 뒤집기가 통째로 깨졌다 — overflow가 visible이
+     아니면 브라우저가 transform-style을 flat으로 강등시켜서, 3D가 사라지고
+     카드가 그냥 거울처럼 좌우 반전된다. 뒷면 대신 **뒤집힌 앞면(지도)**이
+     보이던 것이 이것이다. 애초에 필요하지도 않다: 카드 높이가 보이는 면에
+     맞춰져 있고 안 보이는 면은 backface-visibility로 그려지지 않으므로 넘칠
+     것이 없다. */
   .flip-scene {
     perspective: 1200px;
   }
@@ -141,7 +147,6 @@
   .flip-card {
     display: grid;
     transform-style: preserve-3d;
-    overflow: hidden;
   }
 
   .flip-face {

@@ -49,6 +49,10 @@ interface PhotoMapWidgetProps {
  * 여러 줄로 접혀 늘었다 줄었다 한다. 그래서 **지금 보이는 면의 높이를 재서
  * 카드에 직접 준다** — 안 그러면 카드가 큰 쪽에 맞춰져서 작은 면을 볼 때 아래가
  * 빈다 (폰 폭에서 지도 아래에 수십 px이 남았다).
+ *
+ * 넘치는 것이 걱정돼 카드에 overflow를 걸면 **뒤집기가 통째로 깨진다** — 3D가
+ * 평면으로 강등되어 뒷면 대신 좌우 반전된 지도가 보인다 (index.css의 .flip-card
+ * 주석). 높이가 이미 보이는 면에 맞춰져 있어 넘칠 것도 없다.
  */
 export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
   const { user } = useAuth()
