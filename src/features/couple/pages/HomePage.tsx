@@ -29,6 +29,7 @@ import {
   WidgetPickerDialog,
   type WidgetId,
 } from '@/features/widgets'
+import { WishWidget } from '@/features/wish'
 import { usePartner } from '../hooks/usePartner'
 
 /**
@@ -140,6 +141,8 @@ export function HomePage() {
         )
       case 'poke':
         return <PokeWidget profile={profile} />
+      case 'wish':
+        return <WishWidget profile={profile} />
       case 'memories':
         return (
           <Text type="supporting" justify="center">

@@ -21,6 +21,8 @@ couples ◄───────┘ (couple_id로 연결)
     ├──► travel_visits    (스크래치 지도 — 다녀온 시군구, PK가 couple_id+region_code)
     ├──► travel_maps      (스크래치 지도 배경 사진, 1:1)
     ├──► travel_region_photos (사진 지도 — 시군구마다 사진 한 장, PK가 couple_id+region_code)
+    ├──► wish_quotas      (소원권 — 사람마다 총 장수, PK가 couple_id+owner_id)
+    ├──► wishes           (소원권 — 쓴 한 장이 한 row)
     ├──► memories.location ─► 핀 지도에서 활용 (별도 테이블 없이 memories 재사용)
     └──► couple_settings  (커스터마이징)
 ```
@@ -152,6 +154,45 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 **연타 방지**는 같은 버튼 1초 1회다 (하루 총량 제한은 없다). 직전 발송 조회와 insert가 `send_poke` 한 트랜잭션 안에 있고, `pg_advisory_xact_lock(sender, 버튼)`으로 동시에 들어온 두 요청을 직렬화한다 — 여러 조회로 나누면 버튼 연타가 정확히 그 검사를 빠져나간다. 여기서 "버튼"은 기본 버튼이면 `kind`, 커플이 만든 것이면 `preset_id`다. 서로 다른 버튼끼리는 쿨다운을 공유하지 않는다.
 
 기록을 남기는 건 쿨다운 때문만은 아니다. 나중에 "오늘 세 번 보고 싶다고 했어요" 같은 화면을 붙일 수 있게 하려는 것이라, 발송 성공 여부가 아니라 "보내기로 했다"는 사실을 적는다.
+
+### 2.3.4 `wish_quotas` / `wishes` (소원권)
+
+각자 몇 장을 들고 있고(`wish_quotas`), 그중 몇 장을 무엇에 썼는지(`wishes`). 홈 위젯 "소원권"이 이 둘을 나란히 보여준다. 소원권을 **가진** 사람이 한 장을 써서 상대에게 소원을 말하므로, 두 테이블의 `owner_id`는 모두 "소원권의 주인 = 쓴 사람"이지 들어주는 사람이 아니다.
+
+`wish_quotas`
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| couple_id | uuid (FK → couples.id) | PK 1 |
+| owner_id | uuid (FK → profiles.id) | PK 2 — 소원권을 가진 사람 |
+| total | int | default `wish_default_total()` (5), 0–99 (check 제약) |
+| updated_by | uuid (FK → profiles.id, nullable) | 마지막으로 장수를 정한 사람 |
+| updated_at | timestamptz | default now() |
+
+`wishes`
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| id | uuid (PK) | |
+| couple_id | uuid (FK → couples.id) | |
+| owner_id | uuid (FK → profiles.id) | 소원권을 쓴 사람 |
+| content | text | 부탁한 내용 (1–100자) |
+| created_at | timestamptz | default now() |
+
+**남은 장수를 컬럼으로 들고 있지 않는 것이 이 설계의 전부다.** 남은 장수 = `total` − 그 사람의 `wishes` 수. 세어서 구하므로 어긋날 일이 없다 — 카운터 컬럼을 두면 소원을 지우거나 장수를 고칠 때마다 같이 맞춰야 하고, 한 번 어긋나면 사용자는 그게 왜 3장인지 알 방법이 없다. 소원을 하나 지우면 그 한 장이 자동으로 돌아오는 것도 같은 이유다.
+
+기본 장수는 `public.wish_default_total()` 하나에만 적혀 있다. 컬럼 기본값·잔량 검사·화면이 모두 이 숫자를 읽는데, 화면 쪽 짝인 `WISH_DEFAULT_TOTAL`(`src/features/wish/types.ts`)과 **반드시 같아야 한다**. 어긋나면 위젯이 보여주는 남은 장수와 실제로 쓸 수 있는 장수가 달라진다. 장수를 정한 적 없는 사람은 `wish_quotas`에 row가 아예 없고, DB와 화면 양쪽이 이 기본값으로 떨어진다.
+
+불변식 둘은 트리거가 지킨다. 화면도 같은 조건을 미리 막지만 그건 안내다 — 두 기기에서 동시에 쓰면 화면의 잠금은 둘 다 통과한다.
+
+- `check_wish_quota` (`before insert on wishes`) — 남은 장수를 넘겨 쓸 수 없다. `pg_advisory_xact_lock(owner_id)`로 동시 삽입을 직렬화한다 (`send_poke`의 연타 방지와 같은 장치). 실패하면 `no_wish_left`.
+- `check_wish_total` (`before insert or update on wish_quotas`) — 이미 쓴 장수 아래로 총 장수를 내릴 수 없다. 실패하면 `wish_total_below_used`.
+
+둘 다 `security definer`다. 세는 일이 RLS에 가려지면 쓴 장수가 실제보다 적게 보여서 검사가 오히려 더 쓰게 허락해버린다.
+
+**RLS는 두 테이블이 다르다.** `wish_quotas`는 커플 범위 전체(select/insert/update) — 장수는 둘이 같이 정하는 약속이라, 각자 자기 것만 정할 수 있으면 그건 약속이 아니라 자기 신고가 된다. delete 정책이 없는 것은 의도다: 없애고 싶으면 0장으로 두면 되고, row를 지우면 다음에 읽을 때 조용히 기본값으로 되살아난다. 반면 `wishes`는 읽기만 커플 범위이고 insert/update/delete는 `owner_id = auth.uid()`로 좁다 — 지도나 콕 찌르기 버튼과 달리 소원권은 **내 것을 내가 쓰는** 것이라, 상대가 내 이름으로 한 장을 쓰거나 내가 말한 소원을 바꿔 적을 수 있으면 안 된다.
+
+"들어줬는지"를 기록하는 컬럼은 아직 없다. 지금 이 기능이 답하는 것은 "몇 장 남았나"와 "무엇을 부탁했나" 둘뿐이고, 쓴 소원은 지우기 전까지 계속 쓴 것으로 남는다.
 
 ### 2.4 `memories` (추억 타임라인)
 
@@ -298,6 +339,7 @@ create policy "couple members can insert"
 - `memories(couple_id, memory_date desc)` — 타임라인 조회 최적화
 - `memories(couple_id, latitude, longitude)` — 지도 조회 시 위치 있는 row만 필터링 (`where latitude is not null`)
 - `travel_visits`·`travel_region_photos`는 기본키 `(couple_id, region_code)`가 곧 조회 인덱스다 (§2.4.1, §2.4.3)
+- `wishes(couple_id, created_at desc)` — 목록(최신순), `wishes(couple_id, owner_id)` — 잔량 검사가 사람별로 센다. `wish_quotas`는 기본키 `(couple_id, owner_id)`가 곧 조회 인덱스다 (§2.3.4)
 - `couples(invite_code)` unique — 코드 조회 성능 및 중복 방지
 
 ## 6. 미결 사항

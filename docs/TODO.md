@@ -36,6 +36,11 @@
 - [x] 콕 찌르기 — `pokes` 테이블 + `send_poke` RPC, `api/poke.ts`, 홈 위젯 `src/features/poke`
 - [x] 콕 찌르기를 커플이 직접 만들기 — `poke_presets` 테이블, 위젯의 "콕 찌르기 만들기" 다이얼로그
 - [x] 홈 위젯 순서를 드래그로 바꾸기 — `src/features/widgets/components/WidgetList.tsx` (framer-motion Reorder)
+- [x] 소원권 현황판 — `wish_quotas` / `wishes` 테이블, 홈 위젯 `src/features/wish`
+      - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-13-wish.sql`을
+            Supabase SQL 편집기에서 실행해야 저장이 된다
+      - [ ] "들어줬어요" 표시 검토 — 지금은 쓴 소원이 지우기 전까지 계속 쓴 것으로 남는다
+      - [ ] 상대가 소원권을 쓰면 알림 보내기 (`send_poke`와 같은 경로)
 
 ## Phase 4 — 추억 타임라인
 - [ ] `memories`, `memory_photos` 테이블 생성 + RLS 정책
