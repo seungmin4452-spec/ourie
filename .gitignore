@@ -29,3 +29,7 @@ supabase/.temp
 *.sw?
 .env*
 !.env.example
+
+# 지역 뱃지 형태를 눈으로 고르려고 만드는 생성물.
+# scripts/preview-region-badges.mjs가 찍어낸다 (925KB, 도형 데이터가 통째로 들어간다).
+badge-preview.html

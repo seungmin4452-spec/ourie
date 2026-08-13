@@ -87,6 +87,21 @@
 - [ ] 핀 클릭 → 해당 추억 상세로 이동
 - [ ] `travel_visits.memory_id`로 스크래치 지도와 연동
 
+### 5c. 지역 뱃지 (설계 완료 · 구현 전 — 상세는 `docs/REGION_BADGE.md`)
+
+시도 하나를 다 채우면 그 지역 모양의 뱃지가 생긴다. 두 지도가 뱃지 하나를 나눠 갖는다
+(전부 방문 = `visited`, 사진까지 = `photo`).
+
+- [x] **뱃지 형태 결정 — B안(원형)** (2026-08-13). 진열장에서 격자가 잡히는 쪽이 이겼다
+- [x] `src/features/travel/badges.ts` — 시도별 진행 상태 계산 (순수 함수)
+- [x] **섬이 프레임을 먹는 문제** — 인천은 서해 5도 때문에 본토가 사라졌다.
+      `mainlandBounds.ts`로 본토(가장 큰 덩어리) 기준 프레임 (인천 경계상자 면적 15%로 축소)
+- [x] `RegionBadge.tsx` — 3상태(locked · visited · photo) 원형 뱃지
+- [ ] `travel_badges` 테이블 + `claim_region_badge` RPC — schema.sql과 migrations에 같이 반영
+- [ ] "우리의 뱃지" 위젯 — `WIDGET_IDS` / `catalog.tsx` / `HomePage.tsx` 세 군데 등록, `lazy`로
+- [ ] 획득 순간 연출 + 상대에게 푸시
+- [ ] 두 지도 위젯에 진행 한 줄 ("강원 15/18 — 3곳 남았어요")
+
 ## Phase 6 — 커스터마이징
 - [ ] `couple_settings` 테이블 생성 + RLS 정책
 - [ ] 테마 컬러 선택 UI
