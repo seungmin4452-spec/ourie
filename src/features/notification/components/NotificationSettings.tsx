@@ -5,6 +5,7 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { startOfToday, toDateKey, type Anniversary } from '@/features/anniversary'
 import { useAuth } from '@/features/auth'
@@ -30,6 +31,14 @@ const DESCRIPTIONS: Record<PushState, string> = {
 interface NotificationSettingsProps {
   /** 알림 기준을 고르고 미리보기를 만드는 데 쓴다. */
   anniversaries: Anniversary[]
+  /**
+   * 기념일 목록이 **이 화면에 함께 있는지**.
+   *
+   * 기념일 화면에서는 스위치 바로 위에 목록이 있어서 "위에서 고른 것"이라고
+   * 가리킬 수 있지만, 마이페이지에는 그 목록이 없다. 없는 것을 가리키면 안내가
+   * 아니라 수수께끼가 되므로, 그때는 문구를 바꾸고 갈 수 있는 버튼을 준다.
+   */
+  hasAnniversaryList?: boolean
 }
 
 /**
@@ -39,8 +48,12 @@ interface NotificationSettingsProps {
  * 한 구역이고, Astryx는 그런 구역을 카드로 감싸지 말라고 못 박고 있다
  * ("Notification Preferences"가 문서에 나오는 바로 그 예시다).
  */
-export function NotificationSettings({ anniversaries }: NotificationSettingsProps) {
+export function NotificationSettings({
+  anniversaries,
+  hasAnniversaryList = true,
+}: NotificationSettingsProps) {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const showToast = useToast()
   const { state, toggle } = usePushNotifications(user?.id)
 
@@ -80,7 +93,9 @@ export function NotificationSettings({ anniversaries }: NotificationSettingsProp
         isDisabled={state === 'loading' || isUnavailable || hasNoAnniversary}
         disabledMessage={
           hasNoAnniversary && !isUnavailable
-            ? '기념일을 먼저 등록하면 켤 수 있어요.'
+            ? hasAnniversaryList
+              ? '기념일을 먼저 등록하면 켤 수 있어요.'
+              : '기념일을 먼저 등록하면 켤 수 있어요. 아래 버튼으로 갈 수 있어요.'
             : undefined
         }
         changeAction={async (checked) => {
@@ -119,10 +134,24 @@ export function NotificationSettings({ anniversaries }: NotificationSettingsProp
           </Text>
           <Text type="supporting">{preview.message.body}</Text>
           <Text type="supporting">
-            위에서 고른 "{preview.base.title}" 하나만 알려드려요. 다른 기념일을 고르면
-            알림도 그쪽으로 바뀝니다.
+            {/* "위에서 고른"은 목록이 같은 화면에 있을 때만 쓸 수 있는 말이다.
+                마이페이지에는 그 목록이 없어서, 없는 것을 가리키게 된다. */}
+            {hasAnniversaryList
+              ? `위에서 고른 "${preview.base.title}" 하나만 알려드려요. 다른 기념일을 고르면 알림도 그쪽으로 바뀝니다.`
+              : `골라둔 "${preview.base.title}" 하나만 알려드려요. 기념일 화면에서 다른 기념일을 고를 수 있어요.`}
           </Text>
         </VStack>
+      )}
+
+      {/* 목록이 없는 화면에서는 갈 길을 준다. 기념일이 하나도 없어 스위치가
+          잠긴 경우에도 여기서 등록하러 갈 수 있다. */}
+      {!hasAnniversaryList && !isUnavailable && (
+        <Button
+          label={hasNoAnniversary ? '기념일 등록하러 가기' : '기념일 고르러 가기'}
+          variant="ghost"
+          width="100%"
+          onClick={() => navigate('/anniversaries')}
+        />
       )}
     </VStack>
   )

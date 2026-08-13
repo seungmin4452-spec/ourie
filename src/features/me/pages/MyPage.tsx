@@ -1,5 +1,6 @@
 import { Avatar } from '@astryxdesign/core/Avatar'
 import { AvatarGroup } from '@astryxdesign/core/AvatarGroup'
+import { Divider } from '@astryxdesign/core/Divider'
 import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Text } from '@astryxdesign/core/Text'
@@ -77,7 +78,7 @@ export function MyPage() {
         </VStack>
       </HStack>
 
-      <VStack gap={3}>
+      <VStack gap={4}>
         <VStack gap={1}>
           <Heading level={2}>알림</Heading>
           <Text type="supporting">
@@ -86,10 +87,23 @@ export function MyPage() {
           </Text>
         </VStack>
 
-        {/* 매일 정해진 시각에 오는 것과, 상대가 눌러서 보내는 것. 이 둘은
-            성격이 달라서 스위치도 따로다 (디데이는 받고 싶지만 상대가 내 폰을
+        {/* 스위치 둘을 Divider로 가른다. 디데이 스위치는 아래에 미리보기 세
+            줄을 달고 나오는데, 가르는 선이 없으면 그 줄들이 다음 스위치에
+            붙은 설명처럼 읽힌다 — 둘 사이 간격과 스위치·설명 사이 간격이
+            같아서 무엇이 무엇에 속하는지 알 수가 없었다.
+
+            매일 정해진 시각에 오는 것과, 상대가 눌러서 보내는 것. 스위치가
+            둘인 이유도 성격이 달라서다 (디데이는 받고 싶지만 상대가 내 폰을
             울리는 건 싫을 수 있다). */}
-        <NotificationSettings anniversaries={anniversaries ?? []} />
+        <NotificationSettings
+          anniversaries={anniversaries ?? []}
+          // 이 화면에는 기념일 목록이 없다. "위에서 고른"이 가리킬 곳이 없으므로
+          // 문구를 바꾸고 갈 수 있는 버튼을 준다.
+          hasAnniversaryList={false}
+        />
+
+        <Divider />
+
         <PartnerAlertSwitch profile={profile} />
       </VStack>
     </PageShell>

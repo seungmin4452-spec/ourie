@@ -20,6 +20,7 @@ import {
   useAnniversaries,
 } from '@/features/anniversary'
 import { useAuth } from '@/features/auth'
+import { NotificationPromptDialog } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { isStandalone, openPwaInstallPage } from '@/features/onboarding/pwaInstall'
 import { PokeWidget } from '@/features/poke'
@@ -261,6 +262,10 @@ export function HomePage() {
           />
         )}
       </VStack>
+
+      {/* 앱에 처음 들어온 사람에게 한 번만 뜬다. 알림이 이 앱의 기능 자체라
+          찾아 들어가 켜기를 기다릴 수 없다 (NotificationPromptDialog 주석). */}
+      <NotificationPromptDialog profile={profile} />
 
       <WidgetPickerDialog
         isOpen={isPickerOpen}

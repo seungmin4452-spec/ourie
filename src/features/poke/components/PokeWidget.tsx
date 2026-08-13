@@ -1,5 +1,4 @@
 import { Button } from '@astryxdesign/core/Button'
-import { Divider } from '@astryxdesign/core/Divider'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
@@ -11,7 +10,6 @@ import { useAuth } from '@/features/auth'
 // 배럴(@/features/couple)이 아니라 훅 파일을 직접 가리킨다 — 배럴에는 홈
 // 화면이 들어 있고, 그 홈이 다시 이 위젯을 가져오므로 순환 import가 된다.
 import { partnerQueryKey, usePartner } from '@/features/couple/hooks/usePartner'
-import { PartnerAlertSwitch } from '@/features/notification'
 import type { Profile } from '@/features/onboarding/api/profile'
 import { PokeError, sendPoke } from '../api/poke'
 import { pokeIcon } from '../catalog'
@@ -30,16 +28,14 @@ interface PokeWidgetProps {
  * 홈 위젯 "콕 찌르기"의 본문.
  *
  * 이 위젯이 다른 위젯과 다른 점은 **내 화면이 아니라 상대방 기기를 건드린다**는
- * 것이다. 그래서 두 가지가 UI에 그대로 드러나야 한다:
+ * 것이다. 그래서 상대방이 받겠다고 하지 않았으면 보낼 수 없고, 눌러보고 실패를
+ * 보는 대신 누르기 전부터 버튼이 잠겨 있고 이유가 적혀 있다. 실제 차단은 서버가
+ * 한다 (supabase/schema.sql의 send_poke) — 여기 잠금은 안내다.
  *
- * 1. 상대방이 받겠다고 하지 않았으면 보낼 수 없다. 눌러보고 실패를 보는 대신,
- *    누르기 전부터 버튼이 잠겨 있고 이유가 적혀 있다.
- * 2. 내 수신 동의도 이 자리에서 켠다. 보내는 화면과 받는 설정이 떨어져 있으면
- *    "왜 상대는 나한테 못 보내지?"를 아무도 못 찾는다. 같은 스위치가
- *    마이페이지(/me)에도 있다 — 이 위젯을 홈에 올리지 않은 사람도 켤 수
- *    있어야 하기 때문이다.
- *
- * 실제 차단은 서버가 한다 (supabase/schema.sql의 send_poke). 여기 잠금은 안내다.
+ * **내 수신 동의 스위치는 여기 없다.** 한때 이 위젯 아래에 붙어 있었지만, 그건
+ * 콕 찌르기만의 설정이 아니라 소원권 알림까지 함께 가르는 값이라 위젯 하나에
+ * 얹혀 있을 것이 아니었다 (이 위젯을 홈에 올리지 않은 사람에게는 켤 자리가 아예
+ * 없기도 했다). 지금은 마이페이지(/me)와 첫 실행 안내가 그 일을 맡는다.
  *
  * 버튼은 기본으로 주는 것들 뒤에 커플이 만든 것들이 붙는다. 새로 만든 게
  * 아래에 쌓여야 이미 손에 익은 버튼의 자리가 흔들리지 않는다.
@@ -160,12 +156,6 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
         </>
       )}
 
-      <Divider />
-
-      {/* 스위치의 알맹이는 notification 기능이 들고 있다. 콕 찌르기만의
-          설정이 아니라 소원권 알림까지 함께 가르기 때문이다 —
-          PartnerAlertSwitch 주석 참고. 마이페이지(/me)에도 같은 것이 있다. */}
-      <PartnerAlertSwitch profile={profile} />
     </VStack>
   )
 }
