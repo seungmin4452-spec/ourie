@@ -8,13 +8,12 @@ import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
 import { List, ListItem } from '@astryxdesign/core/List'
-import { NumberInput } from '@astryxdesign/core/NumberInput'
 import { Text } from '@astryxdesign/core/Text'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation } from '@tanstack/react-query'
-import { Check, Pencil, Ticket, Trash2 } from 'lucide-react'
+import { Check, Minus, Pencil, Plus, Ticket, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import type { Partner } from '@/features/couple/api/partner'
@@ -254,7 +253,7 @@ export function WishDialog({
 
                 <VStack gap={3}>
                   <HStack gap={2} hAlign="between" vAlign="center">
-                    <Heading level={2}>{isEditing ? '소원 고치기' : '새 소원권'}</Heading>
+                    <Heading level={2}>{isEditing ? '소원 고치기' : '소원권 사용'}</Heading>
                     {isEditing && (
                       <Button
                         type="button"
@@ -373,26 +372,9 @@ function WishTotalForm({ coupleId, userId, mine, theirs, onChanged }: WishTotalF
 
   return (
     <VStack gap={3}>
-      <NumberInput
-        label={`${mine.name}의 소원권`}
-        // 이미 쓴 장수 아래로는 내릴 수 없다. DB도 같은 것을 막지만
-        // (check_wish_total), 눌러보고 에러를 보는 것보다 못 내려가는 편이 낫다.
-        description={mine.used > 0 ? `이미 ${mine.used}장을 썼어요.` : undefined}
-        min={mine.used}
-        max={WISH_TOTAL_MAX}
-        value={myTotal}
-        onChange={setMyTotal}
-      />
-
+      <WishTotalStepper status={mine} value={myTotal} onChange={setMyTotal} />
       {theirs && (
-        <NumberInput
-          label={`${theirs.name}의 소원권`}
-          description={theirs.used > 0 ? `이미 ${theirs.used}장을 썼어요.` : undefined}
-          min={theirs.used}
-          max={WISH_TOTAL_MAX}
-          value={theirTotal}
-          onChange={setTheirTotal}
-        />
+        <WishTotalStepper status={theirs} value={theirTotal} onChange={setTheirTotal} />
       )}
 
       {/* 바깥 form의 submit이 되지 않도록 type을 못 박는다 — 그쪽은 소원을 쓴다. */}
@@ -406,5 +388,65 @@ function WishTotalForm({ coupleId, userId, mine, theirs, onChanged }: WishTotalF
         onClick={() => save.mutate()}
       />
     </VStack>
+  )
+}
+
+interface WishTotalStepperProps {
+  status: WishStatus
+  value: number
+  onChange: (next: number) => void
+}
+
+/**
+ * 한 사람의 장수를 −/+ 버튼으로 정한다.
+ *
+ * 숫자 입력칸이 아닌 이유: 여기서 바뀌는 값은 대개 한두 장이고, 모바일에서
+ * 숫자칸을 누르면 키보드가 올라와 다이얼로그의 절반을 덮는다. 눌러서 세는
+ * 쪽이 "소원권을 한 장 더 준다"는 행동에도 더 가깝다.
+ *
+ * 아래로는 **이미 쓴 장수**가 바닥이다. DB도 같은 것을 막지만
+ * (check_wish_total), 눌러보고 에러를 보는 것보다 버튼이 잠기는 편이 낫다.
+ */
+function WishTotalStepper({ status, value, onChange }: WishTotalStepperProps) {
+  const canDecrease = value > status.used
+  const canIncrease = value < WISH_TOTAL_MAX
+
+  return (
+    <HStack gap={2} hAlign="between" vAlign="center">
+      <VStack gap={0}>
+        <Text weight="medium">{status.name}의 소원권</Text>
+        {status.used > 0 && (
+          <Text type="supporting">이미 {status.used}장을 썼어요</Text>
+        )}
+      </VStack>
+
+      <HStack gap={1} vAlign="center">
+        <IconButton
+          label={`${status.name}의 소원권 한 장 줄이기`}
+          tooltip={canDecrease ? '한 장 줄이기' : '이미 쓴 장수보다 줄일 수 없어요'}
+          variant="secondary"
+          size="sm"
+          icon={<Minus className="size-4" />}
+          isDisabled={!canDecrease}
+          onClick={() => onChange(value - 1)}
+        />
+        {/* 숫자 자리를 고정한다. 폭이 내용에 따라 변하면 −/+ 버튼이 5장과
+            12장 사이를 오갈 때마다 좌우로 흔들려 연달아 누르기 어렵다. */}
+        <HStack width={52} hAlign="center">
+          <Text weight="semibold" hasTabularNumbers>
+            {value}장
+          </Text>
+        </HStack>
+        <IconButton
+          label={`${status.name}의 소원권 한 장 늘리기`}
+          tooltip={canIncrease ? '한 장 늘리기' : `${WISH_TOTAL_MAX}장까지 정할 수 있어요`}
+          variant="secondary"
+          size="sm"
+          icon={<Plus className="size-4" />}
+          isDisabled={!canIncrease}
+          onClick={() => onChange(value + 1)}
+        />
+      </HStack>
+    </HStack>
   )
 }
