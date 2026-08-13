@@ -200,12 +200,12 @@ export function WishDialog({
                   <EmptyState
                     isCompact
                     icon={<Ticket className="size-6" />}
-                    title="아직 쓴 소원권이 없어요"
+                    title="아직 이루어진 소원이 없어요"
                     description="아래에 소원을 적으면 한 장이 쓰인 것으로 기록돼요."
                   />
                 ) : (
                   <VStack gap={2}>
-                    <Heading level={2}>쓴 소원권</Heading>
+                    <Heading level={2}>이루어진 소원들</Heading>
                     <List hasDividers>
                       {wishes.map((wish) => {
                         const isMine = wish.owner_id === userId
@@ -304,9 +304,9 @@ export function WishDialog({
                   type="submit"
                   label={isEditing ? '저장' : '소원권 쓰기'}
                   variant="primary"
-                  icon={
-                    isEditing ? <Check className="size-4" /> : <Ticket className="size-4" />
-                  }
+                  // 고치는 중에는 지니가 아니라 체크다 — 새로 비는 소원이
+                  // 아니라 이미 빈 소원의 문장을 손보는 것이다.
+                  icon={isEditing ? <Check className="size-4" /> : '🧞'}
                   isLoading={creation.isPending || edit.isPending}
                   isDisabled={!canSubmit}
                 />
