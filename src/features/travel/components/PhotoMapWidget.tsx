@@ -5,7 +5,7 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { motion, useReducedMotion } from 'framer-motion'
 import { FlipHorizontal } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '@/features/auth'
 import type { Profile } from '@/features/onboarding/api/profile'
@@ -44,6 +44,11 @@ interface PhotoMapWidgetProps {
  * 같은 것의 두 면이다 — 지도를 채우면 뱃지가 생기고, 뱃지를 보다 "여기가
  * 비었네" 하면 다시 뒤집어 채우러 간다. 위젯을 하나 더 늘리는 대신 뒷면에 둔
  * 이유이기도 하다 (홈은 위젯이 늘어날수록 무거워진다).
+ *
+ * 두 면의 높이가 다르다. 앞면은 지도라 비율이 고정이고, 뒷면은 뱃지가 폭에 따라
+ * 여러 줄로 접혀 늘었다 줄었다 한다. 그래서 **지금 보이는 면의 높이를 재서
+ * 카드에 직접 준다** — 안 그러면 카드가 큰 쪽에 맞춰져서 작은 면을 볼 때 아래가
+ * 빈다 (폰 폭에서 지도 아래에 수십 px이 남았다).
  */
 export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
   const { user } = useAuth()
@@ -51,6 +56,29 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
   const prefersReducedMotion = useReducedMotion()
   const [openRegion, setOpenRegion] = useState<TravelRegion | null>(null)
   const [isFlipped, setIsFlipped] = useState(false)
+
+  // 두 면의 실제 높이. 지도 사진이 로드되거나 뱃지가 늘어나면 바뀌므로 한 번
+  // 재고 마는 게 아니라 계속 지켜본다.
+  const frontRef = useRef<HTMLDivElement>(null)
+  const backRef = useRef<HTMLDivElement>(null)
+  const [faceHeights, setFaceHeights] = useState({ front: 0, back: 0 })
+
+  useEffect(() => {
+    const front = frontRef.current
+    const back = backRef.current
+    if (!front || !back) return
+
+    const observer = new ResizeObserver(() => {
+      setFaceHeights({ front: front.scrollHeight, back: back.scrollHeight })
+    })
+    observer.observe(front)
+    observer.observe(back)
+    return () => observer.disconnect()
+  }, [])
+
+  // 아직 못 쟀으면 높이를 지정하지 않는다 ('auto'). 0을 주면 첫 프레임에 카드가
+  // 납작하게 접혔다가 펴진다.
+  const activeHeight = isFlipped ? faceHeights.back : faceHeights.front
 
   const coupleId = profile?.couple_id
   const { photos } = useRegionPhotos(coupleId)
@@ -108,7 +136,10 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
       <VStack className="flip-scene">
         <motion.div
           className="flip-card"
-          animate={{ rotateY: isFlipped ? 180 : 0 }}
+          animate={{
+            rotateY: isFlipped ? 180 : 0,
+            height: activeHeight > 0 ? activeHeight : 'auto',
+          }}
           // 모션에 민감한 사용자에게는 돌리지 않고 바로 바꾼다. 뒤집는 동작이
           // 이 기능의 재미지만, 화면이 도는 것 자체가 힘든 사람도 있다.
           transition={
@@ -117,45 +148,55 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
               : { type: 'spring', stiffness: 160, damping: 20 }
           }
         >
-          {/* 앞면 — 지도 */}
-          <VStack className="flip-face" gap={3} aria-hidden={isFlipped}>
-            <RegionMap
-              region={null}
-              reveal={{ kind: 'mosaic', photos }}
-              isInteractive={canFill}
-              onSelectRegion={setOpenRegion}
-            />
+          {/* 앞면 — 지도.
+              높이를 재려면 실제 DOM 요소를 붙들어야 해서 3D 면은 motion.div가
+              맡고, 안쪽 간격은 그대로 VStack이 맡는다. */}
+          <motion.div className="flip-face" ref={frontRef} aria-hidden={isFlipped}>
+            <VStack gap={3}>
+              <RegionMap
+                region={null}
+                reveal={{ kind: 'mosaic', photos }}
+                isInteractive={canFill}
+                onSelectRegion={setOpenRegion}
+              />
 
-            <Text type="supporting" justify="center">
-              {isComplete
-                ? '전국을 우리 사진으로 다 채웠어요.'
-                : `${DISTRICT_COUNT}곳 중 ${filledCount}곳 · ${Math.round(
-                    (filledCount / DISTRICT_COUNT) * 100,
-                  )}%`}
-            </Text>
+              <Text type="supporting" justify="center">
+                {isComplete
+                  ? '전국을 우리 사진으로 다 채웠어요.'
+                  : `${DISTRICT_COUNT}곳 중 ${filledCount}곳 · ${Math.round(
+                      (filledCount / DISTRICT_COUNT) * 100,
+                    )}%`}
+              </Text>
 
-            <NearestBadgeLine visitedCodes={visitedCodes} photoCodes={photos} />
+              <NearestBadgeLine visitedCodes={visitedCodes} photoCodes={photos} />
 
-            <Text type="supporting" justify="center">
-              {coupleId == null
-                ? '커플이 연결되면 함께 채울 수 있어요.'
-                : '지역을 누르면 그 안의 시·군·구에 사진을 한 장씩 걸 수 있어요.'}
-            </Text>
-          </VStack>
+              <Text type="supporting" justify="center">
+                {coupleId == null
+                  ? '커플이 연결되면 함께 채울 수 있어요.'
+                  : '지역을 누르면 그 안의 시·군·구에 사진을 한 장씩 걸 수 있어요.'}
+              </Text>
+            </VStack>
+          </motion.div>
 
           {/* 뒷면 — 뱃지 진열장 */}
-          <VStack className="flip-face flip-face-back" gap={3} aria-hidden={!isFlipped}>
-            {coupleId == null ? (
-              <Text type="supporting" justify="center">
-                커플이 연결되면 함께 뱃지를 모을 수 있어요.
-              </Text>
-            ) : (
-              <BadgeShelf
-                progresses={shelfProgresses(visitedCodes, photos, badges)}
-                photos={photos}
-              />
-            )}
-          </VStack>
+          <motion.div
+            className="flip-face flip-face-back"
+            ref={backRef}
+            aria-hidden={!isFlipped}
+          >
+            <VStack gap={3}>
+              {coupleId == null ? (
+                <Text type="supporting" justify="center">
+                  커플이 연결되면 함께 뱃지를 모을 수 있어요.
+                </Text>
+              ) : (
+                <BadgeShelf
+                  progresses={shelfProgresses(visitedCodes, photos, badges)}
+                  photos={photos}
+                />
+              )}
+            </VStack>
+          </motion.div>
         </motion.div>
       </VStack>
 
