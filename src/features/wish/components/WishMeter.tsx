@@ -10,21 +10,23 @@ interface WishMeterProps {
 }
 
 /**
- * 얼마나 썼는지에 따라 막대 색을 고른다 — 30% 미만은 초록, 30~70%는 주황,
- * 70% 이상은 빨강.
+ * 안 쓰고 남겨둔 비율로 막대 색을 고른다 — 70% 이상 남았으면 빨강, 30~70%는
+ * 주황, 30% 미만은 초록.
  *
- * 막대 길이는 **남은** 장수라서 쓸수록 짧아지는데, 길이만으로는 "짧다"가
- * 눈에 안 들어온다. 색이 함께 넘어가야 "이제 얼마 안 남았으니 아껴 쓰거나
- * 새로 정하자"가 보인다.
+ * 색이 재촉하는 쪽이다. 소원권은 쟁여두라고 있는 게 아니라 쓰라고 있는
+ * 것이라, 하나도 안 쓴 3/3이 가장 빨갛고 거의 다 쓴 쪽이 초록이다.
  *
- * 총 장수가 0장인 사람은 쓸 것도 남을 것도 없으니 다 쓴 것과 같이 본다
- * (0으로 나누는 것도 피한다).
+ * 막대 길이도 남은 장수라서 길이와 색이 같이 움직인다 — 길고 빨간 막대가
+ * "아직 이만큼 안 썼다"이고, 짧고 초록인 막대가 "잘 쓰고 있다"이다.
+ *
+ * 총 장수가 0장인 사람은 남겨둔 것도 없으니 초록으로 둔다 (0으로 나누는
+ * 것도 피한다).
  */
 function meterVariant(status: WishStatus) {
-  const usedRatio = status.total > 0 ? status.used / status.total : 1
+  const remainingRatio = status.total > 0 ? status.remaining / status.total : 0
 
-  if (usedRatio >= 0.7) return 'error'
-  if (usedRatio >= 0.3) return 'warning'
+  if (remainingRatio >= 0.7) return 'error'
+  if (remainingRatio >= 0.3) return 'warning'
   return 'success'
 }
 
