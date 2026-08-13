@@ -53,7 +53,10 @@ export function MyPage() {
   const social = socialAvatar(user)
 
   const adoptSocialAvatar = useMutation({
-    mutationFn: () => updateProfile(user!.id, { avatar_url: social!.url }),
+    mutationFn: () =>
+      // 출처를 'social'로 적으면 이 뒤로는 로그인할 때마다 자동으로 최신
+      // 사진을 따라간다 (src/app/SocialAvatarSync.tsx).
+      updateProfile(user!.id, { avatar_url: social!.url, avatar_source: 'social' }),
     onSuccess: async () => {
       // 홈 화면 아이콘도 이 값을 본다. AppMetaSync가 같은 쿼리를 구독하고
       // 있어서, 무효화 한 번이면 아이콘까지 따라온다.

@@ -128,6 +128,15 @@ create table public.profiles (
   name text,
   app_name text,
   avatar_url text,
+  -- 위 사진이 **어디서 왔는지**. 'social'(제공자가 준 것) / 'upload'(직접
+  -- 올린 것) / null(사진이 없거나 모름).
+  --
+  -- 이 한 칸이 있어야 소셜 사진을 로그인할 때마다 최신으로 따라가게 하면서도
+  -- 직접 올린 사진은 절대 건드리지 않을 수 있다 (src/app/SocialAvatarSync.tsx).
+  -- 주소만 보고 가를 수도 있지만(Storage 도메인이면 직접 올린 것), 버킷 이름이
+  -- 바뀌는 날 그 추측이 조용히 뒤집히고 그때 벌어지는 일이 "직접 올린 사진이
+  -- 지워지는 것"이다. 추측이 틀렸을 때의 대가가 크면 적어둔다.
+  avatar_source text check (avatar_source is null or avatar_source in ('social', 'upload')),
   poke_opt_in boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -151,8 +160,27 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_avatar text;
 begin
-  insert into public.profiles (id, name, avatar_url)
+  -- 소셜 프로필 사진. 온보딩 "꾸미기"에서 바꿀 수 있지만 기본값이 있는 편이
+  -- 첫 화면이 덜 비어 보인다. 이메일 가입이면 둘 다 없어서 그냥 null이다.
+  --
+  -- **http를 https로 올리는 것이 중요하다.** 카카오가 주는 주소는 http라
+  -- (`http://k.kakaocdn.net/...`), https로 서비스되는 앱에서는 브라우저가
+  -- 혼합 콘텐츠로 막는다 — 깨지는 것도 아니고 조용히 안 뜬다. 홈 화면
+  -- 아이콘과 꾸미기 미리보기, 마이페이지가 전부 이 값을 보므로 셋이 함께
+  -- 비어 있었다. 제공자를 가리지 않고 거는 이유는 https 페이지에서 http
+  -- 이미지는 어느 제공자 것이든 똑같이 막히기 때문이다.
+  v_avatar := regexp_replace(
+    coalesce(
+      nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''),
+      nullif(trim(new.raw_user_meta_data ->> 'picture'), '')
+    ),
+    '^http://', 'https://'
+  );
+
+  insert into public.profiles (id, name, avatar_url, avatar_source)
   values (
     new.id,
     -- 순서가 곧 우선순위다. 'name'이 맨 앞인 이유는 이메일 가입에서 우리가 직접
@@ -164,22 +192,10 @@ begin
       nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
       nullif(trim(new.raw_user_meta_data ->> 'preferred_username'), '')
     ),
-    -- 소셜 프로필 사진. 온보딩 "꾸미기"에서 바꿀 수 있지만 기본값이 있는 편이
-    -- 첫 화면이 덜 비어 보인다. 이메일 가입이면 둘 다 없어서 그냥 null이다.
-    --
-    -- **http를 https로 올리는 것이 중요하다.** 카카오가 주는 주소는 http라
-    -- (`http://k.kakaocdn.net/...`), https로 서비스되는 앱에서는 브라우저가
-    -- 혼합 콘텐츠로 막는다 — 깨지는 것도 아니고 조용히 안 뜬다. 홈 화면
-    -- 아이콘과 꾸미기 미리보기, 마이페이지가 전부 이 값을 보므로 셋이 함께
-    -- 비어 있었다. 제공자를 가리지 않고 거는 이유는 https 페이지에서 http
-    -- 이미지는 어느 제공자 것이든 똑같이 막히기 때문이다.
-    regexp_replace(
-      coalesce(
-        nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''),
-        nullif(trim(new.raw_user_meta_data ->> 'picture'), '')
-      ),
-      '^http://', 'https://'
-    )
+    v_avatar,
+    -- 사진이 있으면 그건 제공자가 준 것이다. 이 표시가 있어야 로그인할 때마다
+    -- 최신으로 따라가면서도 직접 올린 사진은 건드리지 않을 수 있다.
+    case when v_avatar is null then null else 'social' end
   );
   return new;
 end;

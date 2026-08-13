@@ -9,6 +9,7 @@ import { AppMetaSync } from './AppMetaSync'
 import { ColorModeProvider } from './ColorModeProvider'
 import { useColorMode } from './useColorMode'
 import { RouterLinkAdapter } from './router-link'
+import { SocialAvatarSync } from './SocialAvatarSync'
 import { ourieTheme } from './theme'
 
 const queryClient = new QueryClient({
@@ -37,6 +38,7 @@ function ThemedApp({ children }: { children: ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <AppMetaSync />
+            <SocialAvatarSync />
             <div className="min-h-screen bg-body text-primary">
               <ColorModeToggle />
               {children}

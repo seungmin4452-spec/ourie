@@ -97,7 +97,9 @@ export function CustomizeForm() {
       await updateProfile(user.id, {
         app_name: appName.trim(),
         name: name.trim() || null,
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+        // 직접 올린 사진이라고 적어둔다. 이게 없으면 다음 로그인 때
+        // SocialAvatarSync가 이 사진을 소셜 사진으로 덮어버린다.
+        ...(avatarUrl ? { avatar_url: avatarUrl, avatar_source: 'upload' as const } : {}),
       })
 
       const previousMeta = readCachedAppMeta()

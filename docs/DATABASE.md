@@ -39,6 +39,7 @@ couples ◄───────┘ (couple_id로 연결)
 | name | text (nullable) | **사람 이름** — 상대방에게 보이는 이름 |
 | app_name | text | **앱 이름** — 사람 이름이 아니다 (아래 참고) |
 | avatar_url | text (nullable) | Storage 경로 또는 URL |
+| avatar_source | text (nullable) | `social` / `upload` (check 제약) — 위 사진의 출처 |
 | poke_opt_in | boolean | default false — 콕 찌르기 수신 동의 (§2.3.2) |
 | created_at | timestamptz | default now() |
 
@@ -50,6 +51,12 @@ couples ◄───────┘ (couple_id로 연결)
 `name`을 회원가입에서 받으면서도 `profiles`에 직접 쓰지 않는 이유: 이메일 확인이 켜져 있으면 `signUp` 직후에 세션이 없고, 세션이 없으면 RLS 때문에 `profiles`에 쓸 수 없다. 그래서 클라이언트는 `supabase.auth.signUp`의 `options.data`로 넘기고, `handle_new_user` 트리거가 `raw_user_meta_data ->> 'name'`을 읽어 프로필 row를 만든다. 키 이름이 양쪽에서 같아야 하며, 바꾸면 이름이 조용히 사라진다.
 
 `name`이 nullable인 이유는 이 컬럼이 생기기 전에 가입한 계정이 있어서다. 비어 있으면 화면과 알림 모두 이름 없는 문구로 떨어진다(`pokeNameLabel`). 그 계정들은 회원가입을 다시 할 수 없으므로 온보딩 "꾸미기" 화면에서도 이 값을 채울 수 있게 해두었다.
+
+**소셜 프로필 사진과 `avatar_source`.** 카카오가 주는 사진 주소는 `http`다(`http://k.kakaocdn.net/...`). https로 서비스되는 앱에서는 브라우저가 혼합 콘텐츠로 막는데, 깨진 이미지가 뜨는 것도 아니고 조용히 사라져서 "받고 있는데 안 보이는" 상태가 된다 — 홈 화면 아이콘·꾸미기 미리보기·마이페이지가 전부 이 값을 보므로 셋이 함께 비어 있었다. 그래서 `handle_new_user`가 스킴을 https로 올려 저장한다 (제공자를 가리지 않는다 — 어느 제공자 것이든 똑같이 막힌다).
+
+`avatar_source`는 그 사진이 **어디서 왔는지**를 적어둔다. 이게 있어야 소셜 사진을 로그인할 때마다 최신으로 따라가면서도(`src/app/SocialAvatarSync.tsx`) 직접 올린 사진은 절대 건드리지 않을 수 있다. 제공자는 사진이 바뀌면 새 주소를 발급하므로, 저장해 둔 주소는 그냥 두면 옛 사진을 가리킨 채 남고 옛 주소의 수명도 제공자 마음이다.
+
+출처를 주소로 추측하지 않는(Storage 도메인이면 직접 올린 것) 이유는 버킷 이름이나 도메인이 바뀌는 날 그 추측이 조용히 뒤집히기 때문이다. 그때 벌어지는 일이 "직접 올린 사진이 지워지는 것"이라, 틀렸을 때의 대가가 너무 크다. `null`은 "사진이 없거나 출처를 모름"이고 그때도 자동 갱신하지 않는다. **`avatar_url`을 쓰는 코드는 `avatar_source`도 반드시 함께 쓴다** (`updateProfile`의 타입이 그걸 유도한다).
 
 컬럼 rename 시 주의: Postgres는 함수 본문을 텍스트로 저장하므로 `send_poke`처럼 그 컬럼을 참조하는 함수는 rename을 따라오지 않는다. 같은 트랜잭션에서 `create or replace`로 다시 만들어야 한다 (`supabase/migrations/2026-08-11-names.sql` 참고).
 

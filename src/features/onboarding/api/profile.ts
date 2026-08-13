@@ -14,14 +14,24 @@ export interface Profile {
    */
   app_name: string | null
   avatar_url: string | null
-  /** 상대방이 보내는 콕 찌르기 알림을 받겠다는 동의. src/features/poke 참고. */
+  /**
+   * 위 사진이 **어디서 왔는지**. 이 표시가 있어야 소셜 사진을 로그인할 때마다
+   * 최신으로 따라가게 하면서도 직접 올린 사진은 절대 건드리지 않을 수 있다
+   * (src/app/SocialAvatarSync.tsx). null은 사진이 없거나 출처를 모른다는 뜻이고,
+   * 그때는 자동 갱신도 하지 않는다.
+   */
+  avatar_source: AvatarSource | null
+  /** 상대방이 보내는 알림을 받겠다는 동의. src/features/notification 참고. */
   poke_opt_in: boolean
 }
+
+/** 'social' = 소셜 로그인 제공자가 준 사진, 'upload' = 직접 올린 사진. */
+export type AvatarSource = 'social' | 'upload'
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, couple_id, name, app_name, avatar_url, poke_opt_in')
+    .select('id, couple_id, name, app_name, avatar_url, avatar_source, poke_opt_in')
     .eq('id', userId)
     .maybeSingle()
   if (error) throw error
@@ -46,7 +56,14 @@ export async function updateProfile(
   // name이 null도 받는 이유: 비워둔 것과 공백만 넣은 것을 DB에서 한 가지 값으로
   // 모으기 위해서다 (가입 트리거의 nullif와 같은 규칙). 표현이 둘이면
   // "이름 없음"을 확인하는 곳마다 분기가 갈라진다.
-  updates: { name?: string | null; app_name?: string; avatar_url?: string },
+  // avatar_url을 넣을 때는 avatar_source도 **반드시 함께** 넣는다. 출처가
+  // 어긋나면 자동 갱신이 직접 올린 사진을 소셜 사진으로 덮어버린다.
+  updates: {
+    name?: string | null
+    app_name?: string
+    avatar_url?: string
+    avatar_source?: AvatarSource
+  },
 ) {
   // upsert, not update: some accounts don't have a profiles row yet (e.g. the
   // handle_new_user signup trigger not having run for them), and .update()
