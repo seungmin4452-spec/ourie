@@ -117,4 +117,40 @@
       animation: none;
     }
   }
+
+  /* 위젯 앞뒤 뒤집기. 사진 지도가 앞면, 뱃지 진열장이 뒷면이다
+     (PhotoMapWidget.tsx).
+
+     3D 변환은 컴포넌트 prop으로 표현할 수 없어 유틸리티로 둔다. 회전 자체는
+     framer-motion이 rotateY로 하고, 여기서는 **그 회전이 3D로 보이게 하는
+     무대**만 만든다.
+
+     두 면을 absolute로 겹치지 않고 같은 그리드 칸에 넣는 이유: absolute는
+     높이를 잃어서 컨테이너에 고정 높이를 박아야 하는데, 앞면(지도, 비율 고정)과
+     뒷면(뱃지, 개수에 따라 줄이 늘어남)의 높이가 다르다. 같은 칸에 쌓으면
+     컨테이너가 둘 중 큰 쪽에 맞춰지고 뒤집을 때 높이가 튀지 않는다. */
+  .flip-scene {
+    perspective: 1200px;
+  }
+
+  .flip-card {
+    display: grid;
+    transform-style: preserve-3d;
+  }
+
+  .flip-face {
+    grid-area: 1 / 1;
+    /* 뒤돌아선 면이 비쳐 보이지 않게. 이게 없으면 앞뒤가 겹쳐 읽힌다. */
+    backface-visibility: hidden;
+  }
+
+  .flip-face-back {
+    transform: rotateY(180deg);
+  }
+
+  /* 뒤에 있는 면은 눌리지 않아야 한다. backface-visibility는 보이지만 않게 할
+     뿐이라, 이게 없으면 지도를 누른다고 생각한 손가락이 뒷면 뱃지를 누른다. */
+  .flip-face[aria-hidden='true'] {
+    pointer-events: none;
+  }
 }

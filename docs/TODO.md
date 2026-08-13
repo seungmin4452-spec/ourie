@@ -97,10 +97,13 @@
 - [x] **섬이 프레임을 먹는 문제** — 인천은 서해 5도 때문에 본토가 사라졌다.
       `mainlandBounds.ts`로 본토(가장 큰 덩어리) 기준 프레임 (인천 경계상자 면적 15%로 축소)
 - [x] `RegionBadge.tsx` — 3상태(locked · visited · photo) 원형 뱃지
-- [ ] `travel_badges` 테이블 + `claim_region_badge` RPC — schema.sql과 migrations에 같이 반영
-- [ ] "우리의 뱃지" 위젯 — `WIDGET_IDS` / `catalog.tsx` / `HomePage.tsx` 세 군데 등록, `lazy`로
-- [ ] 획득 순간 연출 + 상대에게 푸시
-- [ ] 두 지도 위젯에 진행 한 줄 ("강원 15/18 — 3곳 남았어요")
+- [x] `travel_badges` 테이블 + `claim_region_badge` RPC
+      - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-13-region-badges.sql`
+- [x] "우리의 뱃지" 위젯 — `BadgeWidget`, `lazy`로 등록
+- [x] **사진 지도 위젯 뒤집기** — 오른쪽 아래 버튼으로 앞뒤가 돌아가고 뒷면이 뱃지 진열장
+- [x] 획득 순간 연출(`BadgeEarnedOverlay`) + 상대에게 푸시(`api/badge.ts`)
+- [x] 두 지도 위젯에 진행 한 줄 (`NearestBadgeLine`)
+- [ ] 실기기에서 획득 순간 확인 — 지금은 실제로 시도를 다 채워본 적이 없다
 
 ## Phase 6 — 커스터마이징
 - [ ] `couple_settings` 테이블 생성 + RLS 정책

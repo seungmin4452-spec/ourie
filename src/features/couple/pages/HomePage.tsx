@@ -50,6 +50,22 @@ const PhotoMapWidget = lazy(async () => ({
   default: (await import('@/features/travel')).PhotoMapWidget,
 }))
 
+const BadgeWidget = lazy(async () => ({
+  default: (await import('@/features/travel')).BadgeWidget,
+}))
+
+/**
+ * 뱃지 판정. 화면에 아무것도 그리지 않고 다 채운 시도를 알아채 기록한다
+ * (BadgeTracker 주석 참고). 지도·뱃지 위젯 중 하나라도 홈에 있을 때만 부른다 —
+ * 도형 데이터 청크를 그 사람들만 받으면 된다.
+ */
+const BadgeTracker = lazy(async () => ({
+  default: (await import('@/features/travel')).BadgeTracker,
+}))
+
+/** 뱃지가 생길 수 있는 위젯들. 하나라도 홈에 있으면 판정이 돈다. */
+const BADGE_RELATED: WidgetId[] = ['travel', 'photomap', 'badges']
+
 /** 도형 데이터 청크를 받는 동안 위젯 자리에 두는 한 줄. */
 function MapLoading() {
   return (
@@ -162,6 +178,12 @@ export function HomePage() {
             <PhotoMapWidget profile={profile} isEditing={isEditing} />
           </Suspense>
         )
+      case 'badges':
+        return (
+          <Suspense fallback={<MapLoading />}>
+            <BadgeWidget profile={profile} />
+          </Suspense>
+        )
     }
   }
 
@@ -262,6 +284,15 @@ export function HomePage() {
           />
         )}
       </VStack>
+
+      {/* 지도를 다 채운 순간을 알아채 뱃지로 기록한다. 위젯 어느 쪽에도 두지
+          않은 이유는 판정이 한 군데서만 일어나야 하기 때문이다 — 지도 위젯과
+          뱃지 위젯이 각자 하면 같은 뱃지를 두세 번 청구하고 연출도 겹쳐 뜬다. */}
+      {widgets.some((id) => BADGE_RELATED.includes(id)) && (
+        <Suspense fallback={null}>
+          <BadgeTracker profile={profile} />
+        </Suspense>
+      )}
 
       {/* 앱에 처음 들어온 사람에게 한 번만 뜬다. 알림이 이 앱의 기능 자체라
           찾아 들어가 켜기를 기다릴 수 없다 (NotificationPromptDialog 주석). */}

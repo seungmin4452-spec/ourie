@@ -21,6 +21,7 @@ couples ◄───────┘ (couple_id로 연결)
     ├──► travel_visits    (스크래치 지도 — 다녀온 시군구, PK가 couple_id+region_code)
     ├──► travel_maps      (스크래치 지도 배경 사진, 1:1)
     ├──► travel_region_photos (사진 지도 — 시군구마다 사진 한 장, PK가 couple_id+region_code)
+    ├──► travel_badges    (지역 뱃지 — PK가 couple_id+sido_code+tier)
     ├──► wish_quotas      (소원권 — 사람마다 총 장수, PK가 couple_id+owner_id)
     ├──► wishes           (소원권 — 쓴 한 장이 한 row)
     ├──► memories.location ─► 핀 지도에서 활용 (별도 테이블 없이 memories 재사용)
@@ -268,6 +269,24 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 `travel_maps`에 컬럼을 붙이지 않은 이유: 그건 커플당 한 줄(1:1)이고 이건 커플 × 지역이다.
 `travel_visits`와 잇지 않은 이유: "사진을 걸었다"와 "다녀왔다"는 사용자가 따로 하는 말이라,
 사진을 빼는 것이 다녀온 기록까지 지우면 그건 시키지 않은 일이다 (`PRD.md` §3.4.1).
+
+### 2.4.4 `travel_badges` (지역 뱃지)
+
+시도 안의 시군구를 전부 채우면 뱃지 하나. 두 지도가 나눠 갖는다 — 전부 방문하면 `visited`, 사진까지 걸면 `photo`.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| couple_id | uuid (FK → couples.id) | PK 1 |
+| sido_code | text | PK 2 — 시도 코드 두 자리 (`^[0-9]{2}$` check) |
+| tier | text | PK 3 — `visited` / `photo` (check 제약) |
+| earned_at | timestamptz | default now() |
+| earned_by | uuid (FK → profiles.id, nullable) | 마지막 칸을 채운 사람 |
+
+**판정은 화면이 하고 DB는 중복만 막는다.** 트리거로 판정하려면 시도별 시군구 총개수(분모)를 DB가 알아야 하는데, `travel_visits`는 이미 형식만 검사하고 코드는 화면이 안다 (행정구역이 실제로 바뀐다 — 2026년 7월 광주·전남 통합). 분모만 DB로 옮기면 그 결정이 반쪽이 되고 행정구역이 바뀔 때마다 마이그레이션이 하나 더 붙는다. 커플 둘만 쓰는 폐쇄 앱이라 자기 커플 뱃지를 위조해도 남에게 피해가 없다.
+
+**한 번 딴 뱃지는 회수하지 않는다** — 그래서 update·delete 정책이 없다 (select/insert만). 나중에 한 칸을 취소해도 지우지 않는다: 지우면 `earned_at`이 "처음 완성한 날"이 아니라 "마지막으로 완성한 날"이 되고 연대기로서의 가치가 사라진다. 방문 기록만 보면 "지금 완성 상태인지"는 알아도 "언제 처음 완성했는지"는 영영 알 수 없다 — 파생 계산으로 때우지 않고 테이블을 두는 이유다.
+
+획득은 `public.claim_region_badge(p_sido_code, p_tier)`(security definer)가 한다. `insert ... on conflict do nothing` 후 **실제로 새로 생겼는지를 반환**하고, 그 값이 연출과 푸시를 보낼지 정한다 — 둘이 동시에 마지막 칸을 채워도 뱃지는 하나만 생기고 알림도 한 번만 나간다. 신원을 인자로 받지 않고 `auth.uid()`에서 읽으므로 `send_poke`와 달리 `authenticated`의 실행 권한을 회수하지 않는다 (`set_primary_anniversary`와 같은 판단).
 
 ### 2.5 `memory_photos`
 

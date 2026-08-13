@@ -14,8 +14,10 @@ import { countKnownVisits, DISTRICT_COUNT } from '../districtIndex'
 import type { TravelDistrict } from '../districts'
 import { travelMapPhotoQueryKey, useTravelMapPhoto } from '../hooks/useTravelMapPhoto'
 import { useToggleTravelVisit, useTravelVisits } from '../hooks/useTravelVisits'
+import { useRegionPhotos } from '../hooks/useRegionPhotos'
 import { photoFileProblem } from '../photoFile'
 import type { TravelRegion } from '../regions'
+import { NearestBadgeLine } from './NearestBadgeLine'
 import { RegionScratchDialog } from './RegionScratchDialog'
 import { RegionMap } from './RegionMap'
 
@@ -49,6 +51,10 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
   const { visitedCodes } = useTravelVisits(coupleId)
   const { data: photoUrl } = useTravelMapPhoto(coupleId)
   const toggleVisit = useToggleTravelVisit(coupleId, user?.id)
+
+  // 뱃지 진행 한 줄이 두 지도를 함께 본다 — 사진을 건 곳도 다녀온 것으로
+  // 세기 때문이다 (badges.ts). 사진 지도 위젯과 캐시를 공유한다.
+  const { photos } = useRegionPhotos(coupleId)
 
   const visitedCount = countKnownVisits(visitedCodes)
   const isComplete = visitedCount === DISTRICT_COUNT
@@ -113,6 +119,8 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
               (visitedCount / DISTRICT_COUNT) * 100,
             )}%`}
       </Text>
+
+      <NearestBadgeLine visitedCodes={visitedCodes} photoCodes={photos} />
 
       {coupleId == null ? (
         <Text type="supporting" justify="center">

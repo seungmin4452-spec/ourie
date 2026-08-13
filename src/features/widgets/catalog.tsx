@@ -1,4 +1,4 @@
-import { CalendarHeart, Images, MapPin, MapPinned, Pointer, Ticket } from 'lucide-react'
+import { Award, CalendarHeart, Images, MapPin, MapPinned, Pointer, Ticket } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { WIDGET_IDS, type WidgetId, type WidgetMeta } from './types'
@@ -48,6 +48,12 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     description: '지역마다 사진을 한 장씩 걸어서 전국을 우리 사진으로 채워요.',
     isReady: true,
   },
+  badges: {
+    id: 'badges',
+    title: '우리의 뱃지',
+    description: '시·도 한 곳을 다 채울 때마다 그 지역 모양의 뱃지가 생겨요.',
+    isReady: true,
+  },
 }
 
 const HANGUL_FIRST = 0xac00
@@ -82,6 +88,7 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   memories: <Images className="size-4" />,
   travel: <MapPin className="size-4" />,
   photomap: <MapPinned className="size-4" />,
+  badges: <Award className="size-4" />,
 }
 
 /** 상대방 이름이 있을 때 쓰는 제목. "우리"를 그 사람 이름으로 바꾼다. */
