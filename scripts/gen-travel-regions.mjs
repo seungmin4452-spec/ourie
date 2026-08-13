@@ -553,9 +553,9 @@ for (const inset of insets) {
 }
 
 function toPath(entry) {
-  // 본토 조각과 삽입도 조각을 나눠 둔다. bounds(상세 화면의 프레임)는 본토만
-  // 보고 잡아야 한다 — 멀리 있는 상자까지 담으면 프레임이 몇 배로 넓어지면서
-  // 정작 그 시도의 시군구가 손톱만 해진다.
+  // 본토 조각과 삽입도 조각을 나눠 둔다. bounds(상세 화면의 프레임)와 size는
+  // 본토만 보고 잡아야 한다 — 멀리 있는 상자까지 담으면 프레임이 몇 배로
+  // 넓어지면서 정작 그 시도의 시군구가 손톱만 해진다.
   const mainland = entry.rings
     .map((ring) => simplify(ring.map(toView), TOLERANCE))
     .filter((ring) => ring.length >= 4)
@@ -582,13 +582,17 @@ function toPath(entry) {
     cy += (largest[j][1] + largest[i][1]) * cross
   }
 
-  const box = bbox(rings)
   // 울릉군처럼 본토 조각이 하나도 없는 구역은 삽입도가 곧 그 구역이다.
   const frame = bbox(mainland.length > 0 ? mainland : rings)
   return {
     path,
     center: [round(cx / (3 * a2)), round(cy / (3 * a2))],
-    size: round(Math.max(box.maxX - box.minX, box.maxY - box.minY)),
+    // size는 "화면에서 이 구역이 얼마나 작은가"를 재는 값이라(탭 목표를 넓힐지,
+    // 이름을 적을 자리가 있는지) 삽입도를 넣으면 뜻이 뒤집힌다. 인천은 서해 5도
+    // 상자까지 담으면 238이 되어 "큰 구역"으로 분류되지만, 정작 손가락이 닿아야
+    // 하는 본토는 91이라 도움이 제일 급한 축에 든다. 옹진군도 같은 이유로
+    // 205였다 — 그러면 47밖에 안 되는 도형 위에 "옹진군"을 적어도 된다고 나온다.
+    size: round(Math.max(frame.maxX - frame.minX, frame.maxY - frame.minY)),
     bounds: [
       round(frame.minX),
       round(frame.minY),

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type FocusEvent, type KeyboardEvent } from 'react'
+import { useId, useMemo, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { districtsOf } from '../districtIndex'
 import { TRAVEL_DISTRICTS, type TravelDistrict } from '../districts'
@@ -7,8 +7,22 @@ import { MAP_HEIGHT, MAP_WIDTH, TRAVEL_INSETS, TRAVEL_REGIONS, type TravelRegion
 
 /** 위젯 카드 안쪽 폭. 탭 목표가 44px에 못 미치는 구역을 고르는 기준이 된다. */
 const ASSUMED_RENDER_WIDTH = 320
-/** UI_GUIDE §8의 최소 터치 타겟. */
+/** UI_GUIDE §8의 최소 터치 타겟. 도움이 필요한 구역을 고르는 문턱이다. */
 const MIN_TAP_PX = 44
+/**
+ * 탭 원의 지름. 문턱(44px)보다 **일부러 작게** 잡았다.
+ *
+ * 수도권은 한 화면에서 제로섬이다 — 서울 원을 키우면 그만큼 경기를 파먹는다.
+ * 서울은 경기 안에 들어앉아 있고 인천도 바로 옆이라, 셋 중 둘을 만족시키면
+ * 나머지 하나가 무너진다. 지름을 바꿔가며 시도마다 "그 시도를 열 수 있는 가장
+ * 큰 원"을 재보면 이렇다 (화면 폭 320px 기준, 제일 안 좋은 시도의 값):
+ *
+ *   원 없음 9px · 30px→24px · 34px→26px · **36px→27px** · 40px→26px · 44px→24px
+ *
+ * 44px을 그대로 주면 서울은 32px까지 커지지만 경기가 24px로 떨어져서, 지도
+ * 전체로 보면 오히려 나빠진다. 36px이 제일 안 좋은 곳을 가장 높이 끌어올린다.
+ */
+const TAP_CIRCLE_PX = 36
 /** 상세 화면의 시군구 이름 크기. UI_GUIDE §3의 보조 텍스트(13px)보다 한 단계 작다. */
 const LABEL_PX = 10
 /**
@@ -112,32 +126,27 @@ export function RegionMap({
 
   /**
    * 도형만으로는 손가락이 안 닿는 구역들. 가운데에 투명한 원을 하나 더 얹어
-   * 탭 목표를 넓힌다.
+   * 탭 목표를 넓힌다 (`TAP_CIRCLE_PX`).
    *
    * 문턱은 화면에서 재야 의미가 있어서 현재 viewBox 폭으로 환산한다 — 상세로
    * 들어가면 같은 구역이 더 크게 그려지므로 도움이 필요한 곳도 줄어든다.
    *
-   * 작은 구역끼리도 원이 겹친다. 나중에 그린 쪽이 위로 오므로, 도움이 제일
-   * 급한 **작은 순서가 맨 위**에 오도록 큰 것부터 그린다.
+   * **원이 겹치는 것을 막지 않는다.** 예전에는 이웃 중심까지 거리의 절반으로
+   * 반경을 잘랐는데, 그러면 수도권에서 도움이 통째로 사라진다 — 경기는 서울을
+   * 감싸고 있어 두 중심이 화면에서 10px밖에 안 떨어져 있고, 그래서 정작 제일
+   * 작은 서울의 원이 지름 10px로 깎여 도형(22px)보다도 작아졌다.
+   *
+   * 겹침은 반경이 아니라 `nearestTapTarget`에서 가른다. 그러면 서울은 이웃
+   * 반대쪽으로 원을 온전히 갖고, 맞닿은 쪽만 절반씩 나눠 갖는다.
    */
   const tapTargets = useMemo(() => {
     const unitsPerPx = vw / ASSUMED_RENDER_WIDTH
     const minSize = MIN_TAP_PX * unitsPerPx
     const all: (TravelRegion | TravelDistrict)[] = region ? districts : TRAVEL_REGIONS
-    const small = all.filter((t) => t.size < minSize).sort((a, b) => b.size - a.size)
-
-    return small.map((item) => {
-      // 이웃 중심까지 거리의 절반을 넘지 않게 자른다. 인천이나 서울처럼 구가
-      // 촘촘한 곳에서는 원이 서로 깊게 겹쳐서, 누른 자리에서 제일 가까운 구가
-      // 아니라 나중에 그려진 구가 칠해진다.
-      let half = Infinity
-      for (const other of all) {
-        if (other.code === item.code) continue
-        const d = Math.hypot(other.center[0] - item.center[0], other.center[1] - item.center[1])
-        if (d / 2 < half) half = d / 2
-      }
-      return { item, radius: Math.min((MIN_TAP_PX / 2) * unitsPerPx, half) }
-    })
+    return {
+      radius: (TAP_CIRCLE_PX / 2) * unitsPerPx,
+      items: all.filter((item) => item.size < minSize),
+    }
   }, [districts, region, vw])
 
   /**
@@ -163,6 +172,34 @@ export function RegionMap({
   function activate(item: TravelRegion | TravelDistrict) {
     if (region) onSelectDistrict?.(item as TravelDistrict)
     else onSelectRegion?.(item as TravelRegion)
+  }
+
+  /**
+   * 겹친 탭 원 가운데 **누른 지점에서 제일 가까운** 구역. 어느 원이 이벤트를
+   * 받았는지는(= 누가 나중에 그려졌는지는) 결과를 바꾸지 않는다.
+   *
+   * 거리를 재려면 화면 좌표를 뷰박스 좌표로 되돌려야 한다. 변환 행렬을 못 얻는
+   * 드문 경우에는(요소가 아직 화면에 없을 때) 이벤트를 받은 원의 주인을 쓴다 —
+   * 누르긴 눌렀는데 아무 일도 안 일어나는 것보다 낫다.
+   */
+  function nearestTapTarget(
+    event: MouseEvent<SVGCircleElement>,
+    fallback: TravelRegion | TravelDistrict,
+  ): TravelRegion | TravelDistrict {
+    const matrix = event.currentTarget.ownerSVGElement?.getScreenCTM()?.inverse()
+    if (!matrix) return fallback
+
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix)
+    let best = fallback
+    let bestDistance = Infinity
+    for (const item of tapTargets.items) {
+      const distance = Math.hypot(item.center[0] - point.x, item.center[1] - point.y)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = item
+      }
+    }
+    return best
   }
 
   function handleKeyDown(event: KeyboardEvent<SVGElement>, item: TravelRegion | TravelDistrict) {
@@ -363,17 +400,17 @@ export function RegionMap({
       ))}
 
       {isInteractive &&
-        tapTargets.map(({ item, radius }) => (
+        tapTargets.items.map((item) => (
           <circle
             key={item.code}
             cx={item.center[0]}
             cy={item.center[1]}
-            r={radius}
+            r={tapTargets.radius}
             className="cursor-pointer fill-transparent"
             // 도형 쪽 path가 이미 버튼 역할과 이름을 갖고 있다. 여기까지 읽히면
             // 스크린 리더에 같은 지역이 두 번 나온다.
             aria-hidden
-            onClick={() => activate(item)}
+            onClick={(event) => activate(nearestTapTarget(event, item))}
           />
         ))}
     </svg>
