@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { downscaleImage } from '@/lib/image'
+import { getSignedUrl, pruneSignedUrls, putSignedUrl } from './signedUrlCache'
 
 /**
  * 스크래치 지도의 배경 사진과 같은 버킷이다. 둘 다 "커플 사진 원본"이라 성격이
@@ -9,12 +10,18 @@ import { downscaleImage } from '@/lib/image'
  */
 const BUCKET = 'travel-maps'
 
+/** 서명 캐시에서 배경 사진과 섞이지 않게 하는 이름 (signedUrlCache.ts). */
+const SCOPE = 'travel-region-photos' as const
+
 /**
  * 서명 URL의 수명.
  *
  * 배경 사진(1시간, api/map.ts)보다 길다. 이쪽은 한 장이 아니라 **채운 구역
  * 수만큼** 이고, 서명이 갱신되면 URL이 통째로 바뀌어 브라우저 캐시가 무효가
  * 된다 — 짧게 잡으면 홈을 켜둔 채로 지도 전체를 몇십 분마다 다시 받는다.
+ *
+ * 이 수명이 곧 "목록을 얼마나 자주 보나"는 아니다. 서명은 경로 단위로
+ * 캐시되므로(signedUrlCache.ts) 목록은 자주 봐도 사진은 다시 받지 않는다.
  */
 export const REGION_PHOTO_TTL_SECONDS = 6 * 60 * 60
 
@@ -38,6 +45,10 @@ interface RegionPhotoRow {
  *
  * 서명을 한 장씩 받지 않고 `createSignedUrls`로 한 번에 받는다. 191곳까지
  * 늘어날 수 있는 목록이라, 장당 왕복이면 지도가 뜨는 데 그 수만큼 걸린다.
+ *
+ * 이미 서명해둔 경로는 다시 서명하지 않는다(signedUrlCache.ts). 그래서 이
+ * 함수를 자주 불러도 오가는 것은 row 목록뿐이고, 새 서명이 필요한 것은 상대가
+ * 방금 건 사진처럼 **처음 보는 경로**뿐이다.
  */
 export async function listRegionPhotoUrls(coupleId: string): Promise<Map<string, string>> {
   const { data, error } = await supabase
@@ -47,19 +58,26 @@ export async function listRegionPhotoUrls(coupleId: string): Promise<Map<string,
   if (error) throw error
 
   const rows: RegionPhotoRow[] = data ?? []
-  if (rows.length === 0) return new Map()
+  if (rows.length === 0) {
+    pruneSignedUrls(SCOPE, [])
+    return new Map()
+  }
 
-  const { data: signed, error: signError } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrls(
-      rows.map((row) => row.photo_path),
-      REGION_PHOTO_TTL_SECONDS,
-    )
-  if (signError) throw signError
+  const unsigned = rows
+    .map((row) => row.photo_path)
+    .filter((path) => getSignedUrl(SCOPE, path) == null)
 
-  const urlByPath = new Map<string, string>()
-  for (const item of signed ?? []) {
-    if (item.path && item.signedUrl) urlByPath.set(item.path, item.signedUrl)
+  if (unsigned.length > 0) {
+    const { data: signed, error: signError } = await supabase.storage
+      .from(BUCKET)
+      .createSignedUrls(unsigned, REGION_PHOTO_TTL_SECONDS)
+    if (signError) throw signError
+
+    for (const item of signed ?? []) {
+      if (item.path && item.signedUrl) {
+        putSignedUrl(SCOPE, item.path, item.signedUrl, REGION_PHOTO_TTL_SECONDS)
+      }
+    }
   }
 
   // 서명이 안 나온 경로는 그냥 뺀다. 파일이 지워졌는데 row만 남은 경우인데,
@@ -67,9 +85,16 @@ export async function listRegionPhotoUrls(coupleId: string): Promise<Map<string,
   // 안 채운 지역으로 보인다.
   const urlByRegion = new Map<string, string>()
   for (const row of rows) {
-    const url = urlByPath.get(row.photo_path)
+    const url = getSignedUrl(SCOPE, row.photo_path)
     if (url) urlByRegion.set(row.region_code, url)
   }
+
+  // 사진을 바꾸거나 뺀 뒤의 옛 경로를 여기서 버린다.
+  pruneSignedUrls(
+    SCOPE,
+    rows.map((row) => row.photo_path),
+  )
+
   return urlByRegion
 }
 
