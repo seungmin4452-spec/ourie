@@ -1,11 +1,14 @@
 import { Avatar } from '@astryxdesign/core/Avatar'
 import { AvatarGroup } from '@astryxdesign/core/AvatarGroup'
+import { Button } from '@astryxdesign/core/Button'
 import { Divider } from '@astryxdesign/core/Divider'
 import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Text } from '@astryxdesign/core/Text'
+import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ImageDown } from 'lucide-react'
 
 import { BackButton } from '@/components/common/BackButton'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
@@ -14,7 +17,8 @@ import { useAnniversaries } from '@/features/anniversary'
 import { useAuth } from '@/features/auth'
 import { usePartner } from '@/features/couple/hooks/usePartner'
 import { NotificationSettings, PartnerAlertSwitch } from '@/features/notification'
-import { getProfile } from '@/features/onboarding/api/profile'
+import { getProfile, updateProfile } from '@/features/onboarding/api/profile'
+import { socialAvatar } from '../socialAvatar'
 
 /**
  * 마이페이지 — 지금은 알림 설정 하나를 위한 화면이다.
@@ -32,6 +36,8 @@ import { getProfile } from '@/features/onboarding/api/profile'
  */
 export function MyPage() {
   const { user } = useAuth()
+  const showToast = useToast()
+  const queryClient = useQueryClient()
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', user?.id],
@@ -44,9 +50,30 @@ export function MyPage() {
   // 보여준다. 그래서 이 화면도 기념일을 읽는다 (홈과 캐시를 공유한다).
   const { data: anniversaries } = useAnniversaries(profile?.couple_id)
 
+  const social = socialAvatar(user)
+
+  const adoptSocialAvatar = useMutation({
+    mutationFn: () => updateProfile(user!.id, { avatar_url: social!.url }),
+    onSuccess: async () => {
+      // 홈 화면 아이콘도 이 값을 본다. AppMetaSync가 같은 쿼리를 구독하고
+      // 있어서, 무효화 한 번이면 아이콘까지 따라온다.
+      await queryClient.invalidateQueries({ queryKey: ['profile', user!.id] })
+      showToast({ type: 'info', body: `${social!.providerLabel} 사진으로 바꿨어요.` })
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof Error ? error.message : '사진을 바꾸지 못했어요.',
+      })
+    },
+  })
+
   if (isLoading || user == null) {
     return <FullscreenLoader />
   }
+
+  // 이미 그 사진을 쓰고 있으면 권할 것이 없다.
+  const canAdoptSocial = social != null && social.url !== profile?.avatar_url
 
   const myName = profile?.name?.trim()
   const partnerName = partner?.name?.trim()
@@ -77,6 +104,25 @@ export function MyPage() {
           </Text>
         </VStack>
       </HStack>
+
+      {/* 소셜 사진을 지금 가져온다.
+          가입할 때 한 번 받아두긴 하지만, 그 뒤 꾸미기에서 직접 올렸거나
+          사진이 안 뜨던 시절에 가입한 사람은 프로필에 그 사진이 없다. 세션에는
+          로그인할 때마다 최신 값이 실려 오므로 여기서 꺼내 쓴다.
+          로그인할 때 자동으로 덮지 않는 이유는 socialAvatar.ts 주석 참고 —
+          직접 올린 사진이 매번 지워지면 고쳐준 게 아니라 뺏은 것이다.
+          한 사람이 눌러도 그 사람 것만 바뀐다. 상대의 소셜 사진은 상대의
+          세션에만 있어서, 각자 자기 기기에서 눌러야 한다. */}
+      {canAdoptSocial && (
+        <Button
+          label={`${social.providerLabel} 프로필 사진으로 바꾸기`}
+          variant="secondary"
+          width="100%"
+          icon={<ImageDown className="size-4" />}
+          isLoading={adoptSocialAvatar.isPending}
+          onClick={() => adoptSocialAvatar.mutate()}
+        />
+      )}
 
       <VStack gap={4}>
         <VStack gap={1}>
