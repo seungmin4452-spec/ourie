@@ -168,6 +168,31 @@ export function WishDialog({
                 <VStack gap={3}>
                   <WishMeter status={mine} />
                   {theirs && <WishMeter status={theirs} />}
+
+                  {/* 장수를 정하는 자리는 **막대 바로 밑**이다. 한때 다이얼로그
+                      맨 아래에 뒀는데, 목록과 작성 폼을 다 지나쳐야 나와서 이런
+                      게 있는 줄도 모르고 지나쳤다. 바꾸는 숫자 옆에 있어야
+                      찾는다 — "몇 장이지?"를 묻는 그 자리가 "몇 장으로 할까?"를
+                      묻는 자리이기도 하다.
+
+                      접어두는 것은 그대로다. 어쩌다 한 번 정하는 것이라 펼쳐두면
+                      소원을 쓰러 올 때마다 숫자 두 칸이 길을 막는다. */}
+                  <Collapsible
+                    defaultIsOpen={false}
+                    trigger={<Text weight="medium">소원권 장수 정하기</Text>}
+                  >
+                    <WishTotalForm
+                      // 서버 값이 바뀌면(상대가 다른 기기에서 정했다) 새로
+                      // 시작한다. 아래 폼은 처음 받은 숫자를 자기 상태로 들고
+                      // 있어서, key가 없으면 낡은 숫자를 계속 보여준다.
+                      key={`${mine.total}-${theirs?.total ?? 0}`}
+                      coupleId={coupleId}
+                      userId={userId}
+                      mine={mine}
+                      theirs={theirs}
+                      onChanged={onChanged}
+                    />
+                  </Collapsible>
                 </VStack>
 
                 <Divider />
@@ -259,32 +284,11 @@ export function WishDialog({
 
                   {!isEditing && mine.remaining === 0 && (
                     <Text type="supporting">
-                      남은 소원권이 없어요. 위에서 쓴 소원을 하나 지우거나, 아래에서
-                      장수를 늘리면 다시 쓸 수 있어요.
+                      남은 소원권이 없어요. 쓴 소원을 하나 지우거나, 맨 위의
+                      "소원권 장수 정하기"에서 장수를 늘리면 다시 쓸 수 있어요.
                     </Text>
                   )}
                 </VStack>
-
-                <Divider />
-
-                {/* 장수는 어쩌다 한 번 정하는 것이라 접어둔다. 열려 있으면 매번
-                    소원을 쓸 때마다 숫자 두 칸을 지나쳐야 한다. */}
-                <Collapsible
-                  defaultIsOpen={false}
-                  trigger={<Text weight="medium">소원권 장수 정하기</Text>}
-                >
-                  <WishTotalForm
-                    // 서버 값이 바뀌면(상대가 다른 기기에서 정했다) 새로
-                    // 시작한다. 아래 폼은 처음 받은 숫자를 자기 상태로 들고
-                    // 있어서, key가 없으면 낡은 숫자를 계속 보여준다.
-                    key={`${mine.total}-${theirs?.total ?? 0}`}
-                    coupleId={coupleId}
-                    userId={userId}
-                    mine={mine}
-                    theirs={theirs}
-                    onChanged={onChanged}
-                  />
-                </Collapsible>
               </VStack>
             </LayoutContent>
           }
