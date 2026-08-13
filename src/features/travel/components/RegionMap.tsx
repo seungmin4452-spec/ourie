@@ -399,6 +399,34 @@ export function RegionMap({
         </text>
       ))}
 
+      {/* 삽입도는 상자를 통째로 눌러도 그 시도가 열린다.
+          상자 안 섬은 도형만으로는 못 누른다 — 서해 5도는 68 남짓한 자리에 섬이
+          넷이라 하나하나가 손톱만 하다. 울릉도는 혼자 46을 쓰고 있어서 눌렸고,
+          그래서 같은 삽입도인데 한쪽만 되는 것처럼 보였다.
+
+          본토를 가릴 걱정은 없다. 상자는 본토 양옆에 띠로 덧붙인 자리라
+          (생성기의 leftStrip/rightStrip) 시도 도형과 겹치지 않는다. */}
+      {isInteractive &&
+        region == null &&
+        TRAVEL_INSETS.map((inset) => {
+          const owner = TRAVEL_REGIONS.find((item) => item.code === inset.sido)
+          if (!owner) return null
+          return (
+            <rect
+              key={inset.label}
+              x={inset.x}
+              y={inset.y}
+              width={inset.width}
+              height={inset.height}
+              className="cursor-pointer fill-transparent"
+              // 상자 안 섬이 이미 그 시도의 버튼이다. 여기까지 읽히면 스크린
+              // 리더에 같은 시도가 두 번 나온다.
+              aria-hidden
+              onClick={() => activate(owner)}
+            />
+          )
+        })}
+
       {isInteractive &&
         tapTargets.items.map((item) => (
           <circle
