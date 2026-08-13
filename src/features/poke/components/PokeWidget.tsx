@@ -1,6 +1,5 @@
 import { Button } from '@astryxdesign/core/Button'
 import { Divider } from '@astryxdesign/core/Divider'
-import { Switch } from '@astryxdesign/core/Switch'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
@@ -12,9 +11,8 @@ import { useAuth } from '@/features/auth'
 // 배럴(@/features/couple)이 아니라 훅 파일을 직접 가리킨다 — 배럴에는 홈
 // 화면이 들어 있고, 그 홈이 다시 이 위젯을 가져오므로 순환 import가 된다.
 import { partnerQueryKey, usePartner } from '@/features/couple/hooks/usePartner'
-import { usePushNotifications, type PushState } from '@/features/notification'
+import { PartnerAlertSwitch } from '@/features/notification'
 import type { Profile } from '@/features/onboarding/api/profile'
-import { setPokeOptIn } from '../api/partner'
 import { PokeError, sendPoke } from '../api/poke'
 import { pokeIcon } from '../catalog'
 import { usePokePresets } from '../hooks/usePokePresets'
@@ -22,16 +20,6 @@ import { pokePresetIcon } from '../icons'
 import { POKE_KINDS, POKE_LABELS, pokeNameLabel } from '../message'
 import type { PokeTarget } from '../types'
 import { PokePresetDialog } from './PokePresetDialog'
-
-/**
- * 수신 동의 스위치를 아예 켤 수 없는 상태들. 알림 자체가 불가능한 기기라서,
- * 여기서는 되돌릴 방법이 없다.
- */
-const UNAVAILABLE: Partial<Record<PushState, string>> = {
-  unsupported: '이 브라우저는 알림을 지원하지 않아요.',
-  'needs-install': '홈 화면에 추가한 앱에서만 알림을 받을 수 있어요.',
-  blocked: '기기 설정에서 이 앱의 알림을 허용한 뒤 다시 시도해주세요.',
-}
 
 interface PokeWidgetProps {
   /** 홈이 이미 가져온 내 프로필. 같은 걸 또 조회하지 않으려고 받아 쓴다. */
@@ -47,7 +35,9 @@ interface PokeWidgetProps {
  * 1. 상대방이 받겠다고 하지 않았으면 보낼 수 없다. 눌러보고 실패를 보는 대신,
  *    누르기 전부터 버튼이 잠겨 있고 이유가 적혀 있다.
  * 2. 내 수신 동의도 이 자리에서 켠다. 보내는 화면과 받는 설정이 떨어져 있으면
- *    "왜 상대는 나한테 못 보내지?"를 아무도 못 찾는다.
+ *    "왜 상대는 나한테 못 보내지?"를 아무도 못 찾는다. 같은 스위치가
+ *    마이페이지(/me)에도 있다 — 이 위젯을 홈에 올리지 않은 사람도 켤 수
+ *    있어야 하기 때문이다.
  *
  * 실제 차단은 서버가 한다 (supabase/schema.sql의 send_poke). 여기 잠금은 안내다.
  *
@@ -58,7 +48,6 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
   const { user } = useAuth()
   const showToast = useToast()
   const queryClient = useQueryClient()
-  const { state: pushState, toggle: togglePush } = usePushNotifications(user?.id)
   const [isPresetDialogOpen, setIsPresetDialogOpen] = useState(false)
 
   const coupleId = profile?.couple_id
@@ -67,7 +56,6 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
   const { data: presets } = usePokePresets(coupleId)
 
   const canSend = partner?.poke_opt_in === true
-  const unavailableReason = UNAVAILABLE[pushState]
 
   /** 상대방 프로필과 내 프로필을 서버 상태와 다시 맞춘다. */
   async function refreshProfiles() {
@@ -174,53 +162,10 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
 
       <Divider />
 
-      {/* 이 스위치 하나가 "상대방이 내 기기를 울리는 알림" 전부를 가른다.
-          처음에는 콕 찌르기뿐이었지만 소원권 알림(api/wish.ts)도 같은
-          profiles.poke_opt_in을 본다. 동의를 종류별로 쪼개면 스위치가 기능
-          수만큼 늘어나는데, 사람들이 실제로 정하고 싶은 것은 "상대가 내 폰을
-          울려도 되는가" 하나다. 그래서 문구를 둘 다 가리키게 적는다. */}
-      <Switch
-        label="상대방이 보내는 알림 받기"
-        description={
-          unavailableReason ??
-          (pushState === 'on'
-            ? '콕 찌르기와 소원권 알림이 이 기기로 와요.'
-            : '켜면 이 기기의 알림 권한도 함께 켜져요.')
-        }
-        labelSpacing="spread"
-        width="100%"
-        value={profile?.poke_opt_in ?? false}
-        isLoading={pushState === 'loading'}
-        isDisabled={pushState === 'loading' || unavailableReason != null || user == null}
-        disabledMessage={unavailableReason}
-        changeAction={async (checked) => {
-          try {
-            // 동의만 켜고 알림 구독이 없으면 아무것도 오지 않는다. 켜는
-            // 방향일 때만 구독을 같이 만든다 — 끌 때 구독까지 지우면 매일
-            // 디데이 알림도 같이 꺼져버린다.
-            if (checked && pushState !== 'on') {
-              await togglePush(true)
-            }
-            await setPokeOptIn(user!.id, checked)
-            await refreshProfiles()
-            showToast({
-              type: 'info',
-              body: checked
-                ? '이제 상대방이 보낸 알림을 받아요.'
-                : '상대방이 보내는 알림을 껐어요.',
-            })
-          } catch (error) {
-            // changeAction이 던지면 처리되지 않은 거절로 남는다. 여기서 받아
-            // 토스트로 알리고, 스위치는 서버 값으로 되돌린다 (낙관적 UI가
-            // 켜진 채로 남지 않게).
-            await refreshProfiles()
-            showToast({
-              type: 'error',
-              body: error instanceof Error ? error.message : '설정에 실패했어요.',
-            })
-          }
-        }}
-      />
+      {/* 스위치의 알맹이는 notification 기능이 들고 있다. 콕 찌르기만의
+          설정이 아니라 소원권 알림까지 함께 가르기 때문이다 —
+          PartnerAlertSwitch 주석 참고. 마이페이지(/me)에도 같은 것이 있다. */}
+      <PartnerAlertSwitch profile={profile} />
     </VStack>
   )
 }

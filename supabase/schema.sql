@@ -166,9 +166,19 @@ begin
     ),
     -- 소셜 프로필 사진. 온보딩 "꾸미기"에서 바꿀 수 있지만 기본값이 있는 편이
     -- 첫 화면이 덜 비어 보인다. 이메일 가입이면 둘 다 없어서 그냥 null이다.
-    coalesce(
-      nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''),
-      nullif(trim(new.raw_user_meta_data ->> 'picture'), '')
+    --
+    -- **http를 https로 올리는 것이 중요하다.** 카카오가 주는 주소는 http라
+    -- (`http://k.kakaocdn.net/...`), https로 서비스되는 앱에서는 브라우저가
+    -- 혼합 콘텐츠로 막는다 — 깨지는 것도 아니고 조용히 안 뜬다. 홈 화면
+    -- 아이콘과 꾸미기 미리보기, 마이페이지가 전부 이 값을 보므로 셋이 함께
+    -- 비어 있었다. 제공자를 가리지 않고 거는 이유는 https 페이지에서 http
+    -- 이미지는 어느 제공자 것이든 똑같이 막히기 때문이다.
+    regexp_replace(
+      coalesce(
+        nullif(trim(new.raw_user_meta_data ->> 'avatar_url'), ''),
+        nullif(trim(new.raw_user_meta_data ->> 'picture'), '')
+      ),
+      '^http://', 'https://'
     )
   );
   return new;

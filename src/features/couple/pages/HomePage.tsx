@@ -5,7 +5,7 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarHeart, LayoutGrid, Plus } from 'lucide-react'
+import { CalendarHeart, LayoutGrid, Plus, UserRound } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -229,9 +229,18 @@ export function HomePage() {
         <Text type="supporting" justify="center">
           둘만의 공간, Ourie
         </Text>
+        {/* 알림 설정처럼 "가끔 찾는 것"들이 모이는 자리. 홈에 버튼을 하나씩
+            늘리는 대신 여기로 보낸다. */}
+        <Button
+          label="마이페이지"
+          variant="secondary"
+          width="100%"
+          icon={<UserRound className="size-4" />}
+          onClick={() => navigate('/me')}
+        />
         <Button
           label="꾸미기 다시 하기"
-          variant="secondary"
+          variant="ghost"
           width="100%"
           onClick={() => navigate('/onboarding/customize')}
         />

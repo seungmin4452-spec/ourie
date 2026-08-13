@@ -3,6 +3,7 @@ import { AnniversaryPage } from '@/features/anniversary'
 import { LoginPage, RequireAuth, RequireGuest, SignUpPage } from '@/features/auth'
 import { CoupleInvitePage } from '@/features/couple'
 import { HomePage } from '@/features/couple/pages/HomePage'
+import { MyPage } from '@/features/me'
 import { CustomizePage, RequireOnboarding } from '@/features/onboarding'
 
 // Onboarding order: /onboarding/customize (name + photo) -> /onboarding/couple
@@ -28,6 +29,18 @@ export const router = createBrowserRouter(
         <RequireAuth>
           <RequireOnboarding>
             <AnniversaryPage />
+          </RequireOnboarding>
+        </RequireAuth>
+      ),
+    },
+    {
+      // 마이페이지의 알림 설정은 커플·기념일 상태를 읽으므로 홈과 같은
+      // 온보딩 관문을 지난다.
+      path: '/me',
+      element: (
+        <RequireAuth>
+          <RequireOnboarding>
+            <MyPage />
           </RequireOnboarding>
         </RequireAuth>
       ),
