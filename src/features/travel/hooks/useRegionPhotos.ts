@@ -7,24 +7,13 @@ export function travelRegionPhotosQueryKey(coupleId: string | null | undefined) 
 }
 
 /**
- * 이 시간이 지나면 홈에 돌아오거나 앱을 다시 켤 때 목록을 다시 확인한다.
+ * 홈을 켜둔 채로도 이 주기로 다시 확인한다.
  *
- * 예전에는 이 값이 서명 수명의 절반(3시간)이었다. 서명을 다시 받으면 URL이
- * 통째로 바뀌어 지도의 사진을 전부 다시 내려받기 때문에 조회 자체를 묶어둔
- * 것이었는데, 그 바람에 **상대가 건 사진이 최대 3시간 뒤에야 보였다.**
+ * 평소에 상대의 사진을 데려오는 것은 구독 쪽이다(useTravelRealtime). 이 주기는
+ * 두 가지를 맡는다 — 구독이 끊겼던 구간을 메우는 것, 그리고 서명이 수명 절반을
+ * 넘겼을 때 갈아 끼우는 것(서명이 죽으면 채워둔 칸이 아무 단서 없이 빈칸이
+ * 된다). 서명 수명(6시간)이 아니라 이 주기가 짧아야 갱신 시점을 놓치지 않는다.
  *
- * 이제 서명은 경로 단위로 캐시되므로(api/signedUrlCache.ts) 다시 조회해도
- * 안 바뀐 사진은 다시 받지 않는다. 그래서 짧게 잡을 수 있다. 0이 아닌 이유는
- * 위젯을 열고 닫을 때마다 왕복하지 않기 위해서다.
- */
-const FRESH_MS = 30 * 1000
-
-/**
- * 홈을 켜둔 채로도 이 주기로 다시 확인한다. 두 가지를 같이 맡는다 — 상대가
- * 방금 건 사진이 보이는 것, 그리고 서명이 수명 절반을 넘겼을 때 갈아 끼우는
- * 것(서명이 죽으면 채워둔 칸이 아무 단서 없이 빈칸이 된다).
- *
- * 서명 수명(6시간)이 아니라 이 주기가 짧아야 갱신 시점을 놓치지 않는다.
  * 탭이 뒤에 있는 동안에는 react-query가 이 타이머를 쉬게 한다.
  */
 const POLL_MS = 5 * 60 * 1000
@@ -38,7 +27,11 @@ export function useRegionPhotos(coupleId: string | null | undefined) {
     queryKey: travelRegionPhotosQueryKey(coupleId),
     queryFn: () => listRegionPhotoUrls(coupleId!),
     enabled: coupleId != null,
-    staleTime: FRESH_MS,
+    // 앱으로 돌아올 때는 조건 없이 다시 읽는다. 뒤에 있는 동안 온 변경은
+    // 구독이 놓치는데(밀린 것을 몰아 주지 않는다), 여기서 "몇 초 안 지났으니
+    // 넘어간다"고 하면 그 구간에 상대가 건 사진이 그대로 안 보인다.
+    // 다시 읽어도 값은 싸다 — 서명이 캐시돼 있어 사진을 다시 받지는 않는다.
+    staleTime: 0,
     refetchInterval: POLL_MS,
   })
 

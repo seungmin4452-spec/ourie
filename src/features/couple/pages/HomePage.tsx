@@ -63,8 +63,19 @@ const BadgeTracker = lazy(async () => ({
   default: (await import('@/features/travel')).BadgeTracker,
 }))
 
-/** 뱃지가 생길 수 있는 위젯들. 하나라도 홈에 있으면 판정이 돈다. */
-const BADGE_RELATED: WidgetId[] = ['travel', 'photomap', 'badges']
+/**
+ * 상대가 지도를 바꾸면 그 순간 따라 바뀌게 하는 구독. 이것도 화면에 아무것도
+ * 그리지 않고, 위젯이 아니라 여기서 한 번만 마운트한다 (TravelRealtime 주석).
+ */
+const TravelRealtime = lazy(async () => ({
+  default: (await import('@/features/travel')).TravelRealtime,
+}))
+
+/**
+ * 지도와 얽힌 위젯들. 하나라도 홈에 있으면 뱃지 판정이 돌고, 지도 변경 구독도
+ * 켜진다. 셋 다 없는 사람에게는 둘 다 할 일이 없다.
+ */
+const TRAVEL_RELATED: WidgetId[] = ['travel', 'photomap', 'badges']
 
 /** 도형 데이터 청크를 받는 동안 위젯 자리에 두는 한 줄. */
 function MapLoading() {
@@ -287,9 +298,11 @@ export function HomePage() {
 
       {/* 지도를 다 채운 순간을 알아채 뱃지로 기록한다. 위젯 어느 쪽에도 두지
           않은 이유는 판정이 한 군데서만 일어나야 하기 때문이다 — 지도 위젯과
-          뱃지 위젯이 각자 하면 같은 뱃지를 두세 번 청구하고 연출도 겹쳐 뜬다. */}
-      {widgets.some((id) => BADGE_RELATED.includes(id)) && (
+          뱃지 위젯이 각자 하면 같은 뱃지를 두세 번 청구하고 연출도 겹쳐 뜬다.
+          상대의 변경을 구독하는 쪽도 같은 이유로 여기 있다. */}
+      {widgets.some((id) => TRAVEL_RELATED.includes(id)) && (
         <Suspense fallback={null}>
+          <TravelRealtime profile={profile} />
           <BadgeTracker profile={profile} />
         </Suspense>
       )}

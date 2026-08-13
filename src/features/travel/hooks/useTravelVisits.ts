@@ -13,6 +13,10 @@ export function useTravelVisits(coupleId: string | null | undefined) {
     queryKey: travelVisitsQueryKey(coupleId),
     queryFn: () => listTravelVisits(coupleId!),
     enabled: coupleId != null,
+    // 앱으로 돌아올 때는 앱 전역 기본값(60초)을 기다리지 않고 다시 읽는다.
+    // 뒤에 있는 동안 상대가 긁은 지역은 구독이 놓치기 때문이다
+    // (useTravelRealtime 주석). 코드 목록 한 벌이라 값이 싸다.
+    staleTime: 0,
   })
 
   const visitedCodes = useMemo(

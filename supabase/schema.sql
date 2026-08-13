@@ -1290,3 +1290,45 @@ select cron.schedule(
   );
   $$
 );
+
+-- ============================================================
+-- 지도 변경을 상대에게 실시간으로 흘리는 발행
+--
+-- 홈의 지도 위젯은 이 세 테이블의 변경을 구독해, 상대가 사진을 걸거나 지역을
+-- 긁은 그 순간 다시 읽는다 (src/features/travel/hooks/useTravelRealtime.ts).
+-- 여기서 하는 일은 그 변경이 발행되도록 테이블을 얹는 것뿐이다.
+--
+-- 남의 커플 것이 새어나가지 않는 이유: Realtime은 postgres_changes를 보낼 때
+-- 구독자의 RLS를 그대로 적용한다. 세 테이블 모두 couple_id = current_couple_id()
+-- 로 막혀 있다.
+--
+-- replica identity는 기본값 그대로 둔다. delete 이벤트에 기본키만 실려 오는데
+-- 세 테이블 모두 couple_id가 기본키에 들어 있어서 커플 필터가 그대로 먹고,
+-- full로 바꾸면 지운 행 전체가 WAL에 통째로 실린다.
+--
+-- 자세한 경위는 supabase/migrations/2026-08-13-travel-realtime.sql 참고.
+-- ============================================================
+
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end $$;
+
+do $$
+declare
+  target text;
+begin
+  foreach target in array array['travel_visits', 'travel_maps', 'travel_region_photos'] loop
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = target
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', target);
+    end if;
+  end loop;
+end $$;

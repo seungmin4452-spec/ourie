@@ -79,6 +79,13 @@
 - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-12-travel-region-photos.sql`을
       Supabase SQL 편집기에서 실행해야 저장이 된다
 - [ ] 많이 채웠을 때의 첫 화면 무게 재보기 (지금은 채운 수만큼 사진을 한꺼번에 받는다)
+- [x] **상대가 건 사진이 바로 안 보이던 것** — 서명 URL 수명과 조회 주기를 한 값으로
+      묶어둬서 최대 3시간이 걸렸다. 서명을 경로 단위로 캐시하고(`api/signedUrlCache.ts`)
+      변경은 Realtime으로 받는다 (`hooks/useTravelRealtime.ts`, `TravelRealtime`)
+      - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-13-travel-realtime.sql`
+            (이걸 안 돌리면 구독은 붙어도 이벤트가 안 온다. 그때도 5분 주기와 앱 복귀
+            시 재조회는 그대로 동작한다)
+      - [ ] 실기기 두 대에서 확인 — 한쪽이 걸면 다른 쪽 홈이 그 자리에서 바뀌는지
 
 ### 5b. 핀 지도 (미착수 — 추억 타임라인 이후)
 - [ ] 지도 API 벤더 선정 (Kakao/Naver/Mapbox 등)
