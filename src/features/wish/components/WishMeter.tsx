@@ -10,6 +10,25 @@ interface WishMeterProps {
 }
 
 /**
+ * 얼마나 썼는지에 따라 막대 색을 고른다 — 30% 미만은 초록, 30~70%는 주황,
+ * 70% 이상은 빨강.
+ *
+ * 막대 길이는 **남은** 장수라서 쓸수록 짧아지는데, 길이만으로는 "짧다"가
+ * 눈에 안 들어온다. 색이 함께 넘어가야 "이제 얼마 안 남았으니 아껴 쓰거나
+ * 새로 정하자"가 보인다.
+ *
+ * 총 장수가 0장인 사람은 쓸 것도 남을 것도 없으니 다 쓴 것과 같이 본다
+ * (0으로 나누는 것도 피한다).
+ */
+function meterVariant(status: WishStatus) {
+  const usedRatio = status.total > 0 ? status.used / status.total : 1
+
+  if (usedRatio >= 0.7) return 'error'
+  if (usedRatio >= 0.3) return 'warning'
+  return 'success'
+}
+
+/**
  * 한 사람의 소원권 현황 한 줄 — 이름, 남은 장수, 그리고 막대 하나.
  *
  * 위젯과 다이얼로그가 같은 것을 쓴다. 위젯이 작아서 한 사람당 두 줄(글자 +
@@ -44,7 +63,7 @@ export function WishMeter({ status }: WishMeterProps) {
         // 0장으로 정해둔 사람이 있을 수 있다. max가 0이면 채움 비율이
         // 0으로 나누기가 되므로 최소 1로 둔다 (value도 0이라 빈 막대다).
         max={Math.max(1, status.total)}
-        variant={isEmpty ? 'neutral' : 'accent'}
+        variant={meterVariant(status)}
       />
     </VStack>
   )
