@@ -5,7 +5,6 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import { startOfToday, toDateKey, type Anniversary } from '@/features/anniversary'
 import { useAuth } from '@/features/auth'
@@ -53,7 +52,6 @@ export function NotificationSettings({
   hasAnniversaryList = true,
 }: NotificationSettingsProps) {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const showToast = useToast()
   const { state, toggle } = usePushNotifications(user?.id)
 
@@ -86,6 +84,11 @@ export function NotificationSettings({
       <Switch
         label="매일 디데이 알림"
         description={DESCRIPTIONS[state]}
+        // labelPosition="start"가 없으면 토글이 앞, 라벨이 뒤로 간다. spread가
+        // 그 둘을 양 끝으로 밀어내므로 화면 왼쪽 끝에 토글만 덩그러니 놓이고
+        // 글자는 오른쪽 끝에 붙어 오른쪽 정렬처럼 보인다 — 아래 설명·미리보기와
+        // 아무것도 맞지 않는다. 설정 줄은 글자가 왼쪽, 스위치가 오른쪽이다.
+        labelPosition="start"
         labelSpacing="spread"
         width="100%"
         value={state === 'on'}
@@ -93,9 +96,7 @@ export function NotificationSettings({
         isDisabled={state === 'loading' || isUnavailable || hasNoAnniversary}
         disabledMessage={
           hasNoAnniversary && !isUnavailable
-            ? hasAnniversaryList
-              ? '기념일을 먼저 등록하면 켤 수 있어요.'
-              : '기념일을 먼저 등록하면 켤 수 있어요. 아래 버튼으로 갈 수 있어요.'
+            ? '기념일을 먼저 등록하면 켤 수 있어요.'
             : undefined
         }
         changeAction={async (checked) => {
@@ -143,16 +144,6 @@ export function NotificationSettings({
         </VStack>
       )}
 
-      {/* 목록이 없는 화면에서는 갈 길을 준다. 기념일이 하나도 없어 스위치가
-          잠긴 경우에도 여기서 등록하러 갈 수 있다. */}
-      {!hasAnniversaryList && !isUnavailable && (
-        <Button
-          label={hasNoAnniversary ? '기념일 등록하러 가기' : '기념일 고르러 가기'}
-          variant="ghost"
-          width="100%"
-          onClick={() => navigate('/anniversaries')}
-        />
-      )}
     </VStack>
   )
 }

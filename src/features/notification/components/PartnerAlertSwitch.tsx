@@ -61,6 +61,9 @@ export function PartnerAlertSwitch({ profile }: PartnerAlertSwitchProps) {
           ? '콕 찌르기와 소원권 알림이 이 기기로 와요.'
           : '켜면 이 기기의 알림 권한도 함께 켜져요.')
       }
+      // 글자가 왼쪽, 스위치가 오른쪽. 이게 없으면 순서가 뒤집힌 채로 양 끝에
+      // 벌어진다 (NotificationSettings의 같은 자리 주석 참고).
+      labelPosition="start"
       labelSpacing="spread"
       width="100%"
       value={profile?.poke_opt_in ?? false}
