@@ -84,10 +84,6 @@ export function WishWidget({ profile }: WishWidgetProps) {
         label={canWrite ? '소원권 쓰기' : '이루어진 소원들 보기'}
         variant={canWrite ? 'primary' : 'secondary'}
         width="100%"
-        // 지니는 lucide 아이콘이 아니라 이모지다. icon 슬롯이 ReactNode를
-        // 받으므로 문자열이 그대로 들어간다 — 버튼의 접근성 이름은 label이
-        // 따로 들고 있어서, 이 자리는 그림 역할만 한다.
-        icon="🧞"
         onClick={() => setIsDialogOpen(true)}
       />
 

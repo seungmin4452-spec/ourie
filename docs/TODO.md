@@ -40,7 +40,9 @@
       - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-13-wish.sql`을
             Supabase SQL 편집기에서 실행해야 저장이 된다
       - [ ] "들어줬어요" 표시 검토 — 지금은 쓴 소원이 지우기 전까지 계속 쓴 것으로 남는다
-      - [ ] 상대가 소원권을 쓰면 알림 보내기 (`send_poke`와 같은 경로)
+- [x] 소원권을 쓰면 상대에게 "꼭 이뤄주세요" 알림 — `api/wish.ts`, `src/features/wish/message.ts`
+      - [ ] 알림 수신 동의 스위치가 콕 찌르기 위젯에만 있다 (`profiles.poke_opt_in`을 함께 쓴다).
+            소원권 위젯만 올린 사람은 켤 자리가 없으므로 다이얼로그에도 둘지 검토
 
 ## Phase 4 — 추억 타임라인
 - [ ] `memories`, `memory_photos` 테이블 생성 + RLS 정책

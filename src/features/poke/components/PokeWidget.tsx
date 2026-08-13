@@ -174,12 +174,17 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
 
       <Divider />
 
+      {/* 이 스위치 하나가 "상대방이 내 기기를 울리는 알림" 전부를 가른다.
+          처음에는 콕 찌르기뿐이었지만 소원권 알림(api/wish.ts)도 같은
+          profiles.poke_opt_in을 본다. 동의를 종류별로 쪼개면 스위치가 기능
+          수만큼 늘어나는데, 사람들이 실제로 정하고 싶은 것은 "상대가 내 폰을
+          울려도 되는가" 하나다. 그래서 문구를 둘 다 가리키게 적는다. */}
       <Switch
-        label="콕 찌르기 알림 받기"
+        label="상대방이 보내는 알림 받기"
         description={
           unavailableReason ??
           (pushState === 'on'
-            ? '켜두면 상대방이 보낸 알림이 이 기기로 와요.'
+            ? '콕 찌르기와 소원권 알림이 이 기기로 와요.'
             : '켜면 이 기기의 알림 권한도 함께 켜져요.')
         }
         labelSpacing="spread"
@@ -202,7 +207,7 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
               type: 'info',
               body: checked
                 ? '이제 상대방이 보낸 알림을 받아요.'
-                : '콕 찌르기 알림을 껐어요.',
+                : '상대방이 보내는 알림을 껐어요.',
             })
           } catch (error) {
             // changeAction이 던지면 처리되지 않은 거절로 남는다. 여기서 받아

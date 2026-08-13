@@ -110,6 +110,49 @@ export async function deleteWish(id: string): Promise<void> {
   if (error) throw error
 }
 
+/** 알림이 왜 안 갔는지. 화면이 사실대로 말할 수 있게 서버가 함께 준다. */
+export type WishNotifyReason = 'stale' | 'no_couple' | 'not_opted_in'
+
+export interface WishNotifyResult {
+  /** 실제로 알림이 나간 상대방 기기 수. 0이면 닿은 기기가 없다. */
+  delivered: number
+  reason?: WishNotifyReason
+}
+
+/**
+ * 방금 쓴 소원을 상대방에게 알린다. "꼭 이뤄주세요"가 잠금화면에 뜬다.
+ *
+ * 소원을 만드는 일과 **일부러 나눠** 두었다. 알림이 못 가도 그 한 장은 쓰인
+ * 것이 맞고, 알림 실패로 소원을 되돌리면 장수만 이상해진다. 그래서 이 함수는
+ * 던지지 않는다 — 실패하면 delivered 0으로 떨어져서, 부르는 쪽은 "썼다"와
+ * "닿았다"를 따로 말할 수 있다.
+ *
+ * **문구를 보내지 않고 id만 보낸다.** 서버가 DB에서 읽는다 — 여기서 보낸
+ * 문구를 서버가 믿으면 아무 말이나 상대방 잠금화면에 띄울 수 있다
+ * (api/poke.ts와 같은 원칙이다).
+ */
+export async function notifyWish(wishId: string): Promise<WishNotifyResult> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return { delivered: 0 }
+
+    const response = await fetch('/api/wish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ wishId }),
+    })
+
+    const payload = (await response.json().catch(() => null)) as WishNotifyResult | null
+    if (!response.ok) return { delivered: 0 }
+    return { delivered: payload?.delivered ?? 0, reason: payload?.reason }
+  } catch {
+    // 오프라인이거나 함수가 죽은 경우. 소원은 이미 저장됐으므로 여기서
+    // 던지면 사용자는 "안 써졌다"고 오해한다.
+    return { delivered: 0 }
+  }
+}
+
 /**
  * 한 사람의 총 장수를 정한다.
  *

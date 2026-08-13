@@ -17,10 +17,35 @@ import { Check, Minus, Pencil, Plus, Ticket, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import type { Partner } from '@/features/couple/api/partner'
-import { createWish, deleteWish, setWishTotal, updateWish } from '../api/wish'
+import {
+  createWish,
+  deleteWish,
+  notifyWish,
+  setWishTotal,
+  updateWish,
+  type WishNotifyResult,
+} from '../api/wish'
 import { wishDateLabel, wishOwnerName } from '../board'
 import { WISH_CONTENT_MAX, WISH_TOTAL_MAX, type Wish, type WishStatus } from '../types'
 import { WishMeter } from './WishMeter'
+
+/**
+ * 소원권을 쓴 뒤 뭐라고 말할지.
+ *
+ * **"썼다"와 "닿았다"를 갈라 말한다.** 알림이 못 갔는데 전했다고 하면
+ * 거짓말이고, 반대로 실패했다고만 하면 이미 줄어든 장수와 말이 어긋난다.
+ * 한 장은 어느 쪽이든 쓰인 것이 맞다 (api/wish.ts의 notifyWish 주석 참고).
+ */
+function wroteMessage(notified: WishNotifyResult): string {
+  if (notified.delivered > 0) return '소원권 한 장을 썼어요. 상대방에게 전했어요.'
+  if (notified.reason === 'not_opted_in') {
+    return '소원권 한 장을 썼어요. 상대방이 알림을 켜지 않아 전하진 못했어요.'
+  }
+  // 커플이 없으면 알릴 상대가 없다. 이 화면까지 온 이상 흔한 경우는 아니라
+  // 이유를 덧붙이지 않는다.
+  if (notified.reason === 'no_couple') return '소원권 한 장을 썼어요.'
+  return '소원권 한 장을 썼어요. 다만 상대방 기기에 닿지 않았어요.'
+}
 
 interface WishDialogProps {
   isOpen: boolean
@@ -81,10 +106,16 @@ export function WishDialog({
   }
 
   const creation = useMutation({
-    mutationFn: () => createWish(coupleId, userId, trimmed),
-    onSuccess: async () => {
+    // 소원을 만든 뒤 상대에게 알린다. 알림은 던지지 않으므로(api/wish.ts의
+    // notifyWish) 여기까지 오면 소원은 이미 저장된 것이고, 남은 건 그 사실을
+    // 어떻게 말하느냐뿐이다.
+    mutationFn: async () => {
+      const wish = await createWish(coupleId, userId, trimmed)
+      return notifyWish(wish.id)
+    },
+    onSuccess: async (notified) => {
       await onChanged()
-      showToast({ type: 'info', body: '소원권 한 장을 썼어요.' })
+      showToast({ type: 'info', body: wroteMessage(notified) })
       resetForm()
     },
     onError: (error) => {
@@ -281,6 +312,17 @@ export function WishDialog({
                     onChange={setContent}
                   />
 
+                  {/* 알림이 갈지를 **쓰기 전에** 알려준다. 다 쓰고 나서
+                      "닿지 않았어요"를 보면 이미 한 장이 줄어든 뒤라, 그때는
+                      알아도 되돌릴 수가 없다. */}
+                  {!isEditing && partner != null && !partner.poke_opt_in && (
+                    <Text type="supporting">
+                      {wishOwnerName(partner.id, null, partner.name)}님이 알림을 켜지
+                      않아, 소원을 써도 알림은 가지 않아요. 콕 찌르기 위젯의 "상대방이
+                      보내는 알림 받기"를 상대방이 켜면 전해져요.
+                    </Text>
+                  )}
+
                   {!isEditing && mine.remaining === 0 && (
                     <Text type="supporting">
                       남은 소원권이 없어요. 쓴 소원을 하나 지우거나, 맨 위의
@@ -304,9 +346,7 @@ export function WishDialog({
                   type="submit"
                   label={isEditing ? '저장' : '소원권 쓰기'}
                   variant="primary"
-                  // 고치는 중에는 지니가 아니라 체크다 — 새로 비는 소원이
-                  // 아니라 이미 빈 소원의 문장을 손보는 것이다.
-                  icon={isEditing ? <Check className="size-4" /> : '🧞'}
+                  icon={isEditing ? <Check className="size-4" /> : undefined}
                   isLoading={creation.isPending || edit.isPending}
                   isDisabled={!canSubmit}
                 />
