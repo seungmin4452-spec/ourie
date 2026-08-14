@@ -62,6 +62,14 @@ const KST_OFFSET_MINUTES = 9 * 60
  */
 const TTL_SECONDS = 12 * 60 * 60
 
+/**
+ * 여기만 normal이다. 사람이 버튼을 눌러서 나가는 알림들(콕 찌르기, 소원, 뱃지)과
+ * 달리 이건 기다리는 사람이 없다 — 아침에 몇 분 늦게 떠도 "오늘로 1000일"은
+ * 그대로다. 그 대가로 기기가 다른 앱 알림과 함께 한 번에 받아 배터리를 아낀다
+ * (_push.ts의 PushUrgency 주석 참고).
+ */
+const URGENCY = 'normal' as const
+
 interface SubscriptionRow extends PushTarget {
   // PostgREST의 embed 결과. to-one 관계라 객체 하나지만, 배열로 오는 경우도
   // 있어 둘 다 받아 넘긴다.
@@ -176,6 +184,7 @@ export async function GET(request: Request): Promise<Response> {
       }
     },
     TTL_SECONDS,
+    URGENCY,
   )
 
   if (sentIds.length > 0) {

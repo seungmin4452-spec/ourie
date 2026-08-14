@@ -41,6 +41,14 @@ const NOTIFICATION_URL = '/'
 const TTL_SECONDS = 12 * 60 * 60
 
 /**
+ * TTL은 길지만 urgency는 콕 찌르기와 같다. 두 값이 다른 축이기 때문이다
+ * (_push.ts의 PushUrgency 주석 참고): "12시간 안에만 닿으면 된다"는 건 기기가
+ * 꺼져 있을 때의 이야기고, 켜져 있는 상대를 굳이 몇 분 기다리게 할 이유는 없다.
+ * 사람이 방금 버튼을 눌러서 나가는 알림은 누른 사람이 반응을 기다리고 있다.
+ */
+const URGENCY = 'high' as const
+
+/**
  * 방금 쓴 소원만 알릴 수 있다.
  *
  * 이 창이 없으면 지난달에 쓴 소원의 id로 이 엔드포인트를 계속 불러 상대방
@@ -164,6 +172,7 @@ export async function POST(request: Request): Promise<Response> {
     (subscriptionRows ?? []) as PushTarget[],
     () => payload,
     TTL_SECONDS,
+    URGENCY,
   )
 
   if (staleIds.length > 0) {

@@ -35,6 +35,28 @@ export interface PushTarget {
   auth: string
 }
 
+/**
+ * 푸시 서비스가 이 알림을 **언제** 기기로 내려줄지.
+ *
+ * TTL과 헷갈리기 쉬운데 다른 축이다. TTL은 "못 닿으면 언제까지 들고 있다가
+ * 버릴지"이고, 이건 "닿을 수 있을 때 바로 줄지 남들 것과 모아서 줄지"다. TTL을
+ * 아무리 줄여도 normal이면 지연은 그대로다 (실제로 콕 찌르기가 TTL 1시간인데도
+ * 5분 늦게 도착했다).
+ *
+ * - `normal` — 기기가 절전 중이면 다음 기상 타이밍까지 기다렸다가, 다른 앱들의
+ *   대기 중인 알림과 함께 한 번에 내려온다. 라디오를 깨우는 비용을 나눠 쓰는
+ *   대신 몇 분씩 늦는다. 안드로이드의 Doze maintenance window, iOS의
+ *   apns-priority 5가 이것이다.
+ * - `high` — 절전을 무시하고 이 알림 하나를 위해 기기를 깨운다. 배터리를 조금
+ *   더 쓰지만, 하루에 몇 번 누르는 알림에서는 무시할 수 있는 양이다.
+ *
+ * **지정하지 않으면 `normal`이다.** web-push가 옵션이 없을 때 헤더를 빼는 게
+ * 아니라 `Urgency: normal`을 채워 보낸다 (web-push-lib.js의 기본값). 그래서
+ * "안 정했으니 푸시 서비스가 알아서 빨리 주겠지"가 되지 않는다 — 명시적으로
+ * 느려도 된다고 말한 셈이 된다. 아래 인자를 필수로 둔 이유다.
+ */
+export type PushUrgency = 'normal' | 'high'
+
 export interface PushOutcome {
   /** 실제로 보낸 구독의 id. 호출한 쪽이 발송 기록을 남기는 데 쓴다. */
   sentIds: string[]
@@ -83,6 +105,7 @@ export async function sendPushToTargets<T extends PushTarget>(
   targets: T[],
   payloadFor: (target: T) => PushPayload | null,
   ttlSeconds: number,
+  urgency: PushUrgency,
 ): Promise<PushOutcome> {
   const sentIds: string[] = []
   const staleIds: string[] = []
@@ -99,7 +122,7 @@ export async function sendPushToTargets<T extends PushTarget>(
           keys: { p256dh: target.p256dh, auth: target.auth },
         },
         JSON.stringify(payload),
-        { TTL: ttlSeconds },
+        { TTL: ttlSeconds, urgency },
       )
       sentIds.push(target.id)
     } catch (error) {

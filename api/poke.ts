@@ -53,6 +53,14 @@ const NOTIFICATION_URL = '/'
 const TTL_SECONDS = 60 * 60
 
 /**
+ * 절전 중이어도 기기를 깨워 지금 띄운다. 이 앱에서 즉시성이 가장 중요한
+ * 알림이다 — 버튼을 누르는 행위 자체가 "지금 이 순간 네 생각을 하고 있다"는
+ * 뜻이라, 5분 뒤에 도착하면 상대는 그 순간을 놓친다. TTL을 1시간으로 줄여둔
+ * 것만으로는 이게 해결되지 않는다 (_push.ts의 PushUrgency 주석 참고).
+ */
+const URGENCY = 'high' as const
+
+/**
  * send_poke가 던지는 예외를 그대로 사용자에게 보여줄 수 없으니 여기서 옮긴다.
  *
  * code를 따로 내려주는 이유: 화면이 상황마다 다르게 반응해야 한다. 수신 동의가
@@ -212,6 +220,7 @@ export async function POST(request: Request): Promise<Response> {
     subscriptions,
     () => payload,
     TTL_SECONDS,
+    URGENCY,
   )
 
   if (staleIds.length > 0) {

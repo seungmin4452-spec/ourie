@@ -40,6 +40,13 @@ const NOTIFICATION_URL = '/'
 const TTL_SECONDS = 12 * 60 * 60
 
 /**
+ * 소원과 같은 이유로 TTL은 길고 urgency는 높다 (api/wish.ts 참고). 뱃지는 방금
+ * 사진을 건 순간에 딴 것이라, 그 사진을 같이 보고 있을 상대에게 지금 닿아야
+ * "우리가 방금 해냈다"가 된다.
+ */
+const URGENCY = 'high' as const
+
+/**
  * 방금 딴 뱃지만 알릴 수 있다. 화면은 딴 직후에 한 번 부르므로 넉넉히 5분이면
  * 느린 회선까지 덮는다.
  */
@@ -177,6 +184,7 @@ export async function POST(request: Request): Promise<Response> {
     (subscriptionRows ?? []) as PushTarget[],
     () => payload,
     TTL_SECONDS,
+    URGENCY,
   )
 
   if (staleIds.length > 0) {
