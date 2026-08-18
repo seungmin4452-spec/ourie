@@ -40,7 +40,7 @@ export async function sendBroadcast(input: BroadcastInput): Promise<BroadcastRes
     | { error: string; message: string }
     | null
 
-  if (!response.ok) {
+  if (!response.ok || !payload) {
     throw new Error(
       payload && 'message' in payload && payload.message
         ? payload.message
