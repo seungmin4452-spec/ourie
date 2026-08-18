@@ -88,28 +88,6 @@ export async function createWish(
   return data
 }
 
-/**
- * 적어둔 소원 내용을 고친다. 장수에는 영향이 없다 — 이미 쓴 한 장이다.
- *
- * id만 넘긴다. 내 것인지는 RLS(wishes_update_own)가 본다.
- */
-export async function updateWish(id: string, content: string): Promise<Wish> {
-  const { data, error } = await supabase
-    .from('wishes')
-    .update({ content })
-    .eq('id', id)
-    .select(WISH_COLUMNS)
-    .single()
-  if (error) throw error
-  return data
-}
-
-/** 소원을 지우면 그 한 장이 되돌아온다 (남은 장수를 세어서 구하므로 자동이다). */
-export async function deleteWish(id: string): Promise<void> {
-  const { error } = await supabase.from('wishes').delete().eq('id', id)
-  if (error) throw error
-}
-
 /** 알림이 왜 안 갔는지. 화면이 사실대로 말할 수 있게 서버가 함께 준다. */
 export type WishNotifyReason = 'stale' | 'no_couple' | 'not_opted_in'
 

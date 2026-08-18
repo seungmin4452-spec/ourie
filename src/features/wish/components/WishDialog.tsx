@@ -13,21 +13,17 @@ import { TextArea } from '@astryxdesign/core/TextArea'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation } from '@tanstack/react-query'
-import { Check, Minus, Pencil, Plus, Ticket, Trash2 } from 'lucide-react'
+import { Minus, Plus, Ticket } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import type { Partner } from '@/features/couple/api/partner'
-import {
-  createWish,
-  deleteWish,
-  notifyWish,
-  setWishTotal,
-  updateWish,
-  type WishNotifyResult,
-} from '../api/wish'
+import { createWish, notifyWish, setWishTotal, type WishNotifyResult } from '../api/wish'
 import { wishDateLabel, wishOwnerName } from '../board'
 import { WISH_CONTENT_MAX, WISH_TOTAL_MAX, type Wish, type WishStatus } from '../types'
 import { WishMeter } from './WishMeter'
+
+/** 목록에서 접지 않고 바로 보여주는 최근 소원의 수. */
+const RECENT_WISH_COUNT = 3
 
 /**
  * 소원권을 쓴 뒤 뭐라고 말할지.
@@ -66,13 +62,13 @@ interface WishDialogProps {
  * 소원권을 쓰고, 지난 소원을 보고, 장수를 정하는 화면.
  *
  * 셋을 한 다이얼로그에 모은 이유는 셋이 같은 숫자를 보고 움직이기 때문이다 —
- * 한 장을 쓰면 남은 장수가 줄고, 하나를 지우면 돌아오고, 장수를 고치면 둘 다
- * 다시 계산된다. 화면을 나누면 그 인과가 화면 전환 뒤로 숨는다. 그래서 현황
- * 막대를 맨 위에 두고, 아래에서 무엇을 하든 그 막대가 바로 움직이게 했다.
+ * 한 장을 쓰면 남은 장수가 준다. 장수를 고치면 그 숫자도 다시 계산된다.
+ * 화면을 나누면 그 인과가 화면 전환 뒤로 숨는다. 그래서 현황 막대를 맨
+ * 위에 두고, 아래에서 무엇을 하든 그 막대가 바로 움직이게 했다.
  *
- * 고치기가 목록이 아니라 아래 폼에서 일어나는 것은 콕 찌르기 다이얼로그와
- * 같은 방식이다 (PokePresetDialog 참고) — 고치는 줄이 목록에서 선택 상태로
- * 남아 있어서 무엇을 고치는 중인지 보인다.
+ * 지난 소원은 고치거나 지울 수 없다 — 한 번 상대에게 전한 말이라, 나중에
+ * 조용히 바뀌거나 사라지면 상대는 그걸 알 길이 없다. 목록도 최근
+ * {@link RECENT_WISH_COUNT}개만 펼쳐 보여주고 나머지는 접어 둔다.
  */
 export function WishDialog({
   isOpen,
@@ -88,20 +84,12 @@ export function WishDialog({
   const showToast = useToast()
 
   const [content, setContent] = useState('')
-  /** 고치는 중인 소원의 id. null이면 새로 쓰는 중이다. */
-  const [editingId, setEditingId] = useState<string | null>(null)
 
-  const isEditing = editingId != null
   const trimmed = content.trim()
   const canSubmit =
-    trimmed.length > 0 &&
-    trimmed.length <= WISH_CONTENT_MAX &&
-    // 잔량은 새로 쓸 때만 본다. 다 쓴 사람도 이미 적어둔 소원은 고칠 수 있어야
-    // 한다 (그때가 오히려 고치고 싶어지는 때다).
-    (isEditing || mine.remaining > 0)
+    trimmed.length > 0 && trimmed.length <= WISH_CONTENT_MAX && mine.remaining > 0
 
   function resetForm() {
-    setEditingId(null)
     setContent('')
   }
 
@@ -129,45 +117,6 @@ export function WishDialog({
     },
   })
 
-  const edit = useMutation({
-    mutationFn: (id: string) => updateWish(id, trimmed),
-    onSuccess: async () => {
-      await onChanged()
-      showToast({ type: 'info', body: '소원 내용을 고쳤어요.' })
-      resetForm()
-    },
-    onError: (error) => {
-      showToast({
-        type: 'error',
-        body: error instanceof Error ? error.message : '소원을 고치지 못했어요.',
-      })
-    },
-  })
-
-  const deletion = useMutation({
-    mutationFn: (wish: Wish) => deleteWish(wish.id),
-    onSuccess: async (_data, wish) => {
-      await onChanged()
-      // 고치던 소원을 지운 경우. 폼을 그대로 두면 사라진 줄을 계속 고치는
-      // 모양이 되고, 저장하면 아무 row도 안 맞는다.
-      if (editingId === wish.id) resetForm()
-      showToast({ type: 'info', body: '소원권 한 장이 돌아왔어요.' })
-    },
-    onError: (error) => {
-      showToast({
-        type: 'error',
-        body: error instanceof Error ? error.message : '소원을 지우지 못했어요.',
-      })
-    },
-  })
-
-  const isBusy = creation.isPending || edit.isPending || deletion.isPending
-
-  function startEditing(wish: Wish) {
-    setEditingId(wish.id)
-    setContent(wish.content)
-  }
-
   /** 닫을 때 폼을 비운다 — 이 컴포넌트는 위젯 안에 계속 붙어 있어 상태가 남는다. */
   function handleOpenChange(nextIsOpen: boolean) {
     if (!nextIsOpen) resetForm()
@@ -177,10 +126,6 @@ export function WishDialog({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canSubmit) return
-    if (editingId != null) {
-      edit.mutate(editingId)
-      return
-    }
     creation.mutate()
   }
 
@@ -237,74 +182,40 @@ export function WishDialog({
                 ) : (
                   <VStack gap={2}>
                     <Heading level={2}>이루어진 소원들</Heading>
+                    {/* 한 번 상대에게 전한 말이라 고치거나 지울 수 없다. 최근
+                        {RECENT_WISH_COUNT}개만 펼쳐 보여주고, 그 전 것들은
+                        접어서 필요할 때만 펼쳐 본다. */}
                     <List hasDividers>
-                      {wishes.map((wish) => {
-                        const isMine = wish.owner_id === userId
-                        return (
-                          <ListItem
-                            key={wish.id}
-                            label={wish.content}
-                            description={`${wishOwnerName(wish.owner_id, userId, partner?.name)} · ${wishDateLabel(wish.created_at)}`}
-                            isSelected={editingId === wish.id}
-                            // 내 소원권만 고치고 지울 수 있다 (RLS도 같다).
-                            // 상대가 부탁한 말을 내가 바꿔 적을 수 있으면
-                            // 그건 더 이상 상대의 소원이 아니다.
-                            endContent={
-                              isMine ? (
-                                <HStack gap={0.5}>
-                                  <IconButton
-                                    label="이 소원 고치기"
-                                    tooltip="고치기"
-                                    variant="ghost"
-                                    size="sm"
-                                    icon={<Pencil className="size-4" />}
-                                    isDisabled={isBusy}
-                                    onClick={() => startEditing(wish)}
-                                  />
-                                  <IconButton
-                                    label="이 소원 지우기"
-                                    tooltip="지우면 한 장이 돌아와요"
-                                    variant="ghost"
-                                    size="sm"
-                                    icon={<Trash2 className="size-4" />}
-                                    isDisabled={isBusy}
-                                    onClick={() => deletion.mutate(wish)}
-                                  />
-                                </HStack>
-                              ) : undefined
-                            }
-                          />
-                        )
-                      })}
+                      {wishes.slice(0, RECENT_WISH_COUNT).map((wish) => (
+                        <WishListItem key={wish.id} wish={wish} userId={userId} partner={partner} />
+                      ))}
                     </List>
+
+                    {wishes.length > RECENT_WISH_COUNT && (
+                      <Collapsible
+                        defaultIsOpen={false}
+                        trigger={<Text weight="medium">전체 {wishes.length}개 보기</Text>}
+                      >
+                        <List hasDividers>
+                          {wishes.slice(RECENT_WISH_COUNT).map((wish) => (
+                            <WishListItem key={wish.id} wish={wish} userId={userId} partner={partner} />
+                          ))}
+                        </List>
+                      </Collapsible>
+                    )}
                   </VStack>
                 )}
 
                 <Divider />
 
                 <VStack gap={3}>
-                  <HStack gap={2} hAlign="between" vAlign="center">
-                    <Heading level={2}>{isEditing ? '소원 고치기' : '소원권 사용'}</Heading>
-                    {isEditing && (
-                      <Button
-                        type="button"
-                        label="취소"
-                        variant="ghost"
-                        size="sm"
-                        onClick={resetForm}
-                      />
-                    )}
-                  </HStack>
+                  <Heading level={2}>소원권 사용</Heading>
 
                   <TextArea
                     label="소원 내용"
                     htmlName="wish-content"
                     placeholder="예: 하루 종일 같이 뒹굴거리기"
-                    description={
-                      isEditing
-                        ? '이미 쓴 한 장이라 장수는 그대로예요.'
-                        : '적어서 저장하면 소원권 한 장이 쓰인 것으로 기록돼요.'
-                    }
+                    description="적어서 저장하면 소원권 한 장이 쓰인 것으로 기록돼요."
                     isRequired
                     rows={2}
                     maxLength={WISH_CONTENT_MAX}
@@ -315,7 +226,7 @@ export function WishDialog({
                   {/* 알림이 갈지를 **쓰기 전에** 알려준다. 다 쓰고 나서
                       "닿지 않았어요"를 보면 이미 한 장이 줄어든 뒤라, 그때는
                       알아도 되돌릴 수가 없다. */}
-                  {!isEditing && partner != null && !partner.poke_opt_in && (
+                  {partner != null && !partner.poke_opt_in && (
                     <Text type="supporting">
                       {wishOwnerName(partner.id, null, partner.name)}님이 알림을 켜지
                       않아, 소원을 써도 알림은 가지 않아요. 콕 찌르기 위젯의 "상대방이
@@ -323,10 +234,10 @@ export function WishDialog({
                     </Text>
                   )}
 
-                  {!isEditing && mine.remaining === 0 && (
+                  {mine.remaining === 0 && (
                     <Text type="supporting">
-                      남은 소원권이 없어요. 쓴 소원을 하나 지우거나, 맨 위의
-                      "소원권 장수 정하기"에서 장수를 늘리면 다시 쓸 수 있어요.
+                      남은 소원권이 없어요. 맨 위의 "소원권 장수 정하기"에서
+                      장수를 늘리면 다시 쓸 수 있어요.
                     </Text>
                   )}
                 </VStack>
@@ -344,10 +255,9 @@ export function WishDialog({
                 />
                 <Button
                   type="submit"
-                  label={isEditing ? '저장' : '소원권 쓰기'}
+                  label="소원권 쓰기"
                   variant="primary"
-                  icon={isEditing ? <Check className="size-4" /> : undefined}
-                  isLoading={creation.isPending || edit.isPending}
+                  isLoading={creation.isPending}
                   isDisabled={!canSubmit}
                 />
               </HStack>
@@ -356,6 +266,22 @@ export function WishDialog({
         />
       </form>
     </Dialog>
+  )
+}
+
+interface WishListItemProps {
+  wish: Wish
+  userId: string
+  partner: Partner | null
+}
+
+/** 지난 소원 한 줄. 고치거나 지울 수 없어 endContent 없이 내용과 누가/언제만 보여준다. */
+function WishListItem({ wish, userId, partner }: WishListItemProps) {
+  return (
+    <ListItem
+      label={wish.content}
+      description={`${wishOwnerName(wish.owner_id, userId, partner?.name)} · ${wishDateLabel(wish.created_at)}`}
+    />
   )
 }
 
