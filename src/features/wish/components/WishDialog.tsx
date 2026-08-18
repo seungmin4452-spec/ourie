@@ -104,6 +104,11 @@ export function WishDialog({
     onSuccess: async (notified) => {
       await onChanged()
       showToast({ type: 'info', body: wroteMessage(notified) })
+      // canSubmit이 remaining > 0일 때만 열어주므로, 쓰기 전 remaining이
+      // 1이었다면 이 한 장으로 남은 장수가 0이 된 것이다.
+      if (mine.remaining === 1) {
+        showToast({ type: 'info', body: '소원권 내기를 하자고 쫄라봐~😆' })
+      }
       resetForm()
     },
     onError: (error) => {
