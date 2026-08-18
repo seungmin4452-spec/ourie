@@ -170,4 +170,43 @@
   .flip-face[aria-hidden='true'] {
     pointer-events: none;
   }
+
+  /* 화면 전체 뒤집기 — 관리자 모드(AdminFlipStage.tsx). 위 .flip-*와 원리는
+     같다(같은 3D 무대, 같은 높이-직접-지정 기법). 이름을 따로 둔 건 카드
+     한 장이 아니라 라우터 아웃렛 전체를 감싸는 무대라 최소 높이를 뷰포트로
+     깔아야 해서다 (svh 관례는 위 html/body 규칙과 같다 — 이 프로젝트는 dvh
+     대신 svh를 쓴다).
+
+     **주의: 이 무대(.admin-flip-card) 서브트리 안에는 `position: fixed`
+     요소를 두지 말 것.** `transform`이 걸린 조상은 그 자손의 fixed 요소를
+     뷰포트가 아니라 자기 자신 기준으로 붙인다(CSS 스펙상 transform이
+     containing block이 됨) — 뒤집혀 있든 아니든 이 무대에는 rotateY 값이
+     항상 적용돼 있어서 상시로 해당된다. ColorModeToggle이 이 무대 **바깥**
+     형제로 남아 있는 이유이기도 하다. Astryx Dialog(네이티브 <dialog> +
+     top layer)와 Toast(LayerProvider 없이 쓰면 document.body에 별도 React
+     root)는 이 문제에서 자유롭다 — 우리 DOM 트리 바깥에서 그려진다. */
+  .admin-flip-scene {
+    perspective: 1800px;
+    min-height: 100svh;
+  }
+
+  .admin-flip-card {
+    display: grid;
+    transform-style: preserve-3d;
+    align-items: start;
+  }
+
+  .admin-flip-face {
+    grid-area: 1 / 1;
+    min-height: 100svh;
+    backface-visibility: hidden;
+  }
+
+  .admin-flip-face-back {
+    transform: rotateY(180deg);
+  }
+
+  .admin-flip-face[aria-hidden='true'] {
+    pointer-events: none;
+  }
 }

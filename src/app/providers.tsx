@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 
 import { ColorModeToggle } from '@/components/common/ColorModeToggle'
 import { AuthProvider } from '@/features/auth'
+import { AdminFlipStage } from './AdminFlipStage'
 import { AppMetaSync } from './AppMetaSync'
 import { ColorModeProvider } from './ColorModeProvider'
 import { useColorMode } from './useColorMode'
@@ -40,8 +41,12 @@ function ThemedApp({ children }: { children: ReactNode }) {
             <AppMetaSync />
             <SocialAvatarSync />
             <div className="min-h-screen bg-body text-primary">
+              {/* ColorModeToggle은 AdminFlipStage 안이 아니라 형제로 둔다 —
+                  그 안은 rotateY가 걸린 3D 무대라 fixed 위치가 뷰포트가
+                  아니라 그 무대 기준이 된다 (index.css의 .admin-flip-scene
+                  주석 참고). */}
               <ColorModeToggle />
-              {children}
+              <AdminFlipStage>{children}</AdminFlipStage>
             </div>
           </AuthProvider>
         </QueryClientProvider>
