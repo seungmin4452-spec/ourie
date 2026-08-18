@@ -192,12 +192,17 @@
 
   .admin-flip-card {
     display: grid;
+    /* 명시하지 않으면 암시적 auto 트랙이라, 두 면 중 더 좁은 쪽의
+       콘텐츠 너비로 잡힐 수 있다 — 관리자 위젯 카드 너비가 홈 화면보다
+       좁게 잡히던 원인이 이것이다. 1fr로 컨테이너 전체 폭을 못박는다. */
+    grid-template-columns: 1fr;
     transform-style: preserve-3d;
     align-items: start;
   }
 
   .admin-flip-face {
     grid-area: 1 / 1;
+    width: 100%;
     min-height: 100svh;
     backface-visibility: hidden;
   }
