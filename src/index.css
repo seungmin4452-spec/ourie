@@ -209,6 +209,10 @@
   }
 
   .admin-flip-overlay-face-back {
+    /* adminTheme.ts의 --color-background-body와 같은 값을 그대로 적었다.
+       <Theme>로 씌우지 않고 순수 색으로 두는 이유는 AdminFlipStage.tsx에
+       적어뒀다 — 값을 바꾸면 두 곳을 같이 바꿔야 한다. */
+    background-color: #161b17;
     transform: rotateY(180deg);
   }
 }

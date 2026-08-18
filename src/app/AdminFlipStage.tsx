@@ -1,18 +1,30 @@
-import { Heading } from '@astryxdesign/core/Heading'
-import { Theme } from '@astryxdesign/core/theme'
 import { VStack } from '@astryxdesign/core/VStack'
 import { motion, useReducedMotion } from 'framer-motion'
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 
-import { adminTerminalTheme } from './adminTheme'
 import { useAdminMode } from './adminMode'
 
-const AdminScreen = lazy(async () => ({
-  default: (await import('@/features/admin/AdminScreen')).AdminScreen,
-}))
+/**
+ * AdminScreen 번들을 캐싱하며 부르는 함수. `lazy()`와 뒤집기 연출이 각자
+ * import()를 부르면 매번 새 프라미스가 생기니, 하나로 모아 재사용한다 —
+ * 이 프라미스가 먼저 끝나야 콘텐츠를 바꿔치기하기 때문에(아래
+ * `preloadAdminScreen` 참고) `lazy()`가 참조하는 것과 같은 프라미스여야
+ * 한다.
+ */
+let adminScreenModule: ReturnType<typeof importAdminScreen> | null = null
+function importAdminScreen() {
+  return import('@/features/admin/AdminScreen')
+}
+function preloadAdminScreen() {
+  adminScreenModule ??= importAdminScreen()
+  return adminScreenModule
+}
 
-/** 뒤집는 연출의 전체 길이(초). 화면이 가려져 있는 동안 아래 내용을 통째로 바꿔치기한다. */
-const FLIP_DURATION_S = 0.5
+const AdminScreen = lazy(async () => ({ default: (await preloadAdminScreen()).AdminScreen }))
+
+/** 뒤집는 연출 한 쪽 절반의 길이(초) — 절반 지점에 콘텐츠를 바꾸고, 그 뒤로
+ * 같은 시간만큼 더 오버레이가 덮고 있다가 걷힌다. */
+const HALF_FLIP_S = 0.25
 
 interface AdminFlipStageProps {
   /** 라우터 아웃렛 — 평소에 보이는 내용. */
@@ -24,28 +36,30 @@ interface AdminFlipStageProps {
  *
  * **뒤집는 동안만 3D이고, 뒤집힌 뒤에는 완전히 다른 화면이다.** 처음엔
  * PhotoMapWidget처럼 앞뒤 두 면을 항상 같이 띄워두고 backface-visibility로
- * 감추는 방식을 페이지 스케일로 그대로 옮겼는데, 문제가 있었다 —
- * 페이지 전체가 상시로 `perspective`/`transform` 무대 안에 있다 보니
- * 진입 시 비율이 어긋나고, 뒤집은 뒤에도 반대쪽 면이 완전히 사라지지
- * 않았다(문서 트리 안에 계속 살아 있는 채였다).
+ * 감추는 방식을 페이지 스케일로 그대로 옮겼는데, 문제가 있었다 — 페이지
+ * 전체가 상시로 `perspective`/`transform` 무대 안에 있다 보니 진입 시
+ * 비율이 어긋났고, 뒤집은 뒤에도 반대쪽 면이 완전히 사라지지 않았다.
  *
  * 그래서 지금은 **화면을 가리는 짧은 연출(오버레이)**과 **실제로 렌더링할
  * 내용**을 분리했다. 평소엔 `children`이든 `AdminScreen`이든 딱 하나만,
- * 아무 3D 변환도 없이 보통의 페이지로 렌더링된다 (그래서 다른 위젯들과
- * 똑같이 정상적인 폭을 가진다). 모드가 바뀌면 `.admin-flip-overlay`가
- * 잠깐 화면 전체를 덮으며 뒤집히고, **그 오버레이가 가리고 있는 순간에만**
- * 실제로 보여줄 내용을 바꿔치기한다 — 반대쪽 면은 그 짧은 순간 말고는
- * 아예 존재하지 않는다.
+ * 아무 3D 변환도 없이 보통의 페이지로 렌더링된다. 오버레이가 화면 전체를
+ * 덮고 있는 동안에만 안쪽 내용을 통째로 바꿔치기한다.
+ *
+ * **오버레이를 걷기 전에 AdminScreen이 실제로 로드됐는지까지 기다린다.**
+ * `AdminScreen`은 `lazy()`로 갈라진 별도 번들이라, 처음 들어갈 때 네트워크가
+ * 느리면 그 다운로드가 뒤집기 애니메이션(0.5초)보다 오래 걸릴 수 있다.
+ * 시간만 보고 오버레이를 걷으면 아직 테마 CSS도 못 받은 빈 화면이
+ * 잠깐(검게) 드러난다 — "가끔 초록색, 가끔 검정색"으로 보이던 것이 이것이다.
+ * 그래서 절반 지점에서 타이머와 로딩을 `Promise.all`로 같이 기다린 뒤에만
+ * 바꿔치기한다.
  */
 export function AdminFlipStage({ children }: AdminFlipStageProps) {
   const isAdminMode = useAdminMode()
   const prefersReducedMotion = useReducedMotion()
 
-  // displayedMode: 지금 실제로 렌더링할 내용(오버레이 절반 지점에 바뀐다).
-  // settledMode: 연출이 완전히 끝났을 때의 값(오버레이가 사라지는 시점).
-  // 오버레이는 이 둘이 아니라 `isAdminMode`와 `settledMode`가 다른 동안
-  // 떠 있다 — 콘텐츠 교체(절반 지점)와 오버레이 종료(끝 지점) 타이밍이
-  // 서로 달라서 하나의 값으로 줄일 수 없다.
+  // displayedMode: 지금 실제로 렌더링할 내용. settledMode: 연출이 완전히
+  // 끝났을 때의 값(오버레이가 사라지는 시점). 오버레이는 `isAdminMode`와
+  // `settledMode`가 다른 동안 떠 있다.
   const [displayedMode, setDisplayedMode] = useState(isAdminMode)
   const [settledMode, setSettledMode] = useState(isAdminMode)
   const isFlipping = isAdminMode !== settledMode
@@ -61,20 +75,25 @@ export function AdminFlipStage({ children }: AdminFlipStageProps) {
   useEffect(() => {
     if (prefersReducedMotion || !isFlipping) return
 
-    // 오버레이가 화면을 완전히 덮은 절반 지점에 콘텐츠를 바꿔치기한다 —
-    // 두 면 다 불투명한 색으로 덮여 있어서 정확히 90도일 필요는 없다.
-    const swapTimer = window.setTimeout(
-      () => setDisplayedMode(isAdminMode),
-      (FLIP_DURATION_S * 1000) / 2,
-    )
-    const endTimer = window.setTimeout(
-      () => setSettledMode(isAdminMode),
-      FLIP_DURATION_S * 1000,
-    )
+    let isCancelled = false
+    const wait = (seconds: number) =>
+      new Promise<void>((resolve) => window.setTimeout(resolve, seconds * 1000))
 
+    async function runFlip() {
+      // 관리자 모드로 들어가는 쪽일 때만 로딩을 기다린다 — 나가는 쪽(children)은
+      // 이미 항상 로드돼 있는 라우터 아웃렛이라 기다릴 게 없다.
+      await Promise.all([wait(HALF_FLIP_S), isAdminMode ? preloadAdminScreen() : null])
+      if (isCancelled) return
+      setDisplayedMode(isAdminMode)
+
+      await wait(HALF_FLIP_S)
+      if (isCancelled) return
+      setSettledMode(isAdminMode)
+    }
+
+    void runFlip()
     return () => {
-      window.clearTimeout(swapTimer)
-      window.clearTimeout(endTimer)
+      isCancelled = true
     }
   }, [isAdminMode, isFlipping, prefersReducedMotion])
 
@@ -94,22 +113,14 @@ export function AdminFlipStage({ children }: AdminFlipStageProps) {
             className="admin-flip-overlay-card"
             initial={{ rotateY: isAdminMode ? 0 : 180 }}
             animate={{ rotateY: isAdminMode ? 180 : 0 }}
-            transition={{ duration: FLIP_DURATION_S, ease: 'easeInOut' }}
+            transition={{ duration: HALF_FLIP_S * 2, ease: 'easeInOut' }}
           >
-            {/* 앞면 — 지금 나가는 쪽. 중첩 테마가 없으니 지금 화면의 라이트/
-                다크를 그대로 잇는다. */}
+            {/* 앞면 — 지금 나가는 쪽. 뒷면도 일부러 테마 없이 순수 CSS
+                색으로만 칠한다(admin-flip-overlay-face-back, index.css) —
+                여기서 또 다른 <Theme> 인스턴스를 마운트하면 그 순간 새로
+                런타임 CSS 주입이 한 번 더 일어나 로딩 경합만 늘어난다. */}
             <div className="admin-flip-overlay-face bg-body" />
-
-            {/* 뒷면 — 관리자 모드로 들어가는 쪽. 실제 AdminScreen과 같은
-                터미널 테마를 미리 씌워, 오버레이가 걷히는 순간 이질감이
-                없게 한다. */}
-            <Theme theme={adminTerminalTheme} mode="dark">
-              <div className="admin-flip-overlay-face admin-flip-overlay-face-back bg-body">
-                <VStack height="100%" hAlign="center" vAlign="center">
-                  <Heading level={2}>관리자 모드</Heading>
-                </VStack>
-              </div>
-            </Theme>
+            <div className="admin-flip-overlay-face admin-flip-overlay-face-back" />
           </motion.div>
         </VStack>
       )}

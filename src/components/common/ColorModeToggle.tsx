@@ -1,7 +1,7 @@
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Moon, Sun } from 'lucide-react'
 
-import { toggleAdminMode } from '@/app/adminMode'
+import { toggleAdminMode, useAdminMode } from '@/app/adminMode'
 import { useColorMode } from '@/app/useColorMode'
 import { useWidgetEditMode } from '@/app/widgetEditMode'
 import { useAuth } from '@/features/auth'
@@ -11,6 +11,7 @@ import { useLongPress } from '@/features/widgets/useLongPress'
 export function ColorModeToggle() {
   const { mode, toggle } = useColorMode()
   const isWidgetEditMode = useWidgetEditMode()
+  const isAdminMode = useAdminMode()
   const { user } = useAuth()
   const isLight = mode === 'light'
 
@@ -24,6 +25,10 @@ export function ColorModeToggle() {
   // 위젯을 편집하는 동안엔 화면 맨 위가 편집 도구 막대의 자리다. 이 버튼은
   // 페이지와 상관없이 그 오른쪽 끝에 고정되어 있어서 "완료"와 정확히 겹친다.
   if (isWidgetEditMode) return null
+
+  // 관리자 화면도 오른쪽 위에 자기 "나가기" 버튼을 둔다 — 이 버튼이 같은
+  // 자리에 fixed로 계속 떠 있으면 그 위에 겹쳐서 나가기를 누를 수 없다.
+  if (isAdminMode) return null
 
   return (
     <IconButton
