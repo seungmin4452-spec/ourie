@@ -20,6 +20,7 @@ import {
   useAnniversaries,
 } from '@/features/anniversary'
 import { useAuth } from '@/features/auth'
+import { CalendarWidget } from '@/features/calendar'
 import { NotificationPromptDialog } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { isStandalone, openPwaInstallPage } from '@/features/onboarding/pwaInstall'
@@ -171,6 +172,8 @@ export function HomePage() {
         return <PokeWidget profile={profile} />
       case 'wish':
         return <WishWidget profile={profile} />
+      case 'calendar':
+        return <CalendarWidget profile={profile} />
       case 'memories':
         return (
           <Text type="supporting" justify="center">

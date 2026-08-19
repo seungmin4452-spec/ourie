@@ -1,4 +1,13 @@
-import { Award, CalendarHeart, Images, MapPin, MapPinned, Pointer, Ticket } from 'lucide-react'
+import {
+  Award,
+  CalendarDays,
+  CalendarHeart,
+  Images,
+  MapPin,
+  MapPinned,
+  Pointer,
+  Ticket,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { WIDGET_IDS, type WidgetId, type WidgetMeta } from './types'
@@ -28,6 +37,12 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     id: 'wish',
     title: '소원권',
     description: '각자 몇 장이 남았는지 보고, 소원을 적어 한 장씩 써요.',
+    isReady: true,
+  },
+  calendar: {
+    id: 'calendar',
+    title: '커플 캘린더',
+    description: '서로의 일정을 함께 보고, "우리 약속"은 둘 다 고치고 지울 수 있어요.',
     isReady: true,
   },
   memories: {
@@ -85,6 +100,7 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   // 펼친 손이 아니라 검지를 세운 손이다 — "콕" 찌르는 손가락.
   poke: <Pointer className="size-4" />,
   wish: <Ticket className="size-4" />,
+  calendar: <CalendarDays className="size-4" />,
   memories: <Images className="size-4" />,
   travel: <MapPin className="size-4" />,
   photomap: <MapPinned className="size-4" />,

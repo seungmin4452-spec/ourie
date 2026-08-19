@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AnniversaryPage } from '@/features/anniversary'
 import { LoginPage, RequireAuth, RequireGuest, SignUpPage } from '@/features/auth'
+import { CalendarPage } from '@/features/calendar'
 import { CoupleInvitePage } from '@/features/couple'
 import { HomePage } from '@/features/couple/pages/HomePage'
 import { MyPage } from '@/features/me'
@@ -29,6 +30,17 @@ export const router = createBrowserRouter(
         <RequireAuth>
           <RequireOnboarding>
             <AnniversaryPage />
+          </RequireOnboarding>
+        </RequireAuth>
+      ),
+    },
+    {
+      // 캘린더는 커플 데이터라서 홈과 같은 온보딩 관문을 지난다.
+      path: '/calendar',
+      element: (
+        <RequireAuth>
+          <RequireOnboarding>
+            <CalendarPage />
           </RequireOnboarding>
         </RequireAuth>
       ),
