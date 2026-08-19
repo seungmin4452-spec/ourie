@@ -1,4 +1,3 @@
-import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { List, ListItem } from '@astryxdesign/core/List'
@@ -12,7 +11,7 @@ import type { Profile } from '@/features/onboarding/api/profile'
 import { useCalendarEvents } from '../hooks/useCalendarEvents'
 import { formatEventDate, formatEventTime, splitByToday, startOfToday } from '../schedule'
 
-/** 위젯 자리에는 다가오는 일정 몇 개만. 전부는 /calendar 전체 화면 몫이다. */
+/** 위젯 자리에는 다가오는 약속 몇 개만. 전부(개인 일정 포함)는 /calendar 몫이다. */
 const PREVIEW_COUNT = 3
 
 interface CalendarWidgetProps {
@@ -20,13 +19,24 @@ interface CalendarWidgetProps {
   profile: Profile | null | undefined
 }
 
+/**
+ * 홈 위젯 "커플 캘린더"의 본문.
+ *
+ * 개인 일정이 아니라 **"우리 약속"(is_shared)만** 보여준다. 홈은 둘이 함께
+ * 보는 자리라 개인 일정까지 올라오면 상대방 화면에 내 개인 일정이 노출되고,
+ * 정작 같이 챙겨야 할 약속은 그 사이에 묻힌다. 개인 일정을 포함한 전체
+ * 목록은 "/calendar"에서 본다.
+ */
 export function CalendarWidget({ profile }: CalendarWidgetProps) {
   const navigate = useNavigate()
   const coupleId = profile?.couple_id
 
   const { data: events, isLoading } = useCalendarEvents(coupleId)
 
-  const upcoming = useMemo(() => splitByToday(events ?? [], startOfToday()).upcoming, [events])
+  const upcomingShared = useMemo(
+    () => splitByToday(events ?? [], startOfToday()).upcoming.filter((event) => event.is_shared),
+    [events],
+  )
 
   if (coupleId == null) {
     return (
@@ -44,15 +54,15 @@ export function CalendarWidget({ profile }: CalendarWidgetProps) {
     )
   }
 
-  if (upcoming.length === 0) {
+  if (upcomingShared.length === 0) {
     return (
       <EmptyState
         isCompact
         icon={<CalendarDays className="size-6" />}
-        title="다가오는 일정이 없어요"
-        description="함께할 약속이나 개인 일정을 등록해보세요."
+        title="다가오는 우리 약속이 없어요"
+        description="함께할 약속을 등록해보세요."
         actions={
-          <Button label="일정 등록하기" variant="primary" onClick={() => navigate('/calendar')} />
+          <Button label="약속 등록하기" variant="primary" onClick={() => navigate('/calendar')} />
         }
       />
     )
@@ -61,19 +71,22 @@ export function CalendarWidget({ profile }: CalendarWidgetProps) {
   return (
     <VStack gap={3}>
       <List hasDividers density="compact">
-        {upcoming.slice(0, PREVIEW_COUNT).map((event) => (
+        {upcomingShared.slice(0, PREVIEW_COUNT).map((event) => (
           <ListItem
             key={event.id}
             label={event.title}
             description={[formatEventDate(event.event_date), formatEventTime(event.event_time), event.location]
               .filter(Boolean)
               .join(' · ')}
-            endContent={event.is_shared ? <Badge variant="info" label="우리 약속" /> : undefined}
           />
         ))}
       </List>
       <Button
-        label={upcoming.length > PREVIEW_COUNT ? `일정 ${upcoming.length}개 모두 보기` : '일정 관리'}
+        label={
+          upcomingShared.length > PREVIEW_COUNT
+            ? `우리 약속 ${upcomingShared.length}개 모두 보기`
+            : '캘린더 전체 보기'
+        }
         variant="ghost"
         width="100%"
         onClick={() => navigate('/calendar')}

@@ -1,6 +1,8 @@
 import { AlertDialog } from '@astryxdesign/core/AlertDialog'
 import { Button } from '@astryxdesign/core/Button'
+import { Calendar } from '@astryxdesign/core/Calendar'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
+import { Field } from '@astryxdesign/core/Field'
 import { Heading } from '@astryxdesign/core/Heading'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
@@ -18,8 +20,8 @@ import { deleteCalendarEvent } from '../api/calendar'
 import { CalendarEventFormDialog } from '../components/CalendarEventFormDialog'
 import { CalendarEventList } from '../components/CalendarEventList'
 import { calendarEventsQueryKey, useCalendarEvents } from '../hooks/useCalendarEvents'
-import { splitByToday, startOfToday } from '../schedule'
-import type { CalendarEvent } from '../types'
+import { formatEventDate, splitByToday, startOfToday, toDateKey } from '../schedule'
+import type { CalendarEvent, DateKey } from '../types'
 
 export function CalendarPage() {
   const { user } = useAuth()
@@ -29,6 +31,10 @@ export function CalendarPage() {
   const [editing, setEditing] = useState<CalendarEvent | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null)
+  // 새로 만들 때 미리 골라둘 날짜 — 아래 달력에서 날짜를 짚고 등록할 때 쓴다.
+  // 수정할 때는 event 쪽 날짜를 그대로 쓰므로 여기서는 건드리지 않는다.
+  const [createDate, setCreateDate] = useState<DateKey | undefined>(undefined)
+  const [selectedDate, setSelectedDate] = useState<DateKey>(toDateKey(startOfToday()))
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -42,6 +48,11 @@ export function CalendarPage() {
   // startOfToday()를 렌더 중에 부르므로 의존성은 "오늘"이 아니라 데이터로
   // 잡는다 (anniversary/AnniversaryPage와 같은 이유).
   const { upcoming, past } = useMemo(() => splitByToday(events ?? [], startOfToday()), [events])
+
+  const eventsOnSelectedDate = useMemo(
+    () => (events ?? []).filter((event) => event.event_date === selectedDate),
+    [events, selectedDate],
+  )
 
   const deletion = useMutation({
     mutationFn: (event: CalendarEvent) => deleteCalendarEvent(event.id),
@@ -58,8 +69,9 @@ export function CalendarPage() {
     },
   })
 
-  function openCreate() {
+  function openCreate(initialDate?: DateKey) {
     setEditing(null)
+    setCreateDate(initialDate)
     setIsFormOpen(true)
   }
 
@@ -94,47 +106,62 @@ export function CalendarPage() {
           title="일정을 불러오지 못했어요"
           description={error instanceof Error ? error.message : '잠시 후 다시 시도해주세요.'}
         />
-      ) : isEmpty ? (
-        <EmptyState
-          icon={<CalendarDays className="size-8" />}
-          title="아직 등록한 일정이 없어요"
-          description="함께할 약속이나 개인 일정을 등록해보세요."
-          actions={
-            <Button
-              label="일정 등록하기"
-              variant="primary"
-              icon={<Plus className="size-4" />}
-              onClick={openCreate}
-            />
-          }
-        />
       ) : (
         <>
-          {upcoming.length > 0 && (
+          {/* 달력에서 날짜를 짚으면 아래가 그날의 일정으로 바뀐다 — 목록만
+              있으면 "몇 월 며칠이 무슨 요일이었더라"를 머릿속으로 계산해야
+              한다. */}
+          <Field label="날짜로 찾아보기" inputID="calendar-page-date">
+            <Calendar mode="single" value={selectedDate} onChange={setSelectedDate} />
+          </Field>
+
+          {eventsOnSelectedDate.length > 0 && (
             <CalendarEventList
-              header="다가오는 일정"
-              events={upcoming}
+              header={`${formatEventDate(selectedDate)} 일정`}
+              events={eventsOnSelectedDate}
               userId={user.id}
               onEdit={openEdit}
               onDelete={setPendingDelete}
             />
           )}
-          {past.length > 0 && (
-            <CalendarEventList
-              header="지난 일정"
-              events={past}
-              userId={user.id}
-              onEdit={openEdit}
-              onDelete={setPendingDelete}
-            />
-          )}
+          {/* 등록 버튼은 언제나 하나뿐이고 선택된 날짜를 그대로 물려받는다 —
+              그날에 일정이 있든 없든 새로 추가하는 문은 같아야 한다. */}
           <Button
-            label="일정 추가"
+            label={`${formatEventDate(selectedDate)}에 일정 추가`}
             variant="secondary"
             icon={<Plus className="size-4" />}
             width="100%"
-            onClick={openCreate}
+            onClick={() => openCreate(selectedDate)}
           />
+
+          {isEmpty ? (
+            <EmptyState
+              icon={<CalendarDays className="size-8" />}
+              title="아직 등록한 일정이 없어요"
+              description="함께할 약속이나 개인 일정을 등록해보세요."
+            />
+          ) : (
+            <>
+              {upcoming.length > 0 && (
+                <CalendarEventList
+                  header="다가오는 일정"
+                  events={upcoming}
+                  userId={user.id}
+                  onEdit={openEdit}
+                  onDelete={setPendingDelete}
+                />
+              )}
+              {past.length > 0 && (
+                <CalendarEventList
+                  header="지난 일정"
+                  events={past}
+                  userId={user.id}
+                  onEdit={openEdit}
+                  onDelete={setPendingDelete}
+                />
+              )}
+            </>
+          )}
         </>
       )}
 
@@ -144,6 +171,7 @@ export function CalendarPage() {
         coupleId={coupleId}
         userId={user.id}
         event={editing}
+        initialDate={createDate}
       />
 
       <AlertDialog

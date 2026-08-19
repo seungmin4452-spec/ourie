@@ -1,6 +1,7 @@
 import { Button } from '@astryxdesign/core/Button'
-import { DateInput } from '@astryxdesign/core/DateInput'
+import { Calendar } from '@astryxdesign/core/Calendar'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { Field } from '@astryxdesign/core/Field'
 import { HStack } from '@astryxdesign/core/HStack'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
 import { Switch } from '@astryxdesign/core/Switch'
@@ -24,6 +25,8 @@ interface CalendarEventFormDialogProps {
   userId: string
   /** 수정 중인 일정. 새로 만들 때는 null. */
   event: CalendarEvent | null
+  /** 새로 만들 때 미리 골라둘 날짜. 달력에서 날짜를 짚고 바로 등록할 때 쓴다. */
+  initialDate?: DateKey
 }
 
 export function CalendarEventFormDialog({
@@ -32,16 +35,18 @@ export function CalendarEventFormDialog({
   coupleId,
   userId,
   event,
+  initialDate,
 }: CalendarEventFormDialogProps) {
   return (
     // 열릴 때마다(그리고 수정 대상 행이 바뀔 때마다) 다시 마운트시켜 입력값을
     // 초기화한다. AnniversaryFormDialog와 같은 이유.
-    <Dialog key={event?.id ?? 'new'} isOpen={isOpen} onOpenChange={onOpenChange} purpose="form" width={420}>
+    <Dialog key={event?.id ?? initialDate ?? 'new'} isOpen={isOpen} onOpenChange={onOpenChange} purpose="form" width={420}>
       <CalendarEventForm
         onClose={() => onOpenChange(false)}
         coupleId={coupleId}
         userId={userId}
         event={event}
+        initialDate={initialDate}
       />
     </Dialog>
   )
@@ -52,12 +57,15 @@ function CalendarEventForm({
   coupleId,
   userId,
   event,
+  initialDate,
 }: Omit<CalendarEventFormDialogProps, 'isOpen' | 'onOpenChange'> & { onClose: () => void }) {
   const queryClient = useQueryClient()
   const showToast = useToast()
 
   const [title, setTitle] = useState(event?.title ?? '')
-  const [date, setDate] = useState<DateKey>(event?.event_date ?? toDateKey(startOfToday()))
+  const [date, setDate] = useState<DateKey>(
+    event?.event_date ?? initialDate ?? toDateKey(startOfToday()),
+  )
   const [time, setTime] = useState<TimeKey | undefined>(event?.event_time ?? undefined)
   const [location, setLocation] = useState(event?.location ?? '')
   const [isShared, setIsShared] = useState(event?.is_shared ?? false)
@@ -125,17 +133,17 @@ function CalendarEventForm({
                 value={title}
                 onChange={setTitle}
               />
-              <HStack gap={2}>
-                <DateInput label="날짜" isRequired value={date} onChange={(next) => next && setDate(next)} width="100%" />
-                <TimeInput
-                  label="시간"
-                  isOptional
-                  hasClear
-                  value={time}
-                  onChange={setTime}
-                  width="100%"
-                />
-              </HStack>
+              <Field label="날짜" inputID="calendar-event-date">
+                <Calendar mode="single" value={date} onChange={setDate} />
+              </Field>
+              <TimeInput
+                label="시간"
+                isOptional
+                hasClear
+                value={time}
+                onChange={setTime}
+                width="100%"
+              />
               <TextInput
                 label="장소"
                 htmlName="calendar-event-location"
