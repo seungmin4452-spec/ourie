@@ -71,17 +71,17 @@ export function pokeNameLabel(personName: string | null | undefined): string {
 }
 
 const BODIES: Record<PokeKind, string> = {
-  miss: '지금 당신 생각을 하고 있대요!',
-  kakao: '메시지를 보내두고 기다리고 있어요!',
-  call: '목소리가 듣고 싶대요!',
-  doing: '지금 뭐 하고 있는지 궁금하대요!',
+  miss: '지금 당신 생각을 하고 있대요.',
+  kakao: '카카오톡을 확인해보세요.',
+  call: '목소리가 듣고 싶대요.',
+  doing: '지금 뭐 하고 있는지 궁금하대요.',
 }
 
 const TITLES: Record<PokeKind, (who: string) => string> = {
-  miss: (who) => `${who}이 보고 싶대요`,
-  kakao: (who) => `${who}이 카톡을 기다려요`,
-  call: (who) => `${who}이 전화를 기다려요`,
-  doing: (who) => `${who}이 뭐 하냐고 물어요`,
+  miss: (who) => `${who}이 보고 싶대요!`,
+  kakao: (who) => `${who}이 카톡을 기다려요!`,
+  call: (who) => `${who}이 전화를 기다려요!`,
+  doing: (who) => `${who}이 뭐 하냐고 물어요!`,
 }
 
 /**
