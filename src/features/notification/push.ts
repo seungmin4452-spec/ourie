@@ -103,6 +103,31 @@ export async function enablePush(): Promise<PushSubscription> {
 }
 
 /**
+ * 권한은 이미 있는데 구독만 없어졌을 때 조용히 다시 구독한다.
+ *
+ * 브라우저가 오래 열리지 않은 기기의 구독을 스스로 회수하는 일이 있다(위
+ * readPushStatus 주석 참고). 회수돼도 `Notification.permission`은
+ * 'granted'로 남기 때문에, 이 상태를 그대로 두면 스위치는 계속 켜진 걸로
+ * 보이는데 서버에는 보낼 곳이 없어 알림이 영영 닿지 않는다 — 사용자가
+ * 마이페이지에서 스위치를 직접 껐다 켜기 전까지는 스스로 낫지 않는다.
+ *
+ * `requestPermission`을 다시 부르는 게 안전한 이유: 이미 'granted'일 때는
+ * 창을 띄우지 않고 바로 통과하므로, 사용자 제스처 없이 앱을 여는 순간
+ * 불러도 된다 (enablePush 자체의 요구사항이기도 하다).
+ */
+export async function resubscribeIfGranted(): Promise<PushSubscription | null> {
+  if (!hasPushApis()) return null
+  if (Notification.permission !== 'granted') return null
+  if (await currentSubscription()) return null
+
+  try {
+    return await enablePush()
+  } catch {
+    return null
+  }
+}
+
+/**
  * 구독을 해지한다. 해지된 endpoint를 서버에서도 지워야 하므로 그 값을 돌려준다.
  * 구독이 이미 없으면 null.
  */

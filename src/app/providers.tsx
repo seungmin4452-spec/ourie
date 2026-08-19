@@ -9,6 +9,7 @@ import { AdminFlipStage } from './AdminFlipStage'
 import { AppMetaSync } from './AppMetaSync'
 import { ColorModeProvider } from './ColorModeProvider'
 import { useColorMode } from './useColorMode'
+import { PushSubscriptionSync } from './PushSubscriptionSync'
 import { RouterLinkAdapter } from './router-link'
 import { SocialAvatarSync } from './SocialAvatarSync'
 import { ourieTheme } from './theme'
@@ -40,6 +41,7 @@ function ThemedApp({ children }: { children: ReactNode }) {
           <AuthProvider>
             <AppMetaSync />
             <SocialAvatarSync />
+            <PushSubscriptionSync />
             <div className="min-h-screen bg-body text-primary">
               <ColorModeToggle />
               <AdminFlipStage>{children}</AdminFlipStage>
