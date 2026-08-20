@@ -20,6 +20,7 @@ import {
   appLaunchUrl,
   DEFAULT_TITLE,
   defaultIconUrl,
+  maskableIconDataUrl,
   requestOrigin,
   sanitizeIconUrl,
   sanitizeSessionHandoff,
@@ -27,6 +28,8 @@ import {
 } from './_shared.js'
 
 export const config = { runtime: 'edge' }
+
+const BACKGROUND_COLOR = '#F1F4F7'
 
 interface ManifestIcon {
   src: string
@@ -63,13 +66,24 @@ export default function handler(request: Request): Response {
   //
   // 크기·타입은 cropImageToSquare가 내놓는 그대로(512px 정사각 JPEG)라 정확하다.
   // maskable을 같이 선언하는 이유: 이게 없으면 Android O+가 사진을 흰 배경 위에
-  // 축소해 얹어서, 아이콘을 꽉 채우는 iOS 쪽과 달라진다. 어느 쪽 purpose를
-  // 고르든 같은 사진이 나오도록 두 항목 모두 같은 src를 가리킨다.
+  // 축소해 얹어서, 아이콘을 꽉 채우는 iOS 쪽과 달라진다.
+  //
+  // 다만 maskable 항목은 원본 사진을 그대로 내보내면 안 된다 -- 그 사진은
+  // 가장자리까지 꽉 찬 상태라 세이프존 규격이 없고, 규격 없는 이미지를
+  // 런처가 받으면 스스로 방어적으로 다시 축소하는데 그 축소가 배포마다
+  // 누적돼 사진이 점점 작아지는 것처럼 보였다. maskableIconDataUrl이 여백을
+  // 픽셀에 직접 구워 넣은 SVG를 만들어주므로 그걸 쓴다 (_shared.ts 참고).
+  // 'any' 쪽은 여백 없이 꽉 찬 원본 사진 그대로 둔다.
   const icons: ManifestIcon[] =
     icon === defaultIconUrl(origin)
       ? defaultIcons(origin)
       : [
-          { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'maskable' },
+          {
+            src: maskableIconDataUrl(icon, BACKGROUND_COLOR),
+            sizes: '512x512',
+            type: 'image/svg+xml',
+            purpose: 'maskable',
+          },
           { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
         ]
 
@@ -89,8 +103,8 @@ export default function handler(request: Request): Response {
     // 이 파라미터를 URL에서 걷어내고, 자기 세션이 생긴 뒤로는 무시한다. 딱 한
     // 번의 실행에만 유효한 값이다.
     start_url: appLaunchUrl(handoff),
-    theme_color: '#F1F4F7',
-    background_color: '#F1F4F7',
+    theme_color: BACKGROUND_COLOR,
+    background_color: BACKGROUND_COLOR,
     icons,
   }
 

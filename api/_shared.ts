@@ -60,3 +60,31 @@ export function sanitizeIconUrl(value: string | null, origin: string): string {
   }
   return fallback
 }
+
+// purpose: 'maskable'로 내보낼 아이콘은 안드로이드 세이프존 규격을 픽셀에
+// 직접 구워 넣어야 한다 (사진을 캔버스의 80%로 줄이고 나머지를 배경색으로
+// 채운 정사각형). cropImageToSquare(src/lib/image.ts)가 만드는 원본은
+// 가장자리까지 꽉 찬 사진이라 이 규격이 없고, 런처는 여백 없는 이미지를
+// maskable로 받으면 마스크에 잘려도 안전하도록 스스로 사진을 다시 축소해
+// 흰 배경 위에 얹는다 -- 그 자체 축소가 배포/업데이트로 매니페스트를 다시
+// 읽을 때마다 누적되어, 사진이 점점 작아지고 흰 여백이 점점 커지는 것처럼
+// 보였다. 규격에 맞는 이미지를 우리가 직접 내보내면 런처가 더 손댈 필요가
+// 없어져 이 누적이 멈춘다.
+//
+// 새 이미지를 저장소에 다시 업로드하는 대신, 있는 사진 URL을 감싸는 SVG를
+// 요청마다 즉석에서 만든다: <image>가 원본 사진을 참조하고, 그 바깥을
+// 배경색 사각형이 채운다. data: URI라 sanitizeIconUrl의 화이트리스트도
+// 그대로 통과한다.
+const MASKABLE_ICON_SIZE = 512
+const MASKABLE_SAFE_ZONE_RATIO = 0.8 // 사진이 캔버스의 80%를 차지 (여백 10%씩)
+
+export function maskableIconDataUrl(photoUrl: string, backgroundColor: string): string {
+  const inset = (MASKABLE_ICON_SIZE * (1 - MASKABLE_SAFE_ZONE_RATIO)) / 2
+  const content = MASKABLE_ICON_SIZE * MASKABLE_SAFE_ZONE_RATIO
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${MASKABLE_ICON_SIZE}" height="${MASKABLE_ICON_SIZE}">` +
+    `<rect width="${MASKABLE_ICON_SIZE}" height="${MASKABLE_ICON_SIZE}" fill="${escapeHtmlAttr(backgroundColor)}"/>` +
+    `<image href="${escapeHtmlAttr(photoUrl)}" x="${inset}" y="${inset}" width="${content}" height="${content}" preserveAspectRatio="xMidYMid slice"/>` +
+    `</svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
