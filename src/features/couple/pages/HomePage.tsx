@@ -27,9 +27,11 @@ import { isStandalone, openPwaInstallPage } from '@/features/onboarding/pwaInsta
 import { PokeWidget } from '@/features/poke'
 import {
   useHomeWidgets,
+  widgetMeta,
   WidgetList,
   WidgetPickerDialog,
   type WidgetId,
+  type WidgetSize,
 } from '@/features/widgets'
 import { WishWidget } from '@/features/wish'
 import { usePartner } from '../hooks/usePartner'
@@ -78,6 +80,13 @@ const TravelRealtime = lazy(async () => ({
  */
 const TRAVEL_RELATED: WidgetId[] = ['travel', 'photomap', 'badges']
 
+/**
+ * 절반 폭일 때 카드 전체를 눌러 원래 화면(다이얼로그·전체 화면)을 여는
+ * 위젯들. 콕 찌르기는 버튼 자체가 안에 있어 카드를 누르는 동작이 따로
+ * 필요 없고, 뱃지는 애초에 절반이어도 줄바꿈으로 다 보여서 열 게 없다.
+ */
+const OPENS_ON_TAP: ReadonlySet<WidgetId> = new Set(['wish', 'calendar', 'travel', 'photomap'])
+
 /** 도형 데이터 청크를 받는 동안 위젯 자리에 두는 한 줄. */
 function MapLoading() {
   return (
@@ -92,7 +101,8 @@ export function HomePage() {
   const { user } = useAuth()
   const [isInstalled] = useState(isStandalone)
 
-  const { widgets, addWidget, removeWidget, moveWidget, reorderWidgets } = useHomeWidgets()
+  const { widgets, addWidget, removeWidget, moveWidget, reorderWidgets, setWidgetSize } =
+    useHomeWidgets()
   const isEditRequested = useWidgetEditMode()
   const [isPickerOpen, setIsPickerOpen] = useState(false)
 
@@ -138,7 +148,8 @@ export function HomePage() {
 
   // 위젯 본문은 그 기능을 아는 쪽이 그려야 해서 여기서 나눈다. 껍데기(제목,
   // 삭제 버튼)는 WidgetCard가 전부 맡는다.
-  function renderWidgetBody(id: WidgetId) {
+  function renderWidgetBody(id: WidgetId, size: WidgetSize) {
+    const isCompact = size === 'half'
     switch (id) {
       case 'dday':
         return highlight ? (
@@ -169,11 +180,11 @@ export function HomePage() {
           />
         )
       case 'poke':
-        return <PokeWidget profile={profile} />
+        return <PokeWidget profile={profile} isCompact={isCompact} />
       case 'wish':
-        return <WishWidget profile={profile} />
+        return <WishWidget profile={profile} isCompact={isCompact} />
       case 'calendar':
-        return <CalendarWidget profile={profile} />
+        return <CalendarWidget profile={profile} isCompact={isCompact} />
       case 'memories':
         return (
           <Text type="supporting" justify="center">
@@ -183,13 +194,23 @@ export function HomePage() {
       case 'travel':
         return (
           <Suspense fallback={<MapLoading />}>
-            <TravelWidget profile={profile} isEditing={isEditing} />
+            <TravelWidget
+              profile={profile}
+              isEditing={isEditing}
+              isCompact={isCompact}
+              title={widgetMeta('travel', partner?.name).title}
+            />
           </Suspense>
         )
       case 'photomap':
         return (
           <Suspense fallback={<MapLoading />}>
-            <PhotoMapWidget profile={profile} isEditing={isEditing} />
+            <PhotoMapWidget
+              profile={profile}
+              isEditing={isEditing}
+              isCompact={isCompact}
+              title={widgetMeta('photomap', partner?.name).title}
+            />
           </Suspense>
         )
       case 'badges':
@@ -199,6 +220,10 @@ export function HomePage() {
           </Suspense>
         )
     }
+  }
+
+  function opensOnTap(id: WidgetId, size: WidgetSize) {
+    return size === 'half' && OPENS_ON_TAP.has(id)
   }
 
   return (
@@ -247,8 +272,10 @@ export function HomePage() {
             onReorder={reorderWidgets}
             onMove={moveWidget}
             onRemove={removeWidget}
+            onResize={setWidgetSize}
             onLongPress={() => setWidgetEditMode(true)}
             renderBody={renderWidgetBody}
+            opensOnTap={opensOnTap}
             partnerName={partner?.name}
           />
 
@@ -303,7 +330,7 @@ export function HomePage() {
           않은 이유는 판정이 한 군데서만 일어나야 하기 때문이다 — 지도 위젯과
           뱃지 위젯이 각자 하면 같은 뱃지를 두세 번 청구하고 연출도 겹쳐 뜬다.
           상대의 변경을 구독하는 쪽도 같은 이유로 여기 있다. */}
-      {widgets.some((id) => TRAVEL_RELATED.includes(id)) && (
+      {widgets.some((entry) => TRAVEL_RELATED.includes(entry.id)) && (
         <Suspense fallback={null}>
           <TravelRealtime profile={profile} />
           <BadgeTracker profile={profile} />
@@ -317,7 +344,7 @@ export function HomePage() {
       <WidgetPickerDialog
         isOpen={isPickerOpen}
         onOpenChange={setIsPickerOpen}
-        addedWidgets={widgets}
+        addedWidgets={widgets.map((entry) => entry.id)}
         onAdd={addWidget}
         partnerName={partner?.name}
       />

@@ -1,4 +1,6 @@
 import { Button } from '@astryxdesign/core/Button'
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
@@ -26,6 +28,16 @@ interface TravelWidgetProps {
   profile: Profile | null | undefined
   /** 위젯 편집 모드인지. 편집 중에는 지도를 열거나 긁을 수 없다. */
   isEditing: boolean
+  /**
+   * 절반 폭 타일일 때 true. 시도 도형이 너무 작아져 어느 지역인지도 안
+   * 보이므로, 절반 폭에서는 지도를 직접 긁지 않는다 — 진행률만 보여주고,
+   * 타일을 누르면 지금과 같은 전국 지도가 다이얼로그로 크게 열려 그 안에서
+   * 그대로 긁는다. 시군구 상세는 원래도 다이얼로그였으니 한 단계 앞으로
+   * 옮기는 셈이라 기능은 그대로다.
+   */
+  isCompact?: boolean
+  /** 절반 폭에서 여는 다이얼로그의 제목. HomePage가 상대 이름을 넣어 만든다. */
+  title?: string
 }
 
 /**
@@ -39,13 +51,14 @@ interface TravelWidgetProps {
  * 사진과 칠한 지역 둘 다 커플 공용이다. 한쪽이 부산 해운대구를 칠하면 다른 쪽
  * 홈에서도 그 조각이 벗겨져 있다.
  */
-export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
+export function TravelWidget({ profile, isEditing, isCompact, title }: TravelWidgetProps) {
   const { user } = useAuth()
   const showToast = useToast()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [openRegion, setOpenRegion] = useState<TravelRegion | null>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const coupleId = profile?.couple_id
   const { visitedCodes } = useTravelVisits(coupleId)
@@ -103,7 +116,13 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
     }
   }
 
-  return (
+  const progressLine = isComplete
+    ? '전국을 다 다녀왔어요. 사진이 온전히 드러났어요.'
+    : `${DISTRICT_COUNT}곳 중 ${visitedCount}곳 · ${Math.round(
+        (visitedCount / DISTRICT_COUNT) * 100,
+      )}%`
+
+  const body = (
     <VStack gap={3}>
       <RegionMap
         region={null}
@@ -113,11 +132,7 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
       />
 
       <Text type="supporting" justify="center">
-        {isComplete
-          ? '전국을 다 다녀왔어요. 사진이 온전히 드러났어요.'
-          : `${DISTRICT_COUNT}곳 중 ${visitedCount}곳 · ${Math.round(
-              (visitedCount / DISTRICT_COUNT) * 100,
-            )}%`}
+        {progressLine}
       </Text>
 
       <NearestBadgeLine visitedCodes={visitedCodes} photoCodes={photos} />
@@ -162,5 +177,40 @@ export function TravelWidget({ profile, isEditing }: TravelWidgetProps) {
         onToggleDistrict={handleToggleDistrict}
       />
     </VStack>
+  )
+
+  if (!isCompact) return body
+
+  return (
+    <>
+      {/* 미리보기는 항상 isInteractive={false}다 — 도형이 이 폭에서는 너무
+          작아 어느 시도인지도 안 보이는데, 눌리기까지 하면 엉뚱한 지역이
+          칠해진다. 누르는 동작은 타일 전체가 대신 받아 다이얼로그를 연다. */}
+      <button
+        type="button"
+        className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+        onClick={() => setIsExpanded(true)}
+      >
+        <VStack gap={2}>
+          <RegionMap
+            region={null}
+            reveal={{ kind: 'photo', url: photoUrl ?? null, revealedCodes: visitedCodes }}
+            isInteractive={false}
+          />
+          <Text type="supporting" justify="center">
+            {progressLine}
+          </Text>
+        </VStack>
+      </button>
+
+      <Dialog isOpen={isExpanded} onOpenChange={setIsExpanded} width={480}>
+        <Layout
+          header={
+            <DialogHeader title={title ?? '우리가 다녀온 곳'} onOpenChange={() => setIsExpanded(false)} />
+          }
+          content={<LayoutContent>{body}</LayoutContent>}
+        />
+      </Dialog>
+    </>
   )
 }

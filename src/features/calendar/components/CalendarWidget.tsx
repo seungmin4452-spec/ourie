@@ -17,6 +17,11 @@ const PREVIEW_COUNT = 3
 interface CalendarWidgetProps {
   /** 홈이 이미 가져온 내 프로필. 같은 걸 또 조회하지 않으려고 받아 쓴다. */
   profile: Profile | null | undefined
+  /**
+   * 절반 폭 타일일 때 true. 목록을 다가오는 약속 1개로 줄이고, "모두 보기"
+   * 버튼 대신 타일 전체를 누르면 지금과 같은 /calendar로 간다.
+   */
+  isCompact?: boolean
 }
 
 /**
@@ -27,7 +32,7 @@ interface CalendarWidgetProps {
  * 정작 같이 챙겨야 할 약속은 그 사이에 묻힌다. 개인 일정을 포함한 전체
  * 목록은 "/calendar"에서 본다.
  */
-export function CalendarWidget({ profile }: CalendarWidgetProps) {
+export function CalendarWidget({ profile, isCompact }: CalendarWidgetProps) {
   const navigate = useNavigate()
   const coupleId = profile?.couple_id
 
@@ -68,19 +73,39 @@ export function CalendarWidget({ profile }: CalendarWidgetProps) {
     )
   }
 
+  const previewCount = isCompact ? 1 : PREVIEW_COUNT
+
+  const list = (
+    <List hasDividers density="compact">
+      {upcomingShared.slice(0, previewCount).map((event) => (
+        <ListItem
+          key={event.id}
+          label={event.title}
+          description={[formatEventDate(event.event_date), formatEventTime(event.event_time), event.location]
+            .filter(Boolean)
+            .join(' · ')}
+        />
+      ))}
+    </List>
+  )
+
+  if (isCompact) {
+    // "모두 보기" 버튼을 넣을 자리가 없다. 타일 전체를 누르면 그 버튼과 같은
+    // 곳(/calendar)으로 간다.
+    return (
+      <button
+        type="button"
+        className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+        onClick={() => navigate('/calendar')}
+      >
+        {list}
+      </button>
+    )
+  }
+
   return (
     <VStack gap={3}>
-      <List hasDividers density="compact">
-        {upcomingShared.slice(0, PREVIEW_COUNT).map((event) => (
-          <ListItem
-            key={event.id}
-            label={event.title}
-            description={[formatEventDate(event.event_date), formatEventTime(event.event_time), event.location]
-              .filter(Boolean)
-              .join(' · ')}
-          />
-        ))}
-      </List>
+      {list}
       <Button
         label={
           upcomingShared.length > PREVIEW_COUNT

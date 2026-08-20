@@ -1,4 +1,6 @@
 import { Button } from '@astryxdesign/core/Button'
+import { HStack } from '@astryxdesign/core/HStack'
+import { IconButton } from '@astryxdesign/core/IconButton'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
@@ -22,6 +24,12 @@ import { PokePresetDialog } from './PokePresetDialog'
 interface PokeWidgetProps {
   /** 홈이 이미 가져온 내 프로필. 같은 걸 또 조회하지 않으려고 받아 쓴다. */
   profile: Profile | null | undefined
+  /**
+   * 절반 폭 타일일 때 true. 버튼을 세로로 쌓을 자리가 없어, 가로로 스와이프해
+   * 넘기는 한 줄로 바꾼다 — 버튼이 늘어나도(직접 만든 버튼 포함) 타일이 세로로
+   * 자라지 않고 옆으로 늘어난다.
+   */
+  isCompact?: boolean
 }
 
 /**
@@ -40,7 +48,7 @@ interface PokeWidgetProps {
  * 버튼은 기본으로 주는 것들 뒤에 커플이 만든 것들이 붙는다. 새로 만든 게
  * 아래에 쌓여야 이미 손에 익은 버튼의 자리가 흔들리지 않는다.
  */
-export function PokeWidget({ profile }: PokeWidgetProps) {
+export function PokeWidget({ profile, isCompact }: PokeWidgetProps) {
   const { user } = useAuth()
   const showToast = useToast()
   const queryClient = useQueryClient()
@@ -94,68 +102,92 @@ export function PokeWidget({ profile }: PokeWidgetProps) {
     }
   }
 
-  return (
-    <VStack gap={4}>
-      <VStack gap={2}>
-        {POKE_KINDS.map((kind) => (
-          <Button
-            key={kind}
-            label={POKE_LABELS[kind]}
-            variant="secondary"
-            width="100%"
-            icon={pokeIcon(kind)}
-            isDisabled={!canSend}
-            tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
-            // clickAction은 promise가 끝날 때까지 버튼에 스피너를 띄우고 중복
-            // 클릭을 막는다. 서버의 1초 쿨다운과 별개로, 느린 회선에서 연타가
-            // 쌓이지 않게 하는 첫 번째 방어선이다.
-            clickAction={() => send({ type: 'builtin', kind }, POKE_LABELS[kind])}
-          />
-        ))}
+  const buttons = (
+    <>
+      {POKE_KINDS.map((kind) => (
+        <Button
+          key={kind}
+          label={POKE_LABELS[kind]}
+          variant="secondary"
+          size={isCompact ? 'sm' : 'md'}
+          width={isCompact ? undefined : '100%'}
+          icon={pokeIcon(kind)}
+          isDisabled={!canSend}
+          tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
+          // clickAction은 promise가 끝날 때까지 버튼에 스피너를 띄우고 중복
+          // 클릭을 막는다. 서버의 1초 쿨다운과 별개로, 느린 회선에서 연타가
+          // 쌓이지 않게 하는 첫 번째 방어선이다.
+          clickAction={() => send({ type: 'builtin', kind }, POKE_LABELS[kind])}
+        />
+      ))}
 
-        {presets?.map((preset) => (
-          <Button
-            key={preset.id}
-            label={preset.label}
-            variant="secondary"
-            width="100%"
-            icon={pokePresetIcon(preset.icon)}
-            isDisabled={!canSend}
-            tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
-            clickAction={() => send({ type: 'custom', preset }, preset.label)}
-          />
-        ))}
-      </VStack>
+      {presets?.map((preset) => (
+        <Button
+          key={preset.id}
+          label={preset.label}
+          variant="secondary"
+          size={isCompact ? 'sm' : 'md'}
+          width={isCompact ? undefined : '100%'}
+          icon={pokePresetIcon(preset.icon)}
+          isDisabled={!canSend}
+          tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
+          clickAction={() => send({ type: 'custom', preset }, preset.label)}
+        />
+      ))}
+    </>
+  )
+
+  // 커플이 연결돼야 버튼을 만들 수 있다 — poke_presets는 커플 단위이고,
+  // RLS도 커플이 없으면 insert를 막는다.
+  const canCreatePreset = coupleId != null && user != null
+
+  return (
+    <VStack gap={isCompact ? 2 : 4}>
+      {isCompact ? (
+        <HStack gap={2} isScrollable>
+          {buttons}
+          {canCreatePreset && (
+            <IconButton
+              label="콕 찌르기 만들기"
+              tooltip="콕 찌르기 만들기"
+              variant="ghost"
+              size="sm"
+              icon={<Settings2 className="size-4" />}
+              onClick={() => setIsPresetDialogOpen(true)}
+            />
+          )}
+        </HStack>
+      ) : (
+        <VStack gap={2}>{buttons}</VStack>
+      )}
 
       {!canSend && !isPartnerLoading && (
-        <Text type="supporting" justify="center">
+        <Text type="supporting" justify="center" maxLines={isCompact ? 1 : undefined}>
           {partner
             ? `${pokeNameLabel(partner.name)}이 아직 콕 찌르기 알림을 켜지 않았어요.`
             : '커플이 연결되면 보낼 수 있어요.'}
         </Text>
       )}
 
-      {/* 커플이 연결돼야 버튼을 만들 수 있다 — poke_presets는 커플 단위이고,
-          RLS도 커플이 없으면 insert를 막는다. */}
-      {coupleId != null && user != null && (
-        <>
-          <Button
-            label="콕 찌르기 만들기"
-            variant="ghost"
-            width="100%"
-            icon={<Settings2 className="size-4" />}
-            onClick={() => setIsPresetDialogOpen(true)}
-          />
-          <PokePresetDialog
-            isOpen={isPresetDialogOpen}
-            onOpenChange={setIsPresetDialogOpen}
-            coupleId={coupleId}
-            userId={user.id}
-            presets={presets ?? []}
-          />
-        </>
+      {!isCompact && canCreatePreset && (
+        <Button
+          label="콕 찌르기 만들기"
+          variant="ghost"
+          width="100%"
+          icon={<Settings2 className="size-4" />}
+          onClick={() => setIsPresetDialogOpen(true)}
+        />
       )}
 
+      {canCreatePreset && (
+        <PokePresetDialog
+          isOpen={isPresetDialogOpen}
+          onOpenChange={setIsPresetDialogOpen}
+          coupleId={coupleId}
+          userId={user.id}
+          presets={presets ?? []}
+        />
+      )}
     </VStack>
   )
 }

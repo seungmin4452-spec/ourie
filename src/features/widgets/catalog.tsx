@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import { WIDGET_IDS, type WidgetId, type WidgetMeta } from './types'
+import { WIDGET_IDS, type WidgetId, type WidgetMeta, type WidgetSize } from './types'
 
 /**
  * 위젯 하나하나가 무엇인지 적어둔 곳. 홈 화면과 "위젯 추가" 목록이 같은
@@ -26,48 +26,57 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     title: '디데이',
     description: '기념일을 등록해두면 오늘이 며칠째인지 크게 보여줘요.',
     isReady: true,
+    defaultSize: 'full',
+    resizable: false,
   },
   poke: {
     id: 'poke',
     title: '콕 찌르기',
     description: '보고싶다고, 카톡 보라고 상대방에게 바로 알림을 보내요.',
     isReady: true,
+    defaultSize: 'half',
   },
   wish: {
     id: 'wish',
     title: '소원권',
     description: '각자 몇 장이 남았는지 보고, 소원을 적어 한 장씩 써요.',
     isReady: true,
+    defaultSize: 'half',
   },
   calendar: {
     id: 'calendar',
     title: '커플 캘린더',
     description: '서로의 일정을 함께 보고, "우리 약속"은 둘 다 고치고 지울 수 있어요.',
     isReady: true,
+    defaultSize: 'full',
   },
   memories: {
     id: 'memories',
     title: '추억',
     description: '사진과 함께 남긴 최근 추억을 미리 보여줘요.',
     isReady: false,
+    defaultSize: 'half',
   },
   travel: {
     id: 'travel',
     title: '우리가 다녀온 곳',
     description: '고른 사진을 지도로 덮어두고, 다녀온 지역을 긁어서 드러내요.',
     isReady: true,
+    defaultSize: 'half',
   },
   photomap: {
     id: 'photomap',
     title: '사진으로 채우는 지도',
     description: '지역마다 사진을 한 장씩 걸어서 전국을 우리 사진으로 채워요.',
     isReady: true,
+    defaultSize: 'half',
   },
   badges: {
     id: 'badges',
     title: '우리의 뱃지',
     description: '시·도 한 곳을 다 채울 때마다 그 지역 모양의 뱃지가 생겨요.',
     isReady: true,
+    defaultSize: 'half',
   },
 }
 
@@ -132,6 +141,12 @@ export function widgetMeta(id: WidgetId, partnerName?: string | null): WidgetMet
 
 export function widgetIcon(id: WidgetId): ReactNode {
   return WIDGET_ICONS[id]
+}
+
+/** 이 위젯이 처음 놓일 폭과, 폭 토글을 보여줘도 되는지. */
+export function widgetSizing(id: WidgetId): { defaultSize: WidgetSize; resizable: boolean } {
+  const meta = WIDGET_META[id]
+  return { defaultSize: meta.defaultSize, resizable: meta.resizable ?? true }
 }
 
 /** 카탈로그 순서대로의 전체 위젯 목록. */

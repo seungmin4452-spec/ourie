@@ -1,5 +1,7 @@
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
+import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
@@ -26,6 +28,14 @@ interface PhotoMapWidgetProps {
   profile: Profile | null | undefined
   /** 위젯 편집 모드인지. 편집 중에는 지도를 열 수 없다. */
   isEditing: boolean
+  /**
+   * 절반 폭 타일일 때 true. 뒤집는 앞뒤 카드를 그대로 절반 폭에 욱여넣는
+   * 대신, 진행률 미리보기만 보여주고 타일을 누르면 지금과 같은 지도(+뒤집으면
+   * 뱃지)가 다이얼로그로 열린다.
+   */
+  isCompact?: boolean
+  /** 절반 폭에서 여는 다이얼로그의 제목. HomePage가 상대 이름을 넣어 만든다. */
+  title?: string
 }
 
 /**
@@ -54,12 +64,13 @@ interface PhotoMapWidgetProps {
  * 평면으로 강등되어 뒷면 대신 좌우 반전된 지도가 보인다 (index.css의 .flip-card
  * 주석). 높이가 이미 보이는 면에 맞춰져 있어 넘칠 것도 없다.
  */
-export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
+export function PhotoMapWidget({ profile, isEditing, isCompact, title }: PhotoMapWidgetProps) {
   const { user } = useAuth()
   const showToast = useToast()
   const prefersReducedMotion = useReducedMotion()
   const [openRegion, setOpenRegion] = useState<TravelRegion | null>(null)
   const [isFlipped, setIsFlipped] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // 두 면의 실제 높이. 지도 사진이 로드되거나 뱃지가 늘어나면 바뀌므로 한 번
   // 재고 마는 게 아니라 계속 지켜본다.
@@ -67,6 +78,10 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
   const backRef = useRef<HTMLDivElement>(null)
   const [faceHeights, setFaceHeights] = useState({ front: 0, back: 0 })
 
+  // 절반 폭 타일에서는 다이얼로그를 열기 전까지 뒤집는 카드 자체가 DOM에
+  // 없어 잴 ref가 없다. 다이얼로그를 여는 순간(isExpanded) 다시 재도록
+  // 이것도 의존성에 넣는다 — 안 그러면 처음 마운트될 때 잰 게 전부라
+  // 늘 0(= 'auto' 높이)에 머문다.
   useEffect(() => {
     const front = frontRef.current
     const back = backRef.current
@@ -78,7 +93,7 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
     observer.observe(front)
     observer.observe(back)
     return () => observer.disconnect()
-  }, [])
+  }, [isCompact, isExpanded])
 
   // 아직 못 쟀으면 높이를 지정하지 않는다 ('auto'). 0을 주면 첫 프레임에 카드가
   // 납작하게 접혔다가 펴진다.
@@ -135,7 +150,11 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
     })
   }
 
-  return (
+  const progressLine = isComplete
+    ? '전국을 우리 사진으로 다 채웠어요.'
+    : `${DISTRICT_COUNT}곳 중 ${filledCount}곳 · ${Math.round((filledCount / DISTRICT_COUNT) * 100)}%`
+
+  const body = (
     <VStack gap={3}>
       <VStack className="flip-scene">
         <motion.div
@@ -165,11 +184,7 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
               />
 
               <Text type="supporting" justify="center">
-                {isComplete
-                  ? '전국을 우리 사진으로 다 채웠어요.'
-                  : `${DISTRICT_COUNT}곳 중 ${filledCount}곳 · ${Math.round(
-                      (filledCount / DISTRICT_COUNT) * 100,
-                    )}%`}
+                {progressLine}
               </Text>
 
               <NearestBadgeLine visitedCodes={visitedCodes} photoCodes={photos} />
@@ -229,5 +244,39 @@ export function PhotoMapWidget({ profile, isEditing }: PhotoMapWidgetProps) {
         isSaving={setPhoto.isPending || removePhoto.isPending}
       />
     </VStack>
+  )
+
+  if (!isCompact) return body
+
+  return (
+    <>
+      {/* 미리보기는 뒤집지 않는다 — 앞뒤 두 면을 절반 폭에 욱여넣을 자리가
+          없다. 탭하면 지금과 같은 앞뒤 카드가 다이얼로그로 열려 뒤집기까지
+          그대로 쓸 수 있다. */}
+      <button
+        type="button"
+        className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+        onClick={() => setIsExpanded(true)}
+      >
+        <VStack gap={2}>
+          <RegionMap region={null} reveal={{ kind: 'mosaic', photos }} isInteractive={false} />
+          <Text type="supporting" justify="center">
+            {progressLine}
+          </Text>
+        </VStack>
+      </button>
+
+      <Dialog isOpen={isExpanded} onOpenChange={setIsExpanded} width={480}>
+        <Layout
+          header={
+            <DialogHeader
+              title={title ?? '사진으로 채우는 지도'}
+              onOpenChange={() => setIsExpanded(false)}
+            />
+          }
+          content={<LayoutContent>{body}</LayoutContent>}
+        />
+      </Dialog>
+    </>
   )
 }

@@ -16,6 +16,12 @@ import { WishMeter } from './WishMeter'
 interface WishWidgetProps {
   /** 홈이 이미 가져온 내 프로필. 같은 걸 또 조회하지 않으려고 받아 쓴다. */
   profile: Profile | null | undefined
+  /**
+   * 절반 폭 타일일 때 true. "소원권 쓰기" 버튼을 넣을 자리가 없는 대신, 타일
+   * 전체를 누르면 그 버튼과 같은 다이얼로그가 열린다 — 정보(막대)만 줄고
+   * 기능은 그대로다. 쉐브런은 WidgetCard가 그린다(HomePage.tsx의 OPENS_ON_TAP).
+   */
+  isCompact?: boolean
 }
 
 /**
@@ -30,7 +36,7 @@ interface WishWidgetProps {
  * 남았다"까지만 말하고 "무엇에 썼는지"는 열어봐야 알 수 있는데, 그 한 줄이
  * 있으면 열지 않고도 기억이 이어진다.
  */
-export function WishWidget({ profile }: WishWidgetProps) {
+export function WishWidget({ profile, isCompact }: WishWidgetProps) {
   const { user } = useAuth()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -65,27 +71,47 @@ export function WishWidget({ profile }: WishWidgetProps) {
   const latest = wishes[0]
   const canWrite = mine.remaining > 0
 
+  const meters = (
+    <VStack gap={3}>
+      <WishMeter status={mine} />
+      {theirs && <WishMeter status={theirs} />}
+    </VStack>
+  )
+
   return (
-    <VStack gap={4}>
-      <VStack gap={3}>
-        <WishMeter status={mine} />
-        {theirs && <WishMeter status={theirs} />}
-      </VStack>
+    <VStack gap={isCompact ? 3 : 4}>
+      {isCompact ? (
+        // 버튼 문구를 넣을 자리가 없다. 막대를 누르면 그 버튼과 같은
+        // 다이얼로그가 열린다 — all:unset 대신 최소한의 리셋만 유틸리티로 준다
+        // (WidgetCard.tsx의 드래그 손잡이와 같은 패턴).
+        <button
+          type="button"
+          className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+          onClick={() => setIsDialogOpen(true)}
+        >
+          {meters}
+        </button>
+      ) : (
+        <>
+          {meters}
 
-      {latest && (
-        <Text type="supporting" maxLines={1}>
-          최근 · {latest.content}
-        </Text>
+          {latest && (
+            <Text type="supporting" maxLines={1}>
+              최근 · {latest.content}
+            </Text>
+          )}
+
+          {/* 남은 장수가 없어도 버튼을 잠그지 않는다. 다 쓴 사람에게 가장
+              필요한 것이 "무엇에 썼는지 보고 하나 지우는 일"인데, 그 문이 이
+              버튼뿐이다. */}
+          <Button
+            label={canWrite ? '소원권 쓰기' : '이루어진 소원들 보기'}
+            variant={canWrite ? 'primary' : 'secondary'}
+            width="100%"
+            onClick={() => setIsDialogOpen(true)}
+          />
+        </>
       )}
-
-      {/* 남은 장수가 없어도 버튼을 잠그지 않는다. 다 쓴 사람에게 가장 필요한
-          것이 "무엇에 썼는지 보고 하나 지우는 일"인데, 그 문이 이 버튼뿐이다. */}
-      <Button
-        label={canWrite ? '소원권 쓰기' : '이루어진 소원들 보기'}
-        variant={canWrite ? 'primary' : 'secondary'}
-        width="100%"
-        onClick={() => setIsDialogOpen(true)}
-      />
 
       <WishDialog
         isOpen={isDialogOpen}

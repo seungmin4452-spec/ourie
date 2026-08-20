@@ -2,13 +2,14 @@ import { Card } from '@astryxdesign/core/Card'
 import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { VStack } from '@astryxdesign/core/VStack'
 import type { DragControls } from 'framer-motion'
-import { GripVertical, X } from 'lucide-react'
+import { ChevronRight, Columns2, GripVertical, RectangleHorizontal, X } from 'lucide-react'
 import type { KeyboardEvent, ReactNode } from 'react'
 
 import { widgetIcon } from '../catalog'
-import type { WidgetMeta } from '../types'
+import type { WidgetMeta, WidgetSize } from '../types'
 
 interface WidgetCardProps {
   meta: WidgetMeta
@@ -16,6 +17,18 @@ interface WidgetCardProps {
   isEditing: boolean
   /** 홈에서 몇 번째인지. 흔들림 위상을 엇갈리게 하는 데 쓴다. */
   index: number
+  /** 지금 이 위젯이 절반 폭인지 전체 폭인지. 그리드 칸 수와 여백·제목 크기를 정한다. */
+  size: WidgetSize
+  /** 폭 토글 자체를 보여줄지 (디데이는 false). */
+  resizable: boolean
+  /** 편집 모드에서 폭 토글을 눌렀을 때. */
+  onSizeChange: (size: WidgetSize) => void
+  /**
+   * 평소 모드에서 카드 전체가 탭을 받는 위젯(소원권, 지도 등 절반 폭에서
+   * 요약만 보여주고 누르면 원래 화면이 열리는 것들)에 쉐브런을 보여준다.
+   * 편집 중에는 뜨지 않는다 — 그때 카드를 누르는 건 위젯을 옮기는 동작이다.
+   */
+  showsOpenAffordance?: boolean
   /**
    * 이 카드를 감싼 Reorder.Item의 드래그 스위치. 손잡이를 누를 때만 켜진다
    * (WidgetList.tsx 참고).
@@ -36,16 +49,24 @@ interface WidgetCardProps {
  * variant는 default다. muted는 페이지 배경(--color-background-body)과 거의
  * 같은 톤이라 카드 경계가 보이지 않았다. default의 흰 배경 + 옅은 그림자라야
  * "홈에 올려둔 위젯"처럼 배경에서 떠 보인다.
+ *
+ * 절반 폭에서는 여백과 제목 크기를 한 단 줄인다 — 전체 폭과 같은 20px
+ * 패딩·20px 제목을 그대로 쓰면 타일 안에서 글자가 카드보다 커 보인다.
  */
 export function WidgetCard({
   meta,
   isEditing,
   index,
+  size,
+  resizable,
+  onSizeChange,
+  showsOpenAffordance,
   dragControls,
   onMove,
   onRemove,
   children,
 }: WidgetCardProps) {
+  const isHalf = size === 'half'
   const wiggleClass = isEditing
     ? `widget-wiggle${index % 2 === 1 ? ' widget-wiggle-offset' : ''}`
     : undefined
@@ -59,8 +80,8 @@ export function WidgetCard({
   }
 
   return (
-    <Card padding={5} variant="default" elevation="low" className={wiggleClass}>
-      <VStack gap={3}>
+    <Card padding={isHalf ? 4 : 5} variant="default" elevation="low" className={wiggleClass}>
+      <VStack gap={isHalf ? 2 : 3}>
         <HStack gap={2} hAlign="between" vAlign="center">
           <HStack gap={1.5} vAlign="center">
             {isEditing && (
@@ -83,10 +104,12 @@ export function WidgetCard({
               </button>
             )}
             {widgetIcon(meta.id)}
-            <Heading level={2}>{meta.title}</Heading>
+            <Heading level={isHalf ? 4 : 2} maxLines={1}>
+              {meta.title}
+            </Heading>
           </HStack>
 
-          {isEditing && (
+          {isEditing ? (
             <IconButton
               label={`${meta.title} 위젯 삭제`}
               tooltip="위젯 삭제"
@@ -95,10 +118,40 @@ export function WidgetCard({
               icon={<X className="size-4" />}
               onClick={onRemove}
             />
+          ) : (
+            showsOpenAffordance && (
+              <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden="true" />
+            )
           )}
         </HStack>
 
         {children}
+
+        {/* 폭 토글. 위젯을 추가할 때 미리 정하는 규칙이 아니라, 이미 올려둔
+            위젯도 편집 모드에서 언제든 절반↔전체로 바꿀 수 있다. */}
+        {isEditing && resizable && (
+          <HStack hAlign="end">
+            <SegmentedControl
+              value={size}
+              onChange={(value) => onSizeChange(value as WidgetSize)}
+              label={`${meta.title} 위젯 폭`}
+              size="sm"
+            >
+              <SegmentedControlItem
+                value="half"
+                label="절반 폭"
+                isLabelHidden
+                icon={<Columns2 className="size-3.5" />}
+              />
+              <SegmentedControlItem
+                value="full"
+                label="전체 폭"
+                isLabelHidden
+                icon={<RectangleHorizontal className="size-3.5" />}
+              />
+            </SegmentedControl>
+          </HStack>
+        )}
       </VStack>
     </Card>
   )
