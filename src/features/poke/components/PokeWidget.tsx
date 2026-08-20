@@ -6,7 +6,7 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQueryClient } from '@tanstack/react-query'
 import { Settings2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { useAuth } from '@/features/auth'
 // 배럴(@/features/couple)이 아니라 훅 파일을 직접 가리킨다 — 배럴에는 홈
@@ -109,8 +109,7 @@ export function PokeWidget({ profile, isCompact }: PokeWidgetProps) {
           key={kind}
           label={POKE_LABELS[kind]}
           variant="secondary"
-          size={isCompact ? 'sm' : 'md'}
-          width={isCompact ? undefined : '100%'}
+          width="100%"
           icon={pokeIcon(kind)}
           isDisabled={!canSend}
           tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
@@ -126,14 +125,53 @@ export function PokeWidget({ profile, isCompact }: PokeWidgetProps) {
           key={preset.id}
           label={preset.label}
           variant="secondary"
-          size={isCompact ? 'sm' : 'md'}
-          width={isCompact ? undefined : '100%'}
+          width="100%"
           icon={pokePresetIcon(preset.icon)}
           isDisabled={!canSend}
           tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
           clickAction={() => send({ type: 'custom', preset }, preset.label)}
         />
       ))}
+    </>
+  )
+
+  // 절반 폭에서는 Button(아이콘+글자가 가로로 나란한 알약 모양)을 그대로
+  // 줄 세우지 않는다 — 카드 높이가 옆 타일(소원권 등)에 맞춰 늘어나면 알약
+  // 버튼들이 위쪽에만 몰리고 아래는 빈 채로 남아 엉뚱해 보인다. 아이콘이
+  // 위, 이름이 아래인 정사각형에 가까운 칩으로 바꿔 카드가 늘어나도 자연스럽게
+  // 어울리는 크기를 갖게 한다. 실제 버튼은 IconButton이 맡고(접근성 이름도
+  // 그쪽에 있다), 아래 글자는 눈으로만 보는 라벨이라 스크린리더에서 뺀다.
+  function chip(key: string, label: string, icon: ReactNode, onPress: () => void) {
+    return (
+      <VStack key={key} gap={1} vAlign="center" className="w-16 shrink-0">
+        <IconButton
+          label={label}
+          tooltip={canSend ? undefined : '지금은 보낼 수 없어요.'}
+          variant="secondary"
+          size="lg"
+          icon={icon}
+          isDisabled={!canSend}
+          clickAction={onPress}
+        />
+        <Text type="supporting" justify="center" maxLines={1} aria-hidden="true">
+          {label}
+        </Text>
+      </VStack>
+    )
+  }
+
+  const chips = (
+    <>
+      {POKE_KINDS.map((kind) =>
+        chip(kind, POKE_LABELS[kind], pokeIcon(kind), () =>
+          send({ type: 'builtin', kind }, POKE_LABELS[kind]),
+        ),
+      )}
+      {presets?.map((preset) =>
+        chip(preset.id, preset.label, pokePresetIcon(preset.icon), () =>
+          send({ type: 'custom', preset }, preset.label),
+        ),
+      )}
     </>
   )
 
@@ -145,16 +183,18 @@ export function PokeWidget({ profile, isCompact }: PokeWidgetProps) {
     <VStack gap={isCompact ? 2 : 4}>
       {isCompact ? (
         <HStack gap={2} isScrollable>
-          {buttons}
+          {chips}
           {canCreatePreset && (
-            <IconButton
-              label="콕 찌르기 만들기"
-              tooltip="콕 찌르기 만들기"
-              variant="ghost"
-              size="sm"
-              icon={<Settings2 className="size-4" />}
-              onClick={() => setIsPresetDialogOpen(true)}
-            />
+            <VStack gap={1} vAlign="center" className="w-16 shrink-0">
+              <IconButton
+                label="콕 찌르기 만들기"
+                tooltip="콕 찌르기 만들기"
+                variant="ghost"
+                size="lg"
+                icon={<Settings2 className="size-4" />}
+                onClick={() => setIsPresetDialogOpen(true)}
+              />
+            </VStack>
           )}
         </HStack>
       ) : (

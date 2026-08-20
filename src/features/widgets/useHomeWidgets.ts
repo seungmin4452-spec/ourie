@@ -110,9 +110,9 @@ export function useHomeWidgets() {
   }, [])
 
   /**
-   * 위젯 하나를 위/아래 이웃과 맞바꾼다. WidgetCard의 이동 버튼이 부른다.
-   * 목록의 끝에서 더 밀면 아무 일도 일어나지 않는다 (버튼 자체도 그쪽은
-   * 비활성화된다 — WidgetList.tsx의 canMoveUp/canMoveDown).
+   * 위젯 하나를 위/아래 이웃과 맞바꾼다. 손잡이에 포커스를 두고 화살표 키를
+   * 누르는 경로(WidgetCard.tsx)를 위한 것 — 드래그를 못 쓰는 경우의 대안이다.
+   * 목록의 끝에서 더 밀면 아무 일도 일어나지 않는다.
    */
   const moveWidget = useCallback((id: WidgetId, direction: 'up' | 'down') => {
     setWidgets((current) => {
@@ -127,5 +127,27 @@ export function useHomeWidgets() {
     })
   }, [])
 
-  return { widgets, addWidget, removeWidget, moveWidget, setWidgetSize }
+  /**
+   * 드래그로 옮기는 중일 때 부른다: id를 beforeId가 있던 자리로 밀어 넣는다
+   * (WidgetList.tsx가 드래그 중인 카드 아래에 깔린 카드를 알아내 넘겨준다).
+   * "밀리고 밀리는" 관계만 맞으면 되므로, 정확한 드롭 좌표 대신 지금 겹친
+   * 카드의 자리를 그대로 넘겨받는 단순한 자리바꿈이다.
+   */
+  const moveWidgetBefore = useCallback((id: WidgetId, beforeId: WidgetId) => {
+    if (id === beforeId) return
+    setWidgets((current) => {
+      const moved = current.find((entry) => entry.id === id)
+      if (!moved) return current
+
+      const rest = current.filter((entry) => entry.id !== id)
+      const targetIndex = rest.findIndex((entry) => entry.id === beforeId)
+      if (targetIndex === -1) return current
+
+      const next = [...rest]
+      next.splice(targetIndex, 0, moved)
+      return next
+    })
+  }, [])
+
+  return { widgets, addWidget, removeWidget, moveWidget, moveWidgetBefore, setWidgetSize }
 }

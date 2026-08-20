@@ -101,7 +101,8 @@ export function HomePage() {
   const { user } = useAuth()
   const [isInstalled] = useState(isStandalone)
 
-  const { widgets, addWidget, removeWidget, moveWidget, setWidgetSize } = useHomeWidgets()
+  const { widgets, addWidget, removeWidget, moveWidget, moveWidgetBefore, setWidgetSize } =
+    useHomeWidgets()
   const isEditRequested = useWidgetEditMode()
   const [isPickerOpen, setIsPickerOpen] = useState(false)
 
@@ -268,6 +269,7 @@ export function HomePage() {
           <WidgetList
             widgets={widgets}
             isEditing={isEditing}
+            onDragOver={moveWidgetBefore}
             onMove={moveWidget}
             onRemove={removeWidget}
             onResize={setWidgetSize}
@@ -281,7 +283,7 @@ export function HomePage() {
               한 줄로 알려준다. 편집 중에는 지금 할 수 있는 일로 바뀐다. */}
           <Text type="supporting" justify="center">
             {isEditing
-              ? '화살표로 순서를 바꾸고, ✕로 지울 수 있어요.'
+              ? '왼쪽 손잡이를 끌어 순서를 바꾸고, ✕로 지울 수 있어요.'
               : '위젯을 꾹 누르면 추가하거나 지울 수 있어요.'}
           </Text>
         </VStack>
