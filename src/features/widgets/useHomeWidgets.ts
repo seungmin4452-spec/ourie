@@ -110,32 +110,9 @@ export function useHomeWidgets() {
   }, [])
 
   /**
-   * 드래그로 정한 새 순서를 통째로 받는다 (framer-motion의 Reorder.Group이
-   * onReorder로 넘겨주는 배열).
-   *
-   * 들어온 배열을 그대로 믿지 않고 한 번 거른다. 화면 밖에서 올 일은 없지만,
-   * 이 값은 곧바로 localStorage에 적히고 다음 실행 때 홈을 그리는 근거가 되므로
-   * readStoredWidgets와 같은 기준(아는 id만, 중복 없이)을 지키게 한다.
-   */
-  const reorderWidgets = useCallback((next: WidgetEntry[]) => {
-    setWidgets((current) => {
-      const byId = new Map(current.map((entry) => [entry.id, entry]))
-      const seen = new Set<WidgetId>()
-      const result: WidgetEntry[] = []
-      for (const item of next) {
-        const known = byId.get(item.id)
-        if (!known || seen.has(item.id)) continue
-        seen.add(item.id)
-        result.push(known)
-      }
-      return result
-    })
-  }, [])
-
-  /**
-   * 위젯 하나를 위/아래 이웃과 맞바꾼다. 드래그를 못 쓰는 경우 — 손잡이에
-   * 포커스를 두고 화살표 키를 누르는 경로 — 를 위해 남겨둔다. 목록의 끝에서
-   * 더 밀면 아무 일도 일어나지 않는다.
+   * 위젯 하나를 위/아래 이웃과 맞바꾼다. WidgetCard의 이동 버튼이 부른다.
+   * 목록의 끝에서 더 밀면 아무 일도 일어나지 않는다 (버튼 자체도 그쪽은
+   * 비활성화된다 — WidgetList.tsx의 canMoveUp/canMoveDown).
    */
   const moveWidget = useCallback((id: WidgetId, direction: 'up' | 'down') => {
     setWidgets((current) => {
@@ -150,5 +127,5 @@ export function useHomeWidgets() {
     })
   }, [])
 
-  return { widgets, addWidget, removeWidget, moveWidget, reorderWidgets, setWidgetSize }
+  return { widgets, addWidget, removeWidget, moveWidget, setWidgetSize }
 }

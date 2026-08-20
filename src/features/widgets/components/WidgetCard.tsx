@@ -4,16 +4,15 @@ import { HStack } from '@astryxdesign/core/HStack'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { VStack } from '@astryxdesign/core/VStack'
-import type { DragControls } from 'framer-motion'
-import { ChevronRight, Columns2, GripVertical, RectangleHorizontal, X } from 'lucide-react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { ChevronDown, ChevronRight, ChevronUp, Columns2, RectangleHorizontal, X } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { widgetIcon } from '../catalog'
 import type { WidgetMeta, WidgetSize } from '../types'
 
 interface WidgetCardProps {
   meta: WidgetMeta
-  /** 편집 모드에서만 손잡이·삭제 버튼이 뜨고 카드가 흔들린다. 평소엔 내용에 집중하게 둔다. */
+  /** 편집 모드에서만 이동·삭제 버튼이 뜨고 카드가 흔들린다. 평소엔 내용에 집중하게 둔다. */
   isEditing: boolean
   /** 홈에서 몇 번째인지. 흔들림 위상을 엇갈리게 하는 데 쓴다. */
   index: number
@@ -29,12 +28,9 @@ interface WidgetCardProps {
    * 편집 중에는 뜨지 않는다 — 그때 카드를 누르는 건 위젯을 옮기는 동작이다.
    */
   showsOpenAffordance?: boolean
-  /**
-   * 이 카드를 감싼 Reorder.Item의 드래그 스위치. 손잡이를 누를 때만 켜진다
-   * (WidgetList.tsx 참고).
-   */
-  dragControls: DragControls
-  /** 손잡이에 포커스를 두고 화살표 키를 눌렀을 때. 끝에서 더 밀면 무시된다. */
+  /** 목록의 맨 앞/끝인지. 그쪽 이동 버튼을 비활성화한다. */
+  canMoveUp: boolean
+  canMoveDown: boolean
   onMove: (direction: 'up' | 'down') => void
   onRemove: () => void
   children: ReactNode
@@ -52,6 +48,17 @@ interface WidgetCardProps {
  *
  * 절반 폭에서는 여백과 제목 크기를 한 단 줄인다 — 전체 폭과 같은 20px
  * 패딩·20px 제목을 그대로 쓰면 타일 안에서 글자가 카드보다 커 보인다.
+ *
+ * **height="100%"가 이 카드가 grid 칸을 꽉 채우게 한다.** 절반 폭 위젯 둘이
+ * 한 줄에 나란히 놓일 때, grid 칸 자체는 기본으로(align-items: stretch) 그 줄의
+ * 가장 큰 카드에 맞춰 늘어나 있는데, Card가 이걸 안 채우면 짧은 쪽 카드만
+ * 위에 붕 뜨고 아래는 빈 채로 남아 둘의 높이가 안 맞아 보였다.
+ *
+ * **드래그가 아니라 이동 버튼이다.** 2열 grid에서 순서 재기는 framer-motion의
+ * Reorder가 원래 세로 한 줄 목록을 위한 것이라 배열상 바로 다음 항목(대개
+ * 같은 줄의 옆 칸)과만 비교한다 — 아래로 끌면 옆 칸과 바뀌는 식으로 어긋나
+ * 보였다. 자리를 안 옮기고 화살표로만 정확히 한 칸씩 옮기는 편이 grid에서는
+ * 더 예측 가능하다 (실제로 겪었던 문제).
  */
 export function WidgetCard({
   meta,
@@ -61,7 +68,8 @@ export function WidgetCard({
   resizable,
   onSizeChange,
   showsOpenAffordance,
-  dragControls,
+  canMoveUp,
+  canMoveDown,
   onMove,
   onRemove,
   children,
@@ -71,37 +79,38 @@ export function WidgetCard({
     ? `widget-wiggle${index % 2 === 1 ? ' widget-wiggle-offset' : ''}`
     : undefined
 
-  function handleHandleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-    // 기본 동작(페이지 스크롤)을 막지 않으면 순서를 바꿀 때마다 화면이 같이
-    // 튀어서 방금 옮긴 카드를 놓친다.
-    event.preventDefault()
-    onMove(event.key === 'ArrowUp' ? 'up' : 'down')
-  }
-
   return (
-    <Card padding={isHalf ? 4 : 5} variant="default" elevation="low" className={wiggleClass}>
+    <Card
+      padding={isHalf ? 4 : 5}
+      variant="default"
+      elevation="low"
+      height="100%"
+      className={wiggleClass}
+    >
       <VStack gap={isHalf ? 2 : 3}>
         <HStack gap={2} hAlign="between" vAlign="center">
           <HStack gap={1.5} vAlign="center">
             {isEditing && (
-              /* Astryx에는 드래그 손잡이에 해당하는 컴포넌트가 없다. IconButton은
-                 onClick만 받아서 포인터가 눌리는 순간(onPointerDown)을 잡을 수
-                 없는데, 드래그는 바로 그 순간에 시작해야 한다.
-
-                 touch-none이 이 손잡이의 핵심이다. 이것만 터치 제스처를 드래그로
-                 넘기고 카드의 나머지 부분은 그대로 페이지 스크롤에 쓰인다 —
-                 카드 전체를 드래그 가능하게 두면 편집 중에 홈을 스크롤할 방법이
-                 사라진다. 색·모서리·여백은 전부 토큰 기반 유틸리티다. */
-              <button
-                type="button"
-                aria-label={`${meta.title} 위젯 순서 바꾸기. 위/아래 화살표 키로도 옮길 수 있어요.`}
-                className="-m-1 flex cursor-grab touch-none items-center rounded-md border-0 bg-transparent p-1 text-secondary active:cursor-grabbing"
-                onPointerDown={(event) => dragControls.start(event)}
-                onKeyDown={handleHandleKeyDown}
-              >
-                <GripVertical className="size-4" />
-              </button>
+              <HStack gap={0} vAlign="center" className="-ms-1.5">
+                <IconButton
+                  label={`${meta.title} 위젯 위로 옮기기`}
+                  tooltip="위로"
+                  variant="ghost"
+                  size="sm"
+                  icon={<ChevronUp className="size-4" />}
+                  isDisabled={!canMoveUp}
+                  onClick={() => onMove('up')}
+                />
+                <IconButton
+                  label={`${meta.title} 위젯 아래로 옮기기`}
+                  tooltip="아래로"
+                  variant="ghost"
+                  size="sm"
+                  icon={<ChevronDown className="size-4" />}
+                  isDisabled={!canMoveDown}
+                  onClick={() => onMove('down')}
+                />
+              </HStack>
             )}
             {widgetIcon(meta.id)}
             <Heading level={isHalf ? 4 : 2} maxLines={1}>
