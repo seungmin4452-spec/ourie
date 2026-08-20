@@ -298,6 +298,17 @@
     opacity: 0.8;
   }
 
+  /* 관리자가 올린 이미지 — .effect-particle의 기본 effect-fall(똑바로
+     떨어지며 360도 회전)을 그대로 쓴다. 벚꽃처럼 좌우로 흔들지 않는 이유는
+     사용자가 요청한 게 "회전하며 내려오는" 것이지 팔랑거림이 아니라서다.
+     object-fit: contain이라 정사각형이 아닌 이미지(가로로 긴 로고 등)를
+     올려도 찌그러지지 않고, drop-shadow가 투명 배경 PNG를 배경에서
+     살짝 띄워 보이게 한다. */
+  .effect-particle-image {
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  }
+
   /* 모션에 민감한 사용자에게는 흩날리는 대신 그냥 켜져 있다는 것만
      알린다 — widget-wiggle과 같은 처리. */
   @media (prefers-reduced-motion: reduce) {

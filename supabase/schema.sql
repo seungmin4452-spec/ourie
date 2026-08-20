@@ -737,12 +737,16 @@ create trigger calendar_events_set_updated_at
 create table public.app_effects (
   id text primary key,
   is_enabled boolean not null default false,
+  -- 벚꽃·눈은 항상 null이다 — 도형은 CSS로 그리지 이미지가 없다.
+  -- "이미지가 회전하며 떨어지는" 효과(custom_image)만 이 값을 쓴다.
+  image_url text,
   updated_at timestamptz not null default now()
 );
 
 insert into public.app_effects (id, is_enabled) values
   ('cherry_blossom', false),
-  ('snow', false)
+  ('snow', false),
+  ('custom_image', false)
 on conflict (id) do nothing;
 
 create trigger app_effects_set_updated_at
@@ -1344,6 +1348,26 @@ create policy "travel_maps_couple_delete"
     bucket_id = 'travel-maps'
     and (storage.foldername(name))[1] = public.current_couple_id()::text
   );
+
+-- ============================================================
+-- Storage: 특수효과 이미지
+--
+-- 관리자가 올린, 회전하며 홈 화면에 떨어지는 이미지(custom_image 효과)
+-- 하나가 여기 담긴다. **공개 버킷이다** — 로그인한 사용자 전체의 홈
+-- 화면이 봐야 하고, 커플 사진처럼 지켜야 할 사적인 이미지가 아니다.
+--
+-- 쓰기 정책이 없다. 업로드는 오직 관리자 인증을 거친
+-- api/admin/effect-image.ts가 service role로 한다 — 클라이언트가 직접
+-- 쓸 수 있으면 아무나 전체 사용자 화면에 원하는 이미지를 띄울 수 있다.
+-- ============================================================
+
+insert into storage.buckets (id, name, public)
+values ('effect-images', 'effect-images', true)
+on conflict (id) do nothing;
+
+create policy "effect_images_public_read"
+  on storage.objects for select
+  using (bucket_id = 'effect-images');
 
 -- ============================================================
 -- 매일 디데이 알림을 깨우는 스케줄

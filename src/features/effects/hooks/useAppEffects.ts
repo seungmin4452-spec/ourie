@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 
 import { supabase } from '@/lib/supabase'
 import { listAppEffects } from '../api/appEffects'
-import { ALL_EFFECTS_OFF } from '../types'
+import { APP_EFFECTS_EMPTY } from '../types'
 
 export const APP_EFFECTS_QUERY_KEY = ['app-effects'] as const
 
@@ -26,7 +26,7 @@ export function useAppEffects() {
     queryFn: listAppEffects,
     // 실패해도 홈이 죽으면 안 된다 — 장식일 뿐이다. 기본값(전부 꺼짐)으로
     // 떨어지도록 placeholderData를 둔다.
-    placeholderData: ALL_EFFECTS_OFF,
+    placeholderData: APP_EFFECTS_EMPTY,
   })
 
   useEffect(() => {
