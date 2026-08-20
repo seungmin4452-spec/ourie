@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 
 import { BroadcastWidget } from './components/BroadcastWidget'
+import { EffectsWidget } from './components/EffectsWidget'
 import { SignupStatsWidget } from './components/SignupStatsWidget'
 
 export interface AdminWidgetMeta {
@@ -33,5 +34,11 @@ export const ADMIN_WIDGETS: AdminWidgetMeta[] = [
     title: '전체 알림',
     description: '가입자 전체에게 푸시 알림을 즉시 보내요.',
     Component: BroadcastWidget,
+  },
+  {
+    id: 'effects',
+    title: '특수효과',
+    description: '켜면 그 순간 모든 사용자의 홈 화면에 떨어져요.',
+    Component: EffectsWidget,
   },
 ]

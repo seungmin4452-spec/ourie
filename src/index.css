@@ -215,4 +215,95 @@
     background-color: #161b17;
     transform: rotateY(180deg);
   }
+
+  /* 관리자가 켠 특수효과(벚꽃·눈)가 홈 화면 위로 떨어진다
+     (FallingParticles.tsx). position: fixed로 뷰포트 전체를 덮고
+     pointer-events: none이라 위젯을 누르는 데는 지장이 없다.
+     widget-edit-bar(z-index 30)보다는 위, admin-flip-overlay(60)보다는
+     아래에 둔다 — 편집 바 위로도 떨어지되 관리자 뒤집기 연출은 안 가린다. */
+  .effects-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .effect-particle {
+    position: absolute;
+    top: -10%;
+    /* FallingParticles.tsx가 인라인 style로 넘기는 값 (조각마다 다르다). */
+    animation-name: effect-fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  /* 100vh가 아니라 120vh까지 내려간다 — 100이면 화면 아래 끝에 닿자마자
+     사라져서 iOS 홈 인디케이터 높이만큼 "덜 떨어진" 채로 반복되는 게
+     눈에 띄었다. */
+  @keyframes effect-fall {
+    from {
+      transform: translateY(-10vh) translateX(0) rotate(0deg);
+    }
+    to {
+      transform: translateY(120vh) translateX(var(--effect-drift, 0px)) rotate(360deg);
+    }
+  }
+
+  /* 벚꽃 잎 — 완전한 원이 아니라 한쪽 모서리만 둥근 사각형으로 꽃잎 느낌을
+     낸다. 색은 categorical pink 토큰(라이트에서 옅은 분홍, 다크에서 hue
+     tint)이라 다크모드에서도 배경에 묻히지 않는다.
+
+     눈과 같은 effect-fall(똑바로 떨어지기)을 썼더니 그냥 색만 다른 눈처럼
+     보였다. 꽃잎은 가볍고 넓적해서 좌우로 크게 흔들리며(sway) 팔랑팔랑
+     내려오고, 뒤집히듯 도는 동안 옆에서 보면 얇아진다 — 그 느낌을
+     scaleX로 낸다. animation-name을 따로 줘서 .effect-particle의
+     effect-fall을 덮어쓴다. */
+  .effect-particle-petal {
+    border-radius: 70% 0 70% 70%;
+    background-color: var(--color-background-pink);
+    opacity: 0.85;
+    animation-name: effect-fall-petal;
+    animation-timing-function: ease-in-out;
+  }
+
+  @keyframes effect-fall-petal {
+    0% {
+      transform: translateY(-10vh) translateX(0) rotate(0deg) scaleX(1);
+    }
+    20% {
+      transform: translateY(16vh) translateX(var(--effect-sway, 40px)) rotate(100deg) scaleX(0.55);
+    }
+    40% {
+      transform: translateY(42vh) translateX(0) rotate(190deg) scaleX(1);
+    }
+    60% {
+      transform: translateY(68vh) translateX(calc(-1 * var(--effect-sway, 40px))) rotate(260deg)
+        scaleX(0.55);
+    }
+    80% {
+      transform: translateY(94vh) translateX(0) rotate(330deg) scaleX(1);
+    }
+    100% {
+      transform: translateY(120vh) translateX(var(--effect-drift, 0px)) rotate(410deg) scaleX(1);
+    }
+  }
+
+  /* 눈 — 테마와 무관하게 항상 흰 점이어야 해서(다크모드에서 눈이 회색이면
+     안 보인다) 모드에 따라 바뀌는 surface 토큰 대신 고정 흰색 토큰
+     (--color-on-dark)을 쓴다. */
+  .effect-particle-snow {
+    border-radius: var(--radius-full);
+    background-color: var(--color-on-dark);
+    opacity: 0.8;
+  }
+
+  /* 모션에 민감한 사용자에게는 흩날리는 대신 그냥 켜져 있다는 것만
+     알린다 — widget-wiggle과 같은 처리. */
+  @media (prefers-reduced-motion: reduce) {
+    .effect-particle {
+      animation: none;
+      top: 40%;
+    }
+  }
 }

@@ -21,6 +21,7 @@ import {
 } from '@/features/anniversary'
 import { useAuth } from '@/features/auth'
 import { CalendarWidget } from '@/features/calendar'
+import { EffectsLayer } from '@/features/effects'
 import { NotificationPromptDialog } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { isStandalone, openPwaInstallPage } from '@/features/onboarding/pwaInstall'
@@ -227,127 +228,133 @@ export function HomePage() {
   }
 
   return (
-    <PageShell gap={5}>
-      {/* 편집 도구는 iOS 홈 화면 정리 모드와 같은 자리에 둔다 — 왼쪽 위에
-          추가, 오른쪽 위에 완료. PageShell의 첫 자식이어야 위쪽 여백을
-          되돌려 화면 맨 위에 붙을 수 있다 (index.css의 .widget-edit-bar). */}
-      {isEditing && (
-        <HStack className="widget-edit-bar" hAlign="between" vAlign="center">
-          <IconButton
-            label="위젯 추가"
-            tooltip="위젯 추가"
-            variant="secondary"
-            icon={<Plus className="size-5" />}
-            onClick={() => setIsPickerOpen(true)}
-          />
-          <Button
-            label="완료"
-            variant="primary"
-            onClick={() => setWidgetEditMode(false)}
-          />
-        </HStack>
-      )}
-
-      {/* 앱 아이콘과 앱 이름은 홈 화면 아이콘과 상태바가 이미 말해준다. 위젯이
-          첫 화면의 주인공이 되도록 상단에서 뺐다. */}
-      {widgets.length === 0 ? (
-        <EmptyState
-          icon={<LayoutGrid className="size-8" />}
-          title="위젯을 올려보세요"
-          description="디데이처럼 보고 싶은 기능만 골라 홈에 둘 수 있어요."
-          actions={
-            <Button
+    <>
+      {/* 관리자가 켠 특수효과(벚꽃·눈)가 있으면 화면 전체 위로 떨어진다.
+          장식일 뿐이라 PageShell 안이 아니라 밖에 둔다 — 위젯 사이 여백에
+          맞춰 잘리면 안 된다. */}
+      <EffectsLayer />
+      <PageShell gap={5}>
+        {/* 편집 도구는 iOS 홈 화면 정리 모드와 같은 자리에 둔다 — 왼쪽 위에
+            추가, 오른쪽 위에 완료. PageShell의 첫 자식이어야 위쪽 여백을
+            되돌려 화면 맨 위에 붙을 수 있다 (index.css의 .widget-edit-bar). */}
+        {isEditing && (
+          <HStack className="widget-edit-bar" hAlign="between" vAlign="center">
+            <IconButton
               label="위젯 추가"
-              variant="primary"
-              icon={<Plus className="size-4" />}
+              tooltip="위젯 추가"
+              variant="secondary"
+              icon={<Plus className="size-5" />}
               onClick={() => setIsPickerOpen(true)}
             />
-          }
-        />
-      ) : (
-        <VStack gap={3}>
-          <WidgetList
-            widgets={widgets}
-            isEditing={isEditing}
-            onDragOver={moveWidgetBefore}
-            onMove={moveWidget}
-            onRemove={removeWidget}
-            onResize={setWidgetSize}
-            onLongPress={() => setWidgetEditMode(true)}
-            renderBody={renderWidgetBody}
-            opensOnTap={opensOnTap}
-            partnerName={partner?.name}
-          />
-
-          {/* 평소의 홈은 위젯만 보이는 화면이어야 해서, 꾹 누르면 된다는 것만
-              한 줄로 알려준다. 편집 중에는 지금 할 수 있는 일로 바뀐다. */}
-          <Text type="supporting" justify="center">
-            {isEditing
-              ? '왼쪽 손잡이를 끌어 순서를 바꾸고, ✕로 지울 수 있어요.'
-              : '위젯을 꾹 누르면 추가하거나 지울 수 있어요.'}
-          </Text>
-        </VStack>
-      )}
-
-      <VStack gap={2}>
-        <Text type="supporting" justify="center">
-          둘만의 공간, Ourie
-        </Text>
-        {/* 알림 설정처럼 "가끔 찾는 것"들이 모이는 자리. 홈에 버튼을 하나씩
-            늘리는 대신 여기로 보낸다. */}
-        <Button
-          label="마이페이지"
-          variant="secondary"
-          width="100%"
-          icon={<UserRound className="size-4" />}
-          onClick={() => navigate('/me')}
-        />
-        <Button
-          label="꾸미기 다시 하기"
-          variant="ghost"
-          width="100%"
-          onClick={() => navigate('/onboarding/customize')}
-        />
-        {/* 서버가 렌더한 설치 페이지로 바로 보낸다. 중간 화면을 두지 않는 이유는
-            그 페이지만이 iOS에 커플이 정한 이름을 넘겨줄 수 있기 때문이다.
-            이미 홈 화면에서 실행 중이면 감춘다. */}
-        {!isInstalled && (
-          <Button
-            label="홈 화면에 다시 추가하기"
-            variant="ghost"
-            width="100%"
-            onClick={() =>
-              void openPwaInstallPage(
-                profile?.app_name?.trim() ?? '',
-                profile?.avatar_url ?? null,
-              )
+            <Button
+              label="완료"
+              variant="primary"
+              onClick={() => setWidgetEditMode(false)}
+            />
+          </HStack>
+        )}
+  
+        {/* 앱 아이콘과 앱 이름은 홈 화면 아이콘과 상태바가 이미 말해준다. 위젯이
+            첫 화면의 주인공이 되도록 상단에서 뺐다. */}
+        {widgets.length === 0 ? (
+          <EmptyState
+            icon={<LayoutGrid className="size-8" />}
+            title="위젯을 올려보세요"
+            description="디데이처럼 보고 싶은 기능만 골라 홈에 둘 수 있어요."
+            actions={
+              <Button
+                label="위젯 추가"
+                variant="primary"
+                icon={<Plus className="size-4" />}
+                onClick={() => setIsPickerOpen(true)}
+              />
             }
           />
+        ) : (
+          <VStack gap={3}>
+            <WidgetList
+              widgets={widgets}
+              isEditing={isEditing}
+              onDragOver={moveWidgetBefore}
+              onMove={moveWidget}
+              onRemove={removeWidget}
+              onResize={setWidgetSize}
+              onLongPress={() => setWidgetEditMode(true)}
+              renderBody={renderWidgetBody}
+              opensOnTap={opensOnTap}
+              partnerName={partner?.name}
+            />
+  
+            {/* 평소의 홈은 위젯만 보이는 화면이어야 해서, 꾹 누르면 된다는 것만
+                한 줄로 알려준다. 편집 중에는 지금 할 수 있는 일로 바뀐다. */}
+            <Text type="supporting" justify="center">
+              {isEditing
+                ? '왼쪽 손잡이를 끌어 순서를 바꾸고, ✕로 지울 수 있어요.'
+                : '위젯을 꾹 누르면 추가하거나 지울 수 있어요.'}
+            </Text>
+          </VStack>
         )}
-      </VStack>
-
-      {/* 지도를 다 채운 순간을 알아채 뱃지로 기록한다. 위젯 어느 쪽에도 두지
-          않은 이유는 판정이 한 군데서만 일어나야 하기 때문이다 — 지도 위젯과
-          뱃지 위젯이 각자 하면 같은 뱃지를 두세 번 청구하고 연출도 겹쳐 뜬다.
-          상대의 변경을 구독하는 쪽도 같은 이유로 여기 있다. */}
-      {widgets.some((entry) => TRAVEL_RELATED.includes(entry.id)) && (
-        <Suspense fallback={null}>
-          <TravelRealtime profile={profile} />
-          <BadgeTracker profile={profile} />
-        </Suspense>
-      )}
-
-      {/* 앱에 처음 들어온 사람에게 한 번만 뜬다. 알림이 이 앱의 기능 자체라
-          찾아 들어가 켜기를 기다릴 수 없다 (NotificationPromptDialog 주석). */}
-      <NotificationPromptDialog profile={profile} />
-
-      <WidgetPickerDialog
-        isOpen={isPickerOpen}
-        onOpenChange={setIsPickerOpen}
-        addedWidgets={widgets.map((entry) => entry.id)}
-        onAdd={addWidget}
-        partnerName={partner?.name}
-      />
-    </PageShell>
+  
+        <VStack gap={2}>
+          <Text type="supporting" justify="center">
+            둘만의 공간, Ourie
+          </Text>
+          {/* 알림 설정처럼 "가끔 찾는 것"들이 모이는 자리. 홈에 버튼을 하나씩
+              늘리는 대신 여기로 보낸다. */}
+          <Button
+            label="마이페이지"
+            variant="secondary"
+            width="100%"
+            icon={<UserRound className="size-4" />}
+            onClick={() => navigate('/me')}
+          />
+          <Button
+            label="꾸미기 다시 하기"
+            variant="ghost"
+            width="100%"
+            onClick={() => navigate('/onboarding/customize')}
+          />
+          {/* 서버가 렌더한 설치 페이지로 바로 보낸다. 중간 화면을 두지 않는 이유는
+              그 페이지만이 iOS에 커플이 정한 이름을 넘겨줄 수 있기 때문이다.
+              이미 홈 화면에서 실행 중이면 감춘다. */}
+          {!isInstalled && (
+            <Button
+              label="홈 화면에 다시 추가하기"
+              variant="ghost"
+              width="100%"
+              onClick={() =>
+                void openPwaInstallPage(
+                  profile?.app_name?.trim() ?? '',
+                  profile?.avatar_url ?? null,
+                )
+              }
+            />
+          )}
+        </VStack>
+  
+        {/* 지도를 다 채운 순간을 알아채 뱃지로 기록한다. 위젯 어느 쪽에도 두지
+            않은 이유는 판정이 한 군데서만 일어나야 하기 때문이다 — 지도 위젯과
+            뱃지 위젯이 각자 하면 같은 뱃지를 두세 번 청구하고 연출도 겹쳐 뜬다.
+            상대의 변경을 구독하는 쪽도 같은 이유로 여기 있다. */}
+        {widgets.some((entry) => TRAVEL_RELATED.includes(entry.id)) && (
+          <Suspense fallback={null}>
+            <TravelRealtime profile={profile} />
+            <BadgeTracker profile={profile} />
+          </Suspense>
+        )}
+  
+        {/* 앱에 처음 들어온 사람에게 한 번만 뜬다. 알림이 이 앱의 기능 자체라
+            찾아 들어가 켜기를 기다릴 수 없다 (NotificationPromptDialog 주석). */}
+        <NotificationPromptDialog profile={profile} />
+  
+        <WidgetPickerDialog
+          isOpen={isPickerOpen}
+          onOpenChange={setIsPickerOpen}
+          addedWidgets={widgets.map((entry) => entry.id)}
+          onAdd={addWidget}
+          partnerName={partner?.name}
+        />
+      </PageShell>
+    </>
   )
 }

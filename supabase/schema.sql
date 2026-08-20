@@ -723,6 +723,34 @@ create trigger calendar_events_set_updated_at
   execute function public.set_updated_at();
 
 -- ------------------------------------------------------------
+-- app_effects — 관리자가 켜고 끄면 모든 사용자의 홈 화면에 적용되는 특수효과
+-- (벚꽃, 눈). 커플 범위도 개인 범위도 아니라 앱 전체 범위인 값이라 기존
+-- 테이블 어디에도 안 맞는다. key-value 한 줄이 효과 하나다 — 새 효과를
+-- 늘릴 때 컬럼을 더하는 대신 row 하나를 추가하면 된다 (poke_presets의
+-- icon처럼, id에 허용 목록을 check로 박지 않는다).
+--
+-- 쓰기 정책이 없는 건 실수가 아니다. update는 오직 관리자 계정으로 인증한
+-- api/admin/effects.ts가 service role 키로 한다 (api/admin/broadcast.ts와
+-- 같은 구조) — 클라이언트가 RLS를 뚫고 직접 켤 수 있으면 아무나 전체
+-- 사용자 화면에 효과를 띄울 수 있다.
+-- ------------------------------------------------------------
+create table public.app_effects (
+  id text primary key,
+  is_enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.app_effects (id, is_enabled) values
+  ('cherry_blossom', false),
+  ('snow', false)
+on conflict (id) do nothing;
+
+create trigger app_effects_set_updated_at
+  before update on public.app_effects
+  for each row
+  execute function public.set_updated_at();
+
+-- ------------------------------------------------------------
 -- send_poke: 콕 찌르기 한 번을 원자적으로 처리한다.
 --
 -- 상대방 찾기 · 수신 동의 확인 · 쿨다운 확인 · 기록을 한 트랜잭션에 묶는 이유는
@@ -886,6 +914,10 @@ alter table public.poke_presets enable row level security;
 alter table public.pokes enable row level security;
 alter table public.wish_quotas enable row level security;
 alter table public.wishes enable row level security;
+-- 이 줄은 실제 DB에는 2026-08-19-calendar.sql로 이미 있었는데 이 참고
+-- 파일에는 빠져 있었다 — 여기서 같이 채워 넣는다(운영 DB는 영향 없음).
+alter table public.calendar_events enable row level security;
+alter table public.app_effects enable row level security;
 
 -- couples: only the two members can see/manage their own couple row
 create policy "couples_select_member"
@@ -1223,6 +1255,12 @@ create policy "calendar_events_delete_shared_or_own"
     and (is_shared or created_by = auth.uid())
   );
 
+-- app_effects: 누구나 읽는다. 쓰기 정책은 두지 않는다 — 서버(service role)만
+-- 쓴다 (위 app_effects 테이블 주석 참고).
+create policy "app_effects_select_all"
+  on public.app_effects for select
+  using (true);
+
 -- ============================================================
 -- Storage: profile avatars
 -- public read (simple avatar URLs), writes restricted to the
@@ -1390,4 +1428,25 @@ begin
       execute format('alter publication supabase_realtime add table public.%I', target);
     end if;
   end loop;
+end $$;
+
+-- ============================================================
+-- 관리자가 특수효과를 켜고 끄면 열려 있는 모든 홈 화면에 그대로 반영되는
+-- 발행 (src/features/effects/hooks/useAppEffects.ts). 커플 범위가 아니라
+-- 걸 필터가 없다 — app_effects는 원래도 누구나 읽는다.
+--
+-- 자세한 경위는 supabase/migrations/2026-08-20-app-effects.sql 참고.
+-- ============================================================
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'app_effects'
+  ) then
+    alter publication supabase_realtime add table public.app_effects;
+  end if;
 end $$;
