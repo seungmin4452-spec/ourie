@@ -20,6 +20,7 @@ import {
   appLaunchUrl,
   DEFAULT_TITLE,
   defaultIconUrl,
+  fetchImageAsDataUrl,
   maskableIconDataUrl,
   requestOrigin,
   sanitizeIconUrl,
@@ -45,7 +46,7 @@ function defaultIcons(origin: string): ManifestIcon[] {
   ]
 }
 
-export default function handler(request: Request): Response {
+export default async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const origin = requestOrigin(request)
   const title = url.searchParams.get('title')?.trim() || DEFAULT_TITLE
@@ -74,18 +75,31 @@ export default function handler(request: Request): Response {
   // 누적돼 사진이 점점 작아지는 것처럼 보였다. maskableIconDataUrl이 여백을
   // 픽셀에 직접 구워 넣은 SVG를 만들어주므로 그걸 쓴다 (_shared.ts 참고).
   // 'any' 쪽은 여백 없이 꽉 찬 원본 사진 그대로 둔다.
-  const icons: ManifestIcon[] =
-    icon === defaultIconUrl(origin)
-      ? defaultIcons(origin)
-      : [
-          {
-            src: maskableIconDataUrl(icon, BACKGROUND_COLOR),
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'maskable',
-          },
-          { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
-        ]
+  //
+  // maskable SVG는 사진을 URL로 참조하는 대신 base64로 직접 박아 넣는다 --
+  // 그 이유는 _shared.ts의 maskableIconDataUrl 주석 참고 (안드로이드 설치가
+  // "설치 중"에서 멈추던 문제). fetch가 실패하면(네트워크 문제 등) maskable
+  // 항목 없이 'any'만 내보낸다 -- 그건 크롬이 클라이언트에서 직접 원본 URL을
+  // fetch하므로 이 실패와 무관하게 동작한다.
+  let icons: ManifestIcon[]
+  if (icon === defaultIconUrl(origin)) {
+    icons = defaultIcons(origin)
+  } else {
+    const photoDataUrl = await fetchImageAsDataUrl(icon)
+    icons = [
+      ...(photoDataUrl
+        ? [
+            {
+              src: maskableIconDataUrl(photoDataUrl, BACKGROUND_COLOR),
+              sizes: '512x512',
+              type: 'image/svg+xml',
+              purpose: 'maskable',
+            },
+          ]
+        : []),
+      { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
+    ]
+  }
 
   const manifest = {
     // start_url은 바뀌어도 id는 고정이다: 재설치가 옆에 아이콘을 하나 더 만드는

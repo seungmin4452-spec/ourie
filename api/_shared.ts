@@ -71,20 +71,53 @@ export function sanitizeIconUrl(value: string | null, origin: string): string {
 // 보였다. 규격에 맞는 이미지를 우리가 직접 내보내면 런처가 더 손댈 필요가
 // 없어져 이 누적이 멈춘다.
 //
-// 새 이미지를 저장소에 다시 업로드하는 대신, 있는 사진 URL을 감싸는 SVG를
-// 요청마다 즉석에서 만든다: <image>가 원본 사진을 참조하고, 그 바깥을
-// 배경색 사각형이 채운다. data: URI라 sanitizeIconUrl의 화이트리스트도
-// 그대로 통과한다.
+// 처음엔 <image>가 원본 사진 https URL을 그대로 참조하는 SVG를 즉석에서
+// 만들었는데, 그게 안드로이드에서 "설치 중..."이 끝나지 않고 멈추는 새 문제를
+// 냈다. 설치 시 크롬이 매니페스트를 구글 WebAPK 서명 서버로 보내 앱을 만들어
+// 오는데, 그 서버의 SVG 렌더러는 SSRF 방지 목적으로 <image href="https://...">
+// 같은 외부 참조를 따라가지 않는 게 일반적이라, maskable 아이콘 처리가 죽거나
+// 응답 없이 멈춰버린 것으로 보인다. 그래서 사진 URL을 참조만 하는 대신, 사진
+// 바이트 자체를 여기서 fetch해 base64로 SVG 안에 박아 넣는다 -- 어떤 렌더러든
+// 추가 네트워크 요청 없이 그릴 수 있는, 완전히 자기 완결적인 data URI가 된다.
 const MASKABLE_ICON_SIZE = 512
 const MASKABLE_SAFE_ZONE_RATIO = 0.8 // 사진이 캔버스의 80%를 차지 (여백 10%씩)
 
-export function maskableIconDataUrl(photoUrl: string, backgroundColor: string): string {
+// Edge 런타임엔 Buffer가 없어 표준 웹 API로 base64를 인코딩한다. btoa는 한
+// 문자당 1바이트인 "binary string"만 받으므로 먼저 그 형태로 바꾼다. 512px
+// 정사각 JPEG 정도 크기(수십~백여 KB)에서 String.fromCharCode를 청크 없이
+// 한 번에 호출하면 인자 개수 제한에 걸릴 수 있어 청크로 나눠 처리한다.
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+// 사진을 fetch해 data: URI(base64)로 바꾼다. 네트워크 실패·비정상 응답이면
+// null을 돌려주고, 호출한 쪽이 maskable 아이콘을 아예 빼고 'any' 아이콘만
+// (원본 https URL 그대로) 쓰도록 한다 -- 크롬이 'any'는 클라이언트에서 직접
+// fetch하므로 이 경로의 실패와 무관하게 항상 동작한다.
+export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const contentType = response.headers.get('content-type') ?? 'image/jpeg'
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    return `data:${contentType};base64,${bytesToBase64(bytes)}`
+  } catch {
+    return null
+  }
+}
+
+export function maskableIconDataUrl(photoDataUrl: string, backgroundColor: string): string {
   const inset = (MASKABLE_ICON_SIZE * (1 - MASKABLE_SAFE_ZONE_RATIO)) / 2
   const content = MASKABLE_ICON_SIZE * MASKABLE_SAFE_ZONE_RATIO
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${MASKABLE_ICON_SIZE}" height="${MASKABLE_ICON_SIZE}">` +
     `<rect width="${MASKABLE_ICON_SIZE}" height="${MASKABLE_ICON_SIZE}" fill="${escapeHtmlAttr(backgroundColor)}"/>` +
-    `<image href="${escapeHtmlAttr(photoUrl)}" x="${inset}" y="${inset}" width="${content}" height="${content}" preserveAspectRatio="xMidYMid slice"/>` +
+    `<image href="${escapeHtmlAttr(photoDataUrl)}" x="${inset}" y="${inset}" width="${content}" height="${content}" preserveAspectRatio="xMidYMid slice"/>` +
     `</svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
