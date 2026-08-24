@@ -30,21 +30,27 @@ export function InviteCodeCard() {
   const [now, setNow] = useState(() => Date.now())
   const invalidatedForExpiryRef = useRef<number | null>(null)
 
-  const {
-    data: invite,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ['couple-invite', user?.id],
-    queryFn: () => createInviteCode(user!.id),
-    enabled: user != null,
-  })
-
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ['profile', user?.id],
     queryFn: () => getProfile(user!.id),
     enabled: user != null,
   })
+
+  // Only mints a code once we know the user isn't already connected --
+  // otherwise a stale visit to this tab (e.g. browser back before the
+  // parent page's redirect effect runs) would spawn a fresh, orphaned
+  // couples row for someone who's already matched.
+  const {
+    data: invite,
+    isLoading: isInviteLoading,
+    isError,
+  } = useQuery({
+    queryKey: ['couple-invite', user?.id],
+    queryFn: () => createInviteCode(user!.id),
+    enabled: user != null && profile != null && profile.couple_id == null,
+  })
+
+  const isLoading = isProfileLoading || (profile?.couple_id == null && isInviteLoading)
 
   const expiresAt = invite ? new Date(invite.created_at).getTime() + INVITE_CODE_TTL_MS : null
 
@@ -100,7 +106,7 @@ export function InviteCodeCard() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || profile?.couple_id != null) {
     return (
       <div className="flex flex-col items-center gap-3 py-8">
         <Spinner label="초대 코드를 만드는 중..." />

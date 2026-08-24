@@ -72,6 +72,17 @@ begin
     raise exception 'own_code';
   end if;
 
+  -- 방어적 자가치유. 정상적으로는 handle_new_user 트리거가 가입 즉시
+  -- profiles 행을 만든다. 그 트리거가 어떤 이유로 못 돌면(2026-08-22 실사고 —
+  -- 카카오로 막 가입한 사용자의 profiles 행이 통째로 없었다), 아래 UPDATE는
+  -- 대상 행이 없으니 조용히 0건만 갱신하고 끝난다 — join_couple 자체는 에러
+  -- 없이 "성공"하고 couples 행도 연결되지만, 그 사용자 화면은 couple_id를
+  -- 영원히 못 받아 "코드를 넣어도 매칭이 안 된다"는 상태에 갇힌다. 여기서
+  -- 미리 채워 넣어 그 전제 자체를 보장한다.
+  insert into public.profiles (id)
+    values (v_couple.user_a), (v_uid)
+  on conflict (id) do nothing;
+
   update public.couples
     set user_b = v_uid, connected_at = now()
     where id = v_couple.id;
