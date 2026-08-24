@@ -71,14 +71,23 @@ export function sanitizeIconUrl(value: string | null, origin: string): string {
 // 보였다. 규격에 맞는 이미지를 우리가 직접 내보내면 런처가 더 손댈 필요가
 // 없어져 이 누적이 멈춘다.
 //
-// 처음엔 <image>가 원본 사진 https URL을 그대로 참조하는 SVG를 즉석에서
-// 만들었는데, 그게 안드로이드에서 "설치 중..."이 끝나지 않고 멈추는 새 문제를
-// 냈다. 설치 시 크롬이 매니페스트를 구글 WebAPK 서명 서버로 보내 앱을 만들어
-// 오는데, 그 서버의 SVG 렌더러는 SSRF 방지 목적으로 <image href="https://...">
-// 같은 외부 참조를 따라가지 않는 게 일반적이라, maskable 아이콘 처리가 죽거나
-// 응답 없이 멈춰버린 것으로 보인다. 그래서 사진 URL을 참조만 하는 대신, 사진
-// 바이트 자체를 여기서 fetch해 base64로 SVG 안에 박아 넣는다 -- 어떤 렌더러든
-// 추가 네트워크 요청 없이 그릴 수 있는, 완전히 자기 완결적인 data URI가 된다.
+// 이 SVG를 어떻게 내보낼지는 두 번 틀렸다. 처음엔 <image>가 원본 사진 https
+// URL을 그대로 참조했는데, 크롬이 설치 시 매니페스트를 보내는 구글 WebAPK
+// 서명 서버의 SVG 렌더러가 SSRF 방지 목적으로 그런 외부 참조를 따라가지 않아
+// "설치 중..."이 끝나지 않고 멈췄다. 그다음엔 사진 바이트를 직접 base64로
+// SVG 안에 박아 매니페스트의 icons[].src에 data: URI로 얹었는데, 이번엔 설치는
+// 끝나지만(멈추지 않지만) 만들어진 아이콘이 사진이 아니라 기본 로고였다 --
+// 수십~수백 KB짜리 data URI가 매니페스트 JSON 자체를 부풀려, 서명 서버가 그
+// 무게를 못 견디고 조용히 실패해 크롬이 진짜 WebAPK 대신 파비콘을 쓰는 가벼운
+// 바로가기로 물러난 것으로 보인다.
+//
+// 그래서 이 SVG는 이제 데이터로 매니페스트에 얹지 않고, api/icon-maskable.ts가
+// 평범한 이미지 응답으로 내보내는 하나의 https:// 아이콘 URL이 된다. 매니페스트
+// 쪽 icons[].src는 그 URL 하나만 담은 짧은 문자열이라("any" 아이콘이 원본 사진
+// URL을 그대로 담던 것과 같은 모양) 부풀지 않고, 서명 서버는 그 URL을 평범한
+// 외부 아이콘으로 fetch하면 그만이다 -- SVG *안에서* 또 다른 리소스를 참조하지
+// 않으므로(사진 바이트는 이미 그 응답 자체에 구워져 있다) 앞선 두 실패 원인
+// 모두를 비켜간다.
 const MASKABLE_ICON_SIZE = 512
 const MASKABLE_SAFE_ZONE_RATIO = 0.8 // 사진이 캔버스의 80%를 차지 (여백 10%씩)
 
@@ -95,10 +104,10 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-// 사진을 fetch해 data: URI(base64)로 바꾼다. 네트워크 실패·비정상 응답이면
-// null을 돌려주고, 호출한 쪽이 maskable 아이콘을 아예 빼고 'any' 아이콘만
-// (원본 https URL 그대로) 쓰도록 한다 -- 크롬이 'any'는 클라이언트에서 직접
-// fetch하므로 이 경로의 실패와 무관하게 항상 동작한다.
+// 사진을 fetch해 data: URI(base64)로 바꾼다. api/icon-maskable.ts가 자기
+// 응답(SVG) 안에 사진 바이트를 구워 넣을 때 쓴다. 네트워크 실패·비정상 응답이면
+// null을 돌려주고, 호출한 쪽이 404로 응답해 매니페스트의 'any' 아이콘(원본
+// https URL 그대로, 크롬이 클라이언트에서 직접 fetch)으로 물러나게 한다.
 export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
   try {
     const response = await fetch(url)
@@ -111,13 +120,15 @@ export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
   }
 }
 
-export function maskableIconDataUrl(photoDataUrl: string, backgroundColor: string): string {
+// SVG 마크업 그 자체를 돌려준다(data: URI로 감싸지 않는다) -- 응답 바이트로
+// 그대로 내보내는 api/icon-maskable.ts가 쓴다.
+export function maskableIconSvg(photoDataUrl: string, backgroundColor: string): string {
   const inset = (MASKABLE_ICON_SIZE * (1 - MASKABLE_SAFE_ZONE_RATIO)) / 2
   const content = MASKABLE_ICON_SIZE * MASKABLE_SAFE_ZONE_RATIO
-  const svg =
+  return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${MASKABLE_ICON_SIZE}" height="${MASKABLE_ICON_SIZE}">` +
     `<rect width="${MASKABLE_ICON_SIZE}" height="${MASKABLE_ICON_SIZE}" fill="${escapeHtmlAttr(backgroundColor)}"/>` +
     `<image href="${escapeHtmlAttr(photoDataUrl)}" x="${inset}" y="${inset}" width="${content}" height="${content}" preserveAspectRatio="xMidYMid slice"/>` +
     `</svg>`
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+  )
 }
