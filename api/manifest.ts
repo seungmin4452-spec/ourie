@@ -73,10 +73,11 @@ export default function handler(request: Request): Response {
   // 누적돼 사진이 점점 작아지는 것처럼 보였다. 'any' 쪽은 여백 없이 꽉 찬
   // 원본 사진 그대로 두고, maskable 쪽만 세이프존을 구운 별도 아이콘을 쓴다.
   //
-  // 그 세이프존 아이콘은 여기서 데이터(SVG data: URI)로 직접 만들지 않고
-  // api/icon-maskable.ts가 내주는 평범한 https:// URL로 가리킨다 -- 이유는
-  // _shared.ts의 maskableIconSvg 주석 참고 (data: URI로 얹었을 때 매니페스트가
-  // 부풀어 설치가 사진 대신 기본 로고로 조용히 물러났던 문제).
+  // 그 세이프존 아이콘은 api/icon-maskable.ts(sharp로 PNG 합성)가 내주는
+  // 평범한 https:// URL로 가리킨다 -- 데이터로 매니페스트에 직접 얹으면
+  // 매니페스트가 부풀어 설치가 사진 대신 기본 로고로 조용히 물러난다. type도
+  // image/png다: SVG로는(서명 서버가 SVG 아이콘을 신뢰 못 하는 듯) 같은
+  // 증상이 반복됐다 (api/icon-maskable.ts 머리말에 실패 이력이 남아 있다).
   const icons: ManifestIcon[] =
     icon === defaultIconUrl(origin)
       ? defaultIcons(origin)
@@ -84,7 +85,7 @@ export default function handler(request: Request): Response {
           {
             src: `${origin}/api/icon-maskable?icon=${encodeURIComponent(icon)}`,
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'maskable',
           },
           { src: icon, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
