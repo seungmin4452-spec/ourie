@@ -106,7 +106,6 @@
 - [x] `RegionBadge.tsx` — 3상태(locked · visited · photo) 원형 뱃지
 - [x] `travel_badges` 테이블 + `claim_region_badge` RPC
       - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-08-13-region-badges.sql`
-- [x] "우리의 뱃지" 위젯 — `BadgeWidget`, `lazy`로 등록
 - [x] **사진 지도 위젯 뒤집기** — 오른쪽 아래 버튼으로 앞뒤가 돌아가고 뒷면이 뱃지 진열장
 - [x] 획득 순간 연출(`BadgeEarnedOverlay`) + 상대에게 푸시(`api/badge.ts`)
 - [x] 두 지도 위젯에 진행 한 줄 (`NearestBadgeLine`)

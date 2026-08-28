@@ -1,5 +1,4 @@
 import {
-  Award,
   CalendarDays,
   CalendarHeart,
   Images,
@@ -71,13 +70,6 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     isReady: true,
     defaultSize: 'half',
   },
-  badges: {
-    id: 'badges',
-    title: '우리의 뱃지',
-    description: '시·도 한 곳을 다 채울 때마다 그 지역 모양의 뱃지가 생겨요.',
-    isReady: true,
-    defaultSize: 'half',
-  },
 }
 
 const HANGUL_FIRST = 0xac00
@@ -113,7 +105,6 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   memories: <Images className="size-4" />,
   travel: <MapPin className="size-4" />,
   photomap: <MapPinned className="size-4" />,
-  badges: <Award className="size-4" />,
 }
 
 /** 상대방 이름이 있을 때 쓰는 제목. "우리"를 그 사람 이름으로 바꾼다. */

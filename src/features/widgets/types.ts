@@ -13,7 +13,6 @@ export const WIDGET_IDS = [
   'memories',
   'travel',
   'photomap',
-  'badges',
 ] as const
 
 export type WidgetId = (typeof WIDGET_IDS)[number]

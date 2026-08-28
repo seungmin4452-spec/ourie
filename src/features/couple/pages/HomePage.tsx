@@ -54,13 +54,9 @@ const PhotoMapWidget = lazy(async () => ({
   default: (await import('@/features/travel')).PhotoMapWidget,
 }))
 
-const BadgeWidget = lazy(async () => ({
-  default: (await import('@/features/travel')).BadgeWidget,
-}))
-
 /**
  * 뱃지 판정. 화면에 아무것도 그리지 않고 다 채운 시도를 알아채 기록한다
- * (BadgeTracker 주석 참고). 지도·뱃지 위젯 중 하나라도 홈에 있을 때만 부른다 —
+ * (BadgeTracker 주석 참고). 지도 위젯 중 하나라도 홈에 있을 때만 부른다 —
  * 도형 데이터 청크를 그 사람들만 받으면 된다.
  */
 const BadgeTracker = lazy(async () => ({
@@ -77,14 +73,14 @@ const TravelRealtime = lazy(async () => ({
 
 /**
  * 지도와 얽힌 위젯들. 하나라도 홈에 있으면 뱃지 판정이 돌고, 지도 변경 구독도
- * 켜진다. 셋 다 없는 사람에게는 둘 다 할 일이 없다.
+ * 켜진다. 둘 다 없는 사람에게는 할 일이 없다.
  */
-const TRAVEL_RELATED: WidgetId[] = ['travel', 'photomap', 'badges']
+const TRAVEL_RELATED: WidgetId[] = ['travel', 'photomap']
 
 /**
  * 절반 폭일 때 카드 전체를 눌러 원래 화면(다이얼로그·전체 화면)을 여는
  * 위젯들. 콕 찌르기는 버튼 자체가 안에 있어 카드를 누르는 동작이 따로
- * 필요 없고, 뱃지는 애초에 절반이어도 줄바꿈으로 다 보여서 열 게 없다.
+ * 필요 없다.
  */
 const OPENS_ON_TAP: ReadonlySet<WidgetId> = new Set(['wish', 'calendar', 'travel', 'photomap'])
 
@@ -212,12 +208,6 @@ export function HomePage() {
               isCompact={isCompact}
               title={widgetMeta('photomap', partner?.name).title}
             />
-          </Suspense>
-        )
-      case 'badges':
-        return (
-          <Suspense fallback={<MapLoading />}>
-            <BadgeWidget profile={profile} />
           </Suspense>
         )
     }
