@@ -1,6 +1,5 @@
 import { AlertDialog } from '@astryxdesign/core/AlertDialog'
 import { Button } from '@astryxdesign/core/Button'
-import { Calendar } from '@astryxdesign/core/Calendar'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { Field } from '@astryxdesign/core/Field'
 import { Heading } from '@astryxdesign/core/Heading'
@@ -9,8 +8,9 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, Plus } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
+import { Calendar } from '@/components/astryx/Calendar'
 import { BackButton } from '@/components/common/BackButton'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
 import { PageShell } from '@/components/common/PageShell'
@@ -52,6 +52,16 @@ export function CalendarPage() {
   const eventsOnSelectedDate = useMemo(
     () => (events ?? []).filter((event) => event.event_date === selectedDate),
     [events, selectedDate],
+  )
+
+  // 달력 날짜 칸에 점을 찍을 날짜들. Set으로 묶어 매 렌더마다 O(1)로 찾는다.
+  const eventDates = useMemo(
+    () => new Set((events ?? []).map((event) => event.event_date)),
+    [events],
+  )
+  const hasEventOnDate = useCallback(
+    (date: Date) => eventDates.has(toDateKey(date)),
+    [eventDates],
   )
 
   const deletion = useMutation({
@@ -112,7 +122,12 @@ export function CalendarPage() {
               있으면 "몇 월 며칠이 무슨 요일이었더라"를 머릿속으로 계산해야
               한다. */}
           <Field label="날짜로 찾아보기" inputID="calendar-page-date">
-            <Calendar mode="single" value={selectedDate} onChange={setSelectedDate} />
+            <Calendar
+              mode="single"
+              value={selectedDate}
+              onChange={setSelectedDate}
+              hasEvent={hasEventOnDate}
+            />
           </Field>
 
           {eventsOnSelectedDate.length > 0 && (
