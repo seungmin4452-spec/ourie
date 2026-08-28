@@ -1069,7 +1069,7 @@ function DayCell({
           <span
             aria-hidden="true"
             className={cn(
-              'absolute top-1 left-1/2 size-1 -translate-x-1/2 rounded-full',
+              'absolute top-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full',
               endpoint ? 'bg-on-accent' : 'bg-accent',
             )}
           />
