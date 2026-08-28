@@ -54,6 +54,17 @@ export function CalendarPage() {
     [events, selectedDate],
   )
 
+  // 선택된 날짜의 일정은 위 목록에 이미 떠 있으니, 다가오는/지난 일정에서는
+  // 중복으로 보이지 않게 뺀다.
+  const upcomingExcludingSelected = useMemo(
+    () => upcoming.filter((event) => event.event_date !== selectedDate),
+    [upcoming, selectedDate],
+  )
+  const pastExcludingSelected = useMemo(
+    () => past.filter((event) => event.event_date !== selectedDate),
+    [past, selectedDate],
+  )
+
   // 달력 날짜 칸에 점을 찍을 날짜들. Set으로 묶어 매 렌더마다 O(1)로 찾는다.
   const eventDates = useMemo(
     () => new Set((events ?? []).map((event) => event.event_date)),
@@ -157,19 +168,19 @@ export function CalendarPage() {
             />
           ) : (
             <>
-              {upcoming.length > 0 && (
+              {upcomingExcludingSelected.length > 0 && (
                 <CalendarEventList
                   header="다가오는 일정"
-                  events={upcoming}
+                  events={upcomingExcludingSelected}
                   userId={user.id}
                   onEdit={openEdit}
                   onDelete={setPendingDelete}
                 />
               )}
-              {past.length > 0 && (
+              {pastExcludingSelected.length > 0 && (
                 <CalendarEventList
                   header="지난 일정"
-                  events={past}
+                  events={pastExcludingSelected}
                   userId={user.id}
                   onEdit={openEdit}
                   onDelete={setPendingDelete}
