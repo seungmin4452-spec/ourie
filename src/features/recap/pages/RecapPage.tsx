@@ -89,7 +89,7 @@ export function RecapPage() {
   const showGrid = showCalendar || showTravel || showPhotomap || showWish || showPoke
   const hasAnyWidget = showDday || showGrid
 
-  const [granularity, setGranularity] = useState<Granularity>('year')
+  const [granularity, setGranularity] = useState<Granularity>('month')
   const [year, setYear] = useState(() => new Date().getFullYear())
   const [month, setMonth] = useState(() => new Date().getMonth() + 1)
 
