@@ -23,6 +23,29 @@ export interface PokeSendResult {
   delivered: number
 }
 
+/** 콕 찌르기 한 번의 기록. 지금은 연간 결산이 횟수를 세는 데만 쓴다 — 문구를
+ * 보여주는 화면은 아직 없다 (DATABASE.md §2.3.3). */
+export interface PokeRecord {
+  sender_id: string
+  recipient_id: string
+  created_at: string
+}
+
+/**
+ * 커플이 주고받은 콕 찌르기 전부.
+ *
+ * RLS(`pokes_select_couple`)가 이미 호출자의 커플로 범위를 좁히지만, 명시적
+ * 필터가 있어야 pokes_couple_created_idx 인덱스를 탄다.
+ */
+export async function listPokes(coupleId: string): Promise<PokeRecord[]> {
+  const { data, error } = await supabase
+    .from('pokes')
+    .select('sender_id, recipient_id, created_at')
+    .eq('couple_id', coupleId)
+  if (error) throw error
+  return data ?? []
+}
+
 /**
  * 상대방에게 콕 찌르기 하나를 보낸다.
  *

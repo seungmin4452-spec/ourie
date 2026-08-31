@@ -59,3 +59,18 @@ export async function joinCoupleByCode(code: string): Promise<string> {
   if (error) throw error
   return data as string
 }
+
+/**
+ * 이 커플 row가 만들어진 시각(=초대 코드를 처음 만든 시각). 정확히 "연결된"
+ * 시각은 아니지만(연결 전에도 row가 있다) 그보다 늦을 수 없으므로, 연간
+ * 결산이 연도 선택 범위의 하한을 정하는 데는 이걸로 충분하다.
+ */
+export async function getCoupleCreatedAt(coupleId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('couples')
+    .select('created_at')
+    .eq('id', coupleId)
+    .maybeSingle()
+  if (error) throw error
+  return data?.created_at ?? null
+}

@@ -7,6 +7,7 @@ import { CoupleInvitePage } from '@/features/couple'
 import { HomePage } from '@/features/couple/pages/HomePage'
 import { MyPage } from '@/features/me'
 import { CustomizePage, RequireOnboarding } from '@/features/onboarding'
+import { RecapPage } from '@/features/recap'
 
 // Onboarding order: /onboarding/customize (name + photo) -> /onboarding/couple
 // (pairing) -> /add-to-home (server-rendered install page, see
@@ -59,6 +60,17 @@ export const router = createBrowserRouter(
             <RequireAuth>
               <RequireOnboarding>
                 <MyPage />
+              </RequireOnboarding>
+            </RequireAuth>
+          ),
+        },
+        {
+          // 연간 결산도 커플 데이터라서 홈과 같은 온보딩 관문을 지난다.
+          path: '/recap',
+          element: (
+            <RequireAuth>
+              <RequireOnboarding>
+                <RecapPage />
               </RequireOnboarding>
             </RequireAuth>
           ),

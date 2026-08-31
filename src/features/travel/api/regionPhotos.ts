@@ -40,6 +40,26 @@ interface RegionPhotoRow {
   photo_path: string
 }
 
+/** 지역 한 곳에 사진을 마지막으로 걸거나 바꾼 시각. */
+export interface RegionPhotoDate {
+  region_code: string
+  updated_at: string
+}
+
+/**
+ * 지역별 사진의 마지막 갱신 시각만. 연간 결산이 "이 해에 몇 칸을 채웠나"를
+ * 세는 데만 쓰므로, 서명 URL을 받는 `listRegionPhotoUrls`의 캐시·서명 왕복을
+ * 거치지 않는다.
+ */
+export async function listRegionPhotoDates(coupleId: string): Promise<RegionPhotoDate[]> {
+  const { data, error } = await supabase
+    .from('travel_region_photos')
+    .select('region_code, updated_at')
+    .eq('couple_id', coupleId)
+  if (error) throw error
+  return data ?? []
+}
+
 /**
  * 커플이 지역마다 걸어둔 사진의 볼 수 있는 URL. 시군구 코드 -> URL.
  *

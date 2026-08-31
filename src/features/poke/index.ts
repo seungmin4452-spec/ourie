@@ -10,6 +10,8 @@ export {
 } from './icons'
 export type { PokeIconName } from './icons'
 export { usePokePresets, pokePresetsQueryKey } from './hooks/usePokePresets'
+export { usePokeHistory, pokeHistoryQueryKey } from './hooks/usePokeHistory'
+export type { PokeRecord } from './api/poke'
 export {
   buildCustomPokeNotification,
   buildPokeNotification,

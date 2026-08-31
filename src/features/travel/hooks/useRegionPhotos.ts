@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { listRegionPhotoUrls, removeRegionPhoto, setRegionPhoto } from '../api/regionPhotos'
+import {
+  listRegionPhotoDates,
+  listRegionPhotoUrls,
+  removeRegionPhoto,
+  setRegionPhoto,
+} from '../api/regionPhotos'
 
 export function travelRegionPhotosQueryKey(coupleId: string | null | undefined) {
   return ['travel-region-photos', coupleId] as const
@@ -67,5 +72,18 @@ export function useRemoveRegionPhoto(coupleId: string | null | undefined) {
     mutationFn: (regionCode: string) => removeRegionPhoto(coupleId!, regionCode),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: travelRegionPhotosQueryKey(coupleId) }),
+  })
+}
+
+export function travelRegionPhotoDatesQueryKey(coupleId: string | null | undefined) {
+  return ['travel-region-photo-dates', coupleId] as const
+}
+
+/** 지역마다 사진을 마지막으로 건/바꾼 시각. 연간 결산의 유일한 사용처다. */
+export function useRegionPhotoDates(coupleId: string | null | undefined) {
+  return useQuery({
+    queryKey: travelRegionPhotoDatesQueryKey(coupleId),
+    queryFn: () => listRegionPhotoDates(coupleId!),
+    enabled: coupleId != null,
   })
 }

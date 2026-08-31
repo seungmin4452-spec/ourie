@@ -1,5 +1,5 @@
 export { AnniversaryPage } from './pages/AnniversaryPage'
 export { DdayHighlight } from './components/DdayHighlight'
 export { useAnniversaries } from './hooks/useAnniversaries'
-export { pickHighlight, startOfToday, summarizeAll, toDateKey } from './dday'
+export { formatDayCount, pickHighlight, startOfToday, summarizeAll, toDateKey } from './dday'
 export type { Anniversary } from './types'

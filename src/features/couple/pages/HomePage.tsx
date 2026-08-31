@@ -5,7 +5,7 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarHeart, LayoutGrid, Plus, UserRound } from 'lucide-react'
+import { CalendarHeart, LayoutGrid, Plus, Sparkles, UserRound } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -297,6 +297,13 @@ export function HomePage() {
             width="100%"
             icon={<UserRound className="size-4" />}
             onClick={() => navigate('/me')}
+          />
+          <Button
+            label="연간 결산"
+            variant="secondary"
+            width="100%"
+            icon={<Sparkles className="size-4" />}
+            onClick={() => navigate('/recap')}
           />
           <Button
             label="꾸미기 다시 하기"

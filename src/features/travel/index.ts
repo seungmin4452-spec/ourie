@@ -9,6 +9,8 @@ export type { BadgeTier, RegionBadgeProgress } from './badges'
 export { countKnownVisits, districtsOf, DISTRICT_COUNT } from './districtIndex'
 export { useTravelVisits, useToggleTravelVisit, travelVisitsQueryKey } from './hooks/useTravelVisits'
 export { useTravelMapPhoto, travelMapPhotoQueryKey } from './hooks/useTravelMapPhoto'
+export { useRegionPhotoDates, travelRegionPhotoDatesQueryKey } from './hooks/useRegionPhotos'
+export type { RegionPhotoDate } from './api/regionPhotos'
 export {
   useRegionPhotos,
   useRemoveRegionPhoto,
