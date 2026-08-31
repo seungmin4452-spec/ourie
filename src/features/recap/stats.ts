@@ -47,7 +47,6 @@ export interface RecapCounts {
   partnerWishCount: number
   pokesSent: number
   pokesReceived: number
-  hasAnyActivity: boolean
 }
 
 export function computeRecap(input: RecapInput): RecapCounts {
@@ -89,13 +88,6 @@ export function computeRecap(input: RecapInput): RecapCounts {
     partnerWishCount: yearWishes.length - myWishCount,
     pokesSent,
     pokesReceived: yearPokes.length - pokesSent,
-    hasAnyActivity:
-      yearEvents.length > 0 ||
-      yearVisits.length > 0 ||
-      yearPhotos.length > 0 ||
-      yearBadges.length > 0 ||
-      yearWishes.length > 0 ||
-      yearPokes.length > 0,
   }
 }
 
