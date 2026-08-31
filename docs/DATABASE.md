@@ -24,6 +24,7 @@ couples ◄───────┘ (couple_id로 연결)
     ├──► travel_badges    (지역 뱃지 — PK가 couple_id+sido_code+tier)
     ├──► wish_quotas      (소원권 — 사람마다 총 장수, PK가 couple_id+owner_id)
     ├──► wishes           (소원권 — 쓴 한 장이 한 row)
+    ├──► wish_quota_requests (소원권 장수 추가 요청 — 상대 승인이 있어야 늘어난다)
     ├──► memories.location ─► 핀 지도에서 활용 (별도 테이블 없이 memories 재사용)
     └──► couple_settings  (커스터마이징)
 ```
@@ -202,6 +203,43 @@ RLS는 커플 범위 전체 열기(select/insert/update/delete)다. 상대가 �
 
 "들어줬는지"를 기록하는 컬럼은 아직 없다. 지금 이 기능이 답하는 것은 "몇 장 남았나"와 "무엇을 부탁했나" 둘뿐이고, 쓴 소원은 지우기 전까지 계속 쓴 것으로 남는다.
 
+### 2.3.4.1 `wish_quota_requests` (소원권 장수 추가 요청)
+
+`wish_quotas.total`을 줄이는 건 즉시 반영이지만, **늘리는 건 상대의 승인을 거친다.** "내
+소원권 추가"/"상대방 소원권 추가" 버튼을 누르면 이 테이블에 요청 한 row가 생기고 상대방에게
+알림이 간다 (`api/wish-quota-request.ts`). 한 row가 요청 하나다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| id | uuid (PK) | |
+| couple_id | uuid (FK → couples.id) | |
+| target_owner_id | uuid (FK → profiles.id) | 승인되면 소원권이 늘어날 사람 |
+| requested_by | uuid (FK → profiles.id) | 버튼을 누른 사람 |
+| status | text | `pending` / `approved` / `rejected` (check 제약), default `pending` |
+| resolved_by | uuid (FK → profiles.id, nullable) | 응답한 사람 |
+| resolved_at | timestamptz (nullable) | |
+| created_at | timestamptz | default now() |
+
+`target_owner_id`는 요청한 사람 자신일 수도("내 소원권 늘려줘"), 상대일 수도 있다("네 소원권
+늘려줄게"). 어느 쪽이든 **승인은 항상 요청하지 않은 다른 한 사람**이 한다 — 자기 요청을
+자기가 승인하면 승인이라는 절차가 없는 것과 같아진다.
+
+**쓰기 정책이 없다.** `pokes`와 같은 이유다: insert는 `public.request_wish_quota_add(p_target_owner_id)`가, update는 `public.resolve_wish_quota_request(p_request_id, p_approve)`가 한다(둘 다 security definer, 신원은 `auth.uid()`에서 직접 읽는다 — `claim_region_badge`와 같은 판단이라 `send_poke`와 달리 `authenticated`의 실행 권한을 회수하지 않는다). 클라이언트가 직접 넣을 수 있으면 "요청 없이 바로 승인된" row를 만들어 아래 트리거를 우회할 수 있다.
+
+대기 중인 요청은 `(couple_id, target_owner_id)`당 하나로 부분 유니크 인덱스(`where status = 'pending'`)가 막는다 — 버튼을 연달아 눌러도 목록이 늘어나지 않는다. 화면은 `status = 'pending'`인 것만 읽어온다(`listPendingWishQuotaRequests`) — **이미 승인·거절된 요청이 목록에서 사라지는 것**은 이 필터가 전부다, 별도로 지우지 않는다.
+
+**늘리는 걸 실제로 막는 건 트리거다.** 화면이 "추가 요청" 버튼만 보여주고 총 장수를 직접
+올리는 길을 두지 않는 것은 안내일 뿐이고, `wish_quotas`의 update RLS는 여전히 커플 범위
+전체다(줄이는 쪽은 계속 직접 할 수 있어야 하므로). 실제 차단은
+`check_wish_total_increase_requires_approval`(`before insert or update on wish_quotas`)이
+한다: 새 값이 기준값(기존 row가 있으면 그 `total`, 새로 만드는 row라면
+`wish_default_total()`)보다 크면서, 같은 트랜잭션에 `resolve_wish_quota_request`가 남긴
+표시(`set_config('wish.quota_request_approval', 'on', true)`)가 없으면 막는다. INSERT도
+검사 대상인 이유: 장수를 정한 적 없는 사람의 row를 처음부터 기본값보다 높게 만드는 것도
+승인 없는 늘림이기 때문이다.
+
+RLS는 select만 커플 범위다.
+
 ### 2.4 `memories` (추억 타임라인)
 
 | 컬럼 | 타입 | 설명 |
@@ -366,6 +404,7 @@ create policy "couple members can insert"
 - `memories(couple_id, latitude, longitude)` — 지도 조회 시 위치 있는 row만 필터링 (`where latitude is not null`)
 - `travel_visits`·`travel_region_photos`는 기본키 `(couple_id, region_code)`가 곧 조회 인덱스다 (§2.4.1, §2.4.3)
 - `wishes(couple_id, created_at desc)` — 목록(최신순), `wishes(couple_id, owner_id)` — 잔량 검사가 사람별로 센다. `wish_quotas`는 기본키 `(couple_id, owner_id)`가 곧 조회 인덱스다 (§2.3.4)
+- `wish_quota_requests(couple_id, target_owner_id) where status = 'pending'` unique — 대기 중인 요청 중복 방지 및 조회 인덱스 겸용. `wish_quota_requests(couple_id, created_at desc)` — 목록(최신순) (§2.3.4.1)
 - `couples(invite_code)` unique — 코드 조회 성능 및 중복 방지
 
 ## 6. 미결 사항

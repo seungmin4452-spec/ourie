@@ -22,6 +22,25 @@ export interface WishQuota {
 }
 
 /**
+ * 소원권 장수를 늘려달라는 요청 한 건.
+ *
+ * `target_owner_id`가 승인되면 늘어날 사람이고, `requested_by`가 버튼을 누른
+ * 사람이다 — 같을 수도("내 소원권 늘려줘"), 다를 수도 있다("네 소원권
+ * 늘려줄게"). 어느 쪽이든 요청하지 않은 다른 한 사람이 승인한다.
+ *
+ * 화면은 `status === 'pending'`인 것만 가져온다 — 이미 승인·거절된 요청은
+ * 목록에 남지 않는다.
+ */
+export interface WishQuotaRequest {
+  id: string
+  couple_id: string
+  target_owner_id: string
+  requested_by: string
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+}
+
+/**
  * 화면이 그리는 단위 — 한 사람의 현황 한 줄.
  *
  * `remaining`을 저장하지 않고 여기서 계산한다. DB도 같은 방식이라

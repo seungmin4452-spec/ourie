@@ -13,13 +13,22 @@ import { TextArea } from '@astryxdesign/core/TextArea'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation } from '@tanstack/react-query'
-import { Minus, Plus, Ticket } from 'lucide-react'
+import { Minus, Ticket } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import type { Partner } from '@/features/couple/api/partner'
-import { createWish, notifyWish, setWishTotal, type WishNotifyResult } from '../api/wish'
+import {
+  createWish,
+  notifyWish,
+  notifyWishQuotaRequest,
+  requestWishQuotaAdd,
+  resolveWishQuotaRequest,
+  setWishTotal,
+  WishError,
+  type WishNotifyResult,
+} from '../api/wish'
 import { wishDateLabel, wishOwnerName } from '../board'
-import { WISH_CONTENT_MAX, WISH_TOTAL_MAX, type Wish, type WishStatus } from '../types'
+import { WISH_CONTENT_MAX, type Wish, type WishQuotaRequest, type WishStatus } from '../types'
 import { WishMeter } from './WishMeter'
 
 /** 목록에서 접지 않고 바로 보여주는 최근 소원의 수. */
@@ -54,7 +63,9 @@ interface WishDialogProps {
   mine: WishStatus
   /** 커플이 아직 연결되지 않았으면 null. */
   theirs: WishStatus | null
-  /** 소원이나 장수가 바뀌었을 때 — 위젯의 현황판까지 같이 다시 읽는다. */
+  /** 아직 응답하지 않은 소원권 추가 요청 전부. 승인·거절된 것은 여기 없다. */
+  quotaRequests: WishQuotaRequest[]
+  /** 소원이나 장수, 요청이 바뀌었을 때 — 위젯의 현황판까지 같이 다시 읽는다. */
   onChanged: () => Promise<void>
 }
 
@@ -79,6 +90,7 @@ export function WishDialog({
   wishes,
   mine,
   theirs,
+  quotaRequests,
   onChanged,
 }: WishDialogProps) {
   const showToast = useToast()
@@ -134,6 +146,10 @@ export function WishDialog({
     creation.mutate()
   }
 
+  // 내가 응답해야 하는 요청(상대가 만든 요청)이 있으면 접어두지 않는다 —
+  // 알림을 놓쳤더라도 다이얼로그를 열자마자 보여야 승인/거절을 잊지 않는다.
+  const hasActionableRequest = quotaRequests.some((request) => request.requested_by !== userId)
+
   return (
     <Dialog isOpen={isOpen} onOpenChange={handleOpenChange} purpose="form" width={420}>
       <form onSubmit={handleSubmit}>
@@ -155,21 +171,20 @@ export function WishDialog({
                       찾는다 — "몇 장이지?"를 묻는 그 자리가 "몇 장으로 할까?"를
                       묻는 자리이기도 하다.
 
-                      접어두는 것은 그대로다. 어쩌다 한 번 정하는 것이라 펼쳐두면
-                      소원을 쓰러 올 때마다 숫자 두 칸이 길을 막는다. */}
+                      평소엔 접어둔다. 어쩌다 한 번 정하는 것이라 펼쳐두면 소원을
+                      쓰러 올 때마다 길을 막는다 — 다만 내가 응답해야 하는 요청이
+                      있으면 그건 예외다 (hasActionableRequest). */}
                   <Collapsible
-                    defaultIsOpen={false}
+                    defaultIsOpen={hasActionableRequest}
                     trigger={<Text weight="medium">소원권 장수 정하기</Text>}
                   >
-                    <WishTotalForm
-                      // 서버 값이 바뀌면(상대가 다른 기기에서 정했다) 새로
-                      // 시작한다. 아래 폼은 처음 받은 숫자를 자기 상태로 들고
-                      // 있어서, key가 없으면 낡은 숫자를 계속 보여준다.
-                      key={`${mine.total}-${theirs?.total ?? 0}`}
+                    <WishQuotaSection
                       coupleId={coupleId}
                       userId={userId}
                       mine={mine}
                       theirs={theirs}
+                      quotaRequests={quotaRequests}
+                      partnerName={partner?.name}
                       onChanged={onChanged}
                     />
                   </Collapsible>
@@ -290,134 +305,276 @@ function WishListItem({ wish, userId, partner }: WishListItemProps) {
   )
 }
 
-interface WishTotalFormProps {
+interface WishQuotaSectionProps {
   coupleId: string
   userId: string
   mine: WishStatus
   theirs: WishStatus | null
+  /** 아직 응답하지 않은 요청 전부 (couple 범위, status는 항상 pending). */
+  quotaRequests: WishQuotaRequest[]
+  partnerName: string | null | undefined
   onChanged: () => Promise<void>
 }
 
 /**
- * 두 사람의 총 장수를 정한다.
+ * 두 사람의 소원권 장수를 다룬다 — **줄이는 건 즉시, 늘리는 건 요청+승인**이다.
  *
- * 내 장수만이 아니라 상대의 장수도 여기서 정할 수 있다. 소원권은 "몇 장씩
- * 갖자"는 둘 사이의 약속이라, 각자 자기 것만 정할 수 있으면 그건 약속이
- * 아니라 자기 신고가 된다 (RLS도 커플 범위다).
- *
- * 저장 버튼이 따로 있는 이유: 숫자를 올릴 때마다 요청이 나가면 5장에서 12장으로
- * 가는 길에 일곱 번을 쓰게 된다. 바꾼 사람 몫만 골라 한 번에 보낸다.
+ * 줄이는 쪽에 상대의 동의가 필요 없는 이유: 자기 부담(상대에게 부탁받을 수
+ * 있는 최대치)을 스스로 줄이는 것뿐이라 약속을 깨는 일이 아니다. 반면 늘리는
+ * 쪽은 "앞으로 이만큼 더 부탁할 수 있다"는 새 약속이라, 상대가 모르는 새
+ * 조용히 늘어나면 안 된다 — DB도 승인 없는 늘림은 막는다
+ * (schema.sql의 check_wish_total_increase_requires_approval).
  */
-function WishTotalForm({ coupleId, userId, mine, theirs, onChanged }: WishTotalFormProps) {
-  const showToast = useToast()
-  const [myTotal, setMyTotal] = useState(mine.total)
-  const [theirTotal, setTheirTotal] = useState(theirs?.total ?? 0)
-
-  const isDirty = myTotal !== mine.total || (theirs != null && theirTotal !== theirs.total)
-
-  const save = useMutation({
-    mutationFn: async () => {
-      if (myTotal !== mine.total) {
-        await setWishTotal(coupleId, mine.ownerId, userId, myTotal)
-      }
-      if (theirs != null && theirTotal !== theirs.total) {
-        await setWishTotal(coupleId, theirs.ownerId, userId, theirTotal)
-      }
-    },
-    onSuccess: async () => {
-      await onChanged()
-      showToast({ type: 'info', body: '소원권 장수를 정했어요.' })
-    },
-    onError: async (error) => {
-      showToast({
-        type: 'error',
-        body: error instanceof Error ? error.message : '장수를 정하지 못했어요.',
-      })
-      // 한쪽만 저장되고 다른 쪽이 막혔을 수 있다. 서버 값으로 되돌려 화면에
-      // 실제 상태가 남게 한다.
-      await onChanged()
-      setMyTotal(mine.total)
-      setTheirTotal(theirs?.total ?? 0)
-    },
-  })
-
+function WishQuotaSection({
+  coupleId,
+  userId,
+  mine,
+  theirs,
+  quotaRequests,
+  partnerName,
+  onChanged,
+}: WishQuotaSectionProps) {
   return (
-    <VStack gap={3}>
-      <WishTotalStepper status={mine} value={myTotal} onChange={setMyTotal} />
-      {theirs && (
-        <WishTotalStepper status={theirs} value={theirTotal} onChange={setTheirTotal} />
-      )}
+    <VStack gap={4}>
+      <VStack gap={3}>
+        <WishQuotaRow
+          coupleId={coupleId}
+          userId={userId}
+          status={mine}
+          hasPendingRequest={quotaRequests.some(
+            (request) => request.target_owner_id === mine.ownerId,
+          )}
+          onChanged={onChanged}
+        />
+        {theirs && (
+          <WishQuotaRow
+            coupleId={coupleId}
+            userId={userId}
+            status={theirs}
+            hasPendingRequest={quotaRequests.some(
+              (request) => request.target_owner_id === theirs.ownerId,
+            )}
+            onChanged={onChanged}
+          />
+        )}
+      </VStack>
 
-      {/* 바깥 form의 submit이 되지 않도록 type을 못 박는다 — 그쪽은 소원을 쓴다. */}
-      <Button
-        type="button"
-        label="장수 저장"
-        variant="secondary"
-        width="100%"
-        isDisabled={!isDirty}
-        isLoading={save.isPending}
-        onClick={() => save.mutate()}
+      <WishQuotaRequestList
+        requests={quotaRequests}
+        userId={userId}
+        partnerName={partnerName}
+        onChanged={onChanged}
       />
     </VStack>
   )
 }
 
-interface WishTotalStepperProps {
+interface WishQuotaRowProps {
+  coupleId: string
+  userId: string
   status: WishStatus
-  value: number
-  onChange: (next: number) => void
+  /** 이 사람 앞으로 이미 대기 중인 요청이 있으면 추가 요청 버튼을 잠근다 —
+      DB의 부분 유니크 인덱스가 어차피 막지만, 눌러보고 에러를 보는 것보다
+      버튼이 미리 잠기는 편이 낫다. */
+  hasPendingRequest: boolean
+  onChanged: () => Promise<void>
 }
 
-/**
- * 한 사람의 장수를 −/+ 버튼으로 정한다.
- *
- * 숫자 입력칸이 아닌 이유: 여기서 바뀌는 값은 대개 한두 장이고, 모바일에서
- * 숫자칸을 누르면 키보드가 올라와 다이얼로그의 절반을 덮는다. 눌러서 세는
- * 쪽이 "소원권을 한 장 더 준다"는 행동에도 더 가깝다.
- *
- * 아래로는 **이미 쓴 장수**가 바닥이다. DB도 같은 것을 막지만
- * (check_wish_total), 눌러보고 에러를 보는 것보다 버튼이 잠기는 편이 낫다.
- */
-function WishTotalStepper({ status, value, onChange }: WishTotalStepperProps) {
-  const canDecrease = value > status.used
-  const canIncrease = value < WISH_TOTAL_MAX
+/** 한 사람의 장수 한 줄 — 줄이는 버튼과 "추가 요청" 버튼. */
+function WishQuotaRow({ coupleId, userId, status, hasPendingRequest, onChanged }: WishQuotaRowProps) {
+  const showToast = useToast()
+  const canDecrease = status.total > status.used
+
+  // 줄이는 쪽은 누르면 바로 반영한다. 알릴 상대도, 지킬 약속도 없는 즉시
+  // 반영이라 늘리는 쪽처럼 여러 번 눌러 모았다가 한 번에 보낼 이유가 없다.
+  const decrease = useMutation({
+    mutationFn: () => setWishTotal(coupleId, status.ownerId, userId, status.total - 1),
+    onSuccess: onChanged,
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof Error ? error.message : '장수를 줄이지 못했어요.',
+      })
+      void onChanged()
+    },
+  })
+
+  // 요청을 만든 뒤 상대에게 알린다. 알림은 던지지 않으므로(notifyWishQuotaRequest)
+  // 여기까지 오면 요청은 이미 저장된 것이다 (creation 뮤테이션과 같은 모양).
+  const request = useMutation({
+    mutationFn: async () => {
+      const row = await requestWishQuotaAdd(status.ownerId)
+      return notifyWishQuotaRequest(row.id)
+    },
+    onSuccess: async (notified) => {
+      await onChanged()
+      showToast({
+        type: 'info',
+        body:
+          notified.delivered > 0
+            ? `${status.name}의 소원권 추가를 요청했어요. 상대방에게 전했어요.`
+            : `${status.name}의 소원권 추가를 요청했어요. 다만 상대방 기기에 닿지 않았어요.`,
+      })
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof WishError ? error.message : '요청을 보내지 못했어요.',
+      })
+      void onChanged()
+    },
+  })
 
   return (
     <HStack gap={2} hAlign="between" vAlign="center">
       <VStack gap={0}>
         <Text weight="medium">{status.name}의 소원권</Text>
-        {status.used > 0 && (
-          <Text type="supporting">이미 {status.used}장을 썼어요</Text>
-        )}
+        <Text type="supporting">
+          {status.total}장{status.used > 0 ? ` · 이미 ${status.used}장을 썼어요` : ''}
+        </Text>
       </VStack>
 
-      <HStack gap={1} vAlign="center">
+      <HStack gap={2} vAlign="center">
         <IconButton
           label={`${status.name}의 소원권 한 장 줄이기`}
           tooltip={canDecrease ? '한 장 줄이기' : '이미 쓴 장수보다 줄일 수 없어요'}
           variant="secondary"
           size="sm"
           icon={<Minus className="size-4" />}
-          isDisabled={!canDecrease}
-          onClick={() => onChange(value - 1)}
+          isDisabled={!canDecrease || decrease.isPending}
+          onClick={() => decrease.mutate()}
         />
-        {/* 숫자 자리를 고정한다. 폭이 내용에 따라 변하면 −/+ 버튼이 5장과
-            12장 사이를 오갈 때마다 좌우로 흔들려 연달아 누르기 어렵다. */}
-        <HStack width={52} hAlign="center">
-          <Text weight="semibold" hasTabularNumbers>
-            {value}장
-          </Text>
-        </HStack>
-        <IconButton
-          label={`${status.name}의 소원권 한 장 늘리기`}
-          tooltip={canIncrease ? '한 장 늘리기' : `${WISH_TOTAL_MAX}장까지 정할 수 있어요`}
+        <Button
+          type="button"
+          label={hasPendingRequest ? `${status.name}의 소원권 추가 요청 중` : `${status.name}의 소원권 추가 요청`}
           variant="secondary"
           size="sm"
-          icon={<Plus className="size-4" />}
-          isDisabled={!canIncrease}
-          onClick={() => onChange(value + 1)}
+          isDisabled={hasPendingRequest}
+          isLoading={request.isPending}
+          onClick={() => request.mutate()}
         />
       </HStack>
     </HStack>
+  )
+}
+
+interface WishQuotaRequestListProps {
+  requests: WishQuotaRequest[]
+  userId: string
+  partnerName: string | null | undefined
+  onChanged: () => Promise<void>
+}
+
+/**
+ * 아직 응답하지 않은 소원권 추가 요청 목록 — 추가 요청 버튼 바로 아래다.
+ *
+ * `requests`는 애초에 `status = 'pending'`만 읽어온 것이라
+ * (listPendingWishQuotaRequests) 이미 승인·거절된 요청은 여기 올 일이 없다 —
+ * 화면이 따로 걸러낼 필요가 없다.
+ */
+function WishQuotaRequestList({ requests, userId, partnerName, onChanged }: WishQuotaRequestListProps) {
+  if (requests.length === 0) {
+    return (
+      <EmptyState
+        isCompact
+        title="대기 중인 요청이 없어요"
+        description="추가 요청을 보내면 여기 뜨고, 상대방이 응답하면 사라져요."
+      />
+    )
+  }
+
+  return (
+    <VStack gap={2}>
+      <Text weight="medium">소원권 추가 요청</Text>
+      <List hasDividers>
+        {requests.map((request) => (
+          <WishQuotaRequestListItem
+            key={request.id}
+            request={request}
+            userId={userId}
+            partnerName={partnerName}
+            onChanged={onChanged}
+          />
+        ))}
+      </List>
+    </VStack>
+  )
+}
+
+interface WishQuotaRequestListItemProps {
+  request: WishQuotaRequest
+  userId: string
+  partnerName: string | null | undefined
+  onChanged: () => Promise<void>
+}
+
+/**
+ * 요청 한 줄.
+ *
+ * 내가 응답해야 하는 요청(상대가 만든 것)에만 승인/거절 버튼이 붙는다 — 내가
+ * 만든 요청은 상대의 응답을 기다리는 중이라는 말만 보여준다.
+ * resolve_wish_quota_request가 요청한 사람의 응답 자체를 막으므로 버튼을
+ * 보여줘도 눌러지지 않는데, 그럴 바엔 처음부터 안 보이는 편이 낫다.
+ */
+function WishQuotaRequestListItem({
+  request,
+  userId,
+  partnerName,
+  onChanged,
+}: WishQuotaRequestListItemProps) {
+  const showToast = useToast()
+  const isMine = request.requested_by === userId
+  const requesterLabel = wishOwnerName(request.requested_by, userId, partnerName)
+  const targetLabel = wishOwnerName(request.target_owner_id, userId, partnerName)
+
+  const label =
+    request.target_owner_id === request.requested_by
+      ? `${requesterLabel}의 소원권을 1장 늘려달라는 요청`
+      : `${requesterLabel}이 ${targetLabel}의 소원권을 1장 늘려주겠다는 요청`
+
+  const resolve = useMutation({
+    mutationFn: (approve: boolean) => resolveWishQuotaRequest(request.id, approve),
+    onSuccess: async (_row, approve) => {
+      await onChanged()
+      showToast({ type: 'info', body: approve ? '요청을 승인했어요.' : '요청을 거절했어요.' })
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof WishError ? error.message : '응답하지 못했어요.',
+      })
+      void onChanged()
+    },
+  })
+
+  return (
+    <ListItem
+      label={label}
+      description={
+        isMine ? '상대방의 응답을 기다리는 중이에요.' : wishDateLabel(request.created_at)
+      }
+      endContent={
+        isMine ? undefined : (
+          <HStack gap={2}>
+            <Button
+              type="button"
+              label="거절"
+              variant="secondary"
+              size="sm"
+              isDisabled={resolve.isPending}
+              onClick={() => resolve.mutate(false)}
+            />
+            <Button
+              type="button"
+              label="승인"
+              variant="primary"
+              size="sm"
+              isDisabled={resolve.isPending}
+              onClick={() => resolve.mutate(true)}
+            />
+          </HStack>
+        )
+      }
+    />
   )
 }

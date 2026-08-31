@@ -55,3 +55,31 @@ export function buildWishNotification(
     renotify: true,
   }
 }
+
+/**
+ * 소원권 추가 요청이 왔을 때 상대방(=승인해야 하는 사람) 기기에 뜰 알림.
+ *
+ * 늘어날 사람이 요청한 사람 자신인지 아닌지에 따라 문구가 갈린다 — 전자는
+ * "나 좀 늘려줘"고 후자는 "너 늘려줄게"라, 같은 문장으로 뭉치면 누가 늘고
+ * 누가 부탁하는 건지 알림만 보고는 알 수 없다.
+ */
+export function buildWishQuotaRequestNotification(
+  requestId: string,
+  /** 요청을 만든 사람의 `profiles.name`. `app_name`이 아니다. */
+  requesterName: string | null | undefined,
+  /** target_owner_id === requested_by — 요청한 사람 자신의 소원권이 느는가. */
+  isForRequesterThemself: boolean,
+): WishNotification {
+  const name = wishNameLabel(requesterName)
+  const body = isForRequesterThemself
+    ? `${name}이 자신의 소원권을 1장 늘려달라고 요청했어요. 앱에서 승인하거나 거절할 수 있어요.`
+    : `${name}이 내 소원권을 1장 늘려주겠다고 요청했어요. 앱에서 승인하거나 거절할 수 있어요.`
+
+  return {
+    title: `${name}이 소원권 추가를 요청했어요`,
+    body,
+    // 요청마다 tag가 달라야 서로를 덮지 않는다 (buildWishNotification과 같은 이유).
+    tag: `ourie-wish-quota-request-${requestId}`,
+    renotify: true,
+  }
+}

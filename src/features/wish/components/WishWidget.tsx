@@ -42,7 +42,7 @@ export function WishWidget({ profile, isCompact }: WishWidgetProps) {
 
   const coupleId = profile?.couple_id
   const { data: partner } = usePartner(profile)
-  const { wishes, quotas, isLoading, refresh } = useWishBoard(coupleId)
+  const { wishes, quotas, quotaRequests, isLoading, refresh } = useWishBoard(coupleId)
 
   // 소원권은 둘 사이의 약속이라 혼자서는 성립하지 않는다. 커플이 없으면
   // RLS도 쓰기를 막으므로, 빈 현황판을 보여주는 대신 이유를 적는다.
@@ -122,6 +122,7 @@ export function WishWidget({ profile, isCompact }: WishWidgetProps) {
         wishes={wishes}
         mine={mine}
         theirs={theirs}
+        quotaRequests={quotaRequests}
         onChanged={refresh}
       />
     </VStack>
