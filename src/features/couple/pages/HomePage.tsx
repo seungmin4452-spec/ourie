@@ -299,7 +299,7 @@ export function HomePage() {
             onClick={() => navigate('/me')}
           />
           <Button
-            label="연간 결산"
+            label="결산"
             variant="secondary"
             width="100%"
             icon={<Sparkles className="size-4" />}

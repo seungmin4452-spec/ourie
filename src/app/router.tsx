@@ -65,7 +65,7 @@ export const router = createBrowserRouter(
           ),
         },
         {
-          // 연간 결산도 커플 데이터라서 홈과 같은 온보딩 관문을 지난다.
+          // 결산도 커플 데이터라서 홈과 같은 온보딩 관문을 지난다.
           path: '/recap',
           element: (
             <RequireAuth>

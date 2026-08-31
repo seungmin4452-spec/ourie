@@ -23,7 +23,7 @@ export interface PokeSendResult {
   delivered: number
 }
 
-/** 콕 찌르기 한 번의 기록. 지금은 연간 결산이 횟수를 세는 데만 쓴다 — 문구를
+/** 콕 찌르기 한 번의 기록. 지금은 결산이 횟수를 세는 데만 쓴다 — 문구를
  * 보여주는 화면은 아직 없다 (DATABASE.md §2.3.3). */
 export interface PokeRecord {
   sender_id: string

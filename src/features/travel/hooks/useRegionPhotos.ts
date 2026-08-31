@@ -79,7 +79,7 @@ export function travelRegionPhotoDatesQueryKey(coupleId: string | null | undefin
   return ['travel-region-photo-dates', coupleId] as const
 }
 
-/** 지역마다 사진을 마지막으로 건/바꾼 시각. 연간 결산의 유일한 사용처다. */
+/** 지역마다 사진을 마지막으로 건/바꾼 시각. 결산의 유일한 사용처다. */
 export function useRegionPhotoDates(coupleId: string | null | undefined) {
   return useQuery({
     queryKey: travelRegionPhotoDatesQueryKey(coupleId),

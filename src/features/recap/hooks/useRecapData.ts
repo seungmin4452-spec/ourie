@@ -11,7 +11,7 @@ export function coupleCreatedAtQueryKey(coupleId: string | null | undefined) {
 }
 
 /**
- * 연간 결산이 필요로 하는 모든 데이터. 화면마다 흩어진 훅을 한 자리에
+ * 결산이 필요로 하는 모든 데이터. 화면마다 흩어진 훅을 한 자리에
  * 모으기만 한다 — 각 훅은 이미 자기 캐시 키로 다른 화면과 공유되므로, 결산
  * 화면을 연다고 같은 데이터를 두 번 받지 않는다.
  */
