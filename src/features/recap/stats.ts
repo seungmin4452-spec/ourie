@@ -69,7 +69,7 @@ export function computeRecap(input: RecapInput): RecapCounts {
 
   const yearEvents = calendarEvents.filter((event) => yearOfDateKey(event.event_date) === year)
   const yearVisits = knownVisits.filter((visit) => yearOfTimestamp(visit.created_at) === year)
-  const yearPhotos = knownPhotoDates.filter((photo) => yearOfTimestamp(photo.updated_at) === year)
+  const yearPhotos = knownPhotoDates.filter((photo) => yearOfTimestamp(photo.created_at) === year)
   const yearBadges = travelBadges.filter((badge) => yearOfTimestamp(badge.earned_at) === year)
   const yearWishes = wishes.filter((wish) => yearOfTimestamp(wish.created_at) === year)
   const yearPokes = pokes.filter((poke) => yearOfTimestamp(poke.created_at) === year)

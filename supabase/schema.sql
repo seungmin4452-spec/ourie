@@ -382,6 +382,13 @@ create table public.travel_region_photos (
   photo_path text not null,
   updated_by uuid references public.profiles (id) on delete set null,
   updated_at timestamptz not null default now(),
+  -- 이 지역에 **처음** 사진을 건 시각. updated_at과 달리 사진을 바꿔 끼워도
+  -- 그대로다 — setRegionPhoto의 upsert가 이 컬럼을 SET 목록에 넣지 않기
+  -- 때문에, INSERT일 때만 기본값(now())이 들어가고 그 뒤로는 몇 번을 바꿔도
+  -- 건드려지지 않는다. 연간 결산(src/features/recap)이 "이 해에 새로 채운
+  -- 곳"을 셀 때 이 값을 본다 — updated_at을 쓰면 이미 채운 지역의 사진을
+  -- 다른 해에 바꿔 끼울 때마다 "새로 채운 곳"으로 다시 잡힌다.
+  created_at timestamptz not null default now(),
 
   -- 한 지역에 한 장. 새로 올리면 갈아 끼우는 것이지 쌓이는 게 아니다.
   -- 위젯은 커플의 사진을 통째로 읽는데, 선두 컬럼이 couple_id인 이 기본키

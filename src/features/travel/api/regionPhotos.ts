@@ -40,21 +40,23 @@ interface RegionPhotoRow {
   photo_path: string
 }
 
-/** 지역 한 곳에 사진을 마지막으로 걸거나 바꾼 시각. */
+/** 지역 한 곳에 **처음** 사진을 건 시각. 그 뒤로 사진을 바꿔도 그대로다
+ * (schema.sql의 travel_region_photos.created_at 주석 참고). */
 export interface RegionPhotoDate {
   region_code: string
-  updated_at: string
+  created_at: string
 }
 
 /**
- * 지역별 사진의 마지막 갱신 시각만. 연간 결산이 "이 해에 몇 칸을 채웠나"를
- * 세는 데만 쓰므로, 서명 URL을 받는 `listRegionPhotoUrls`의 캐시·서명 왕복을
- * 거치지 않는다.
+ * 지역별 사진의 최초 게시 시각만. 연간 결산이 "이 해에 몇 칸을 **새로**
+ * 채웠나"를 세는 데만 쓴다 — updated_at을 썼다면 이미 채운 지역의 사진을
+ * 다른 해에 바꿔 끼울 때마다 그 해에도 "새로 채운 곳"으로 다시 잡힌다.
+ * 서명 URL을 받는 `listRegionPhotoUrls`의 캐시·서명 왕복도 거치지 않는다.
  */
 export async function listRegionPhotoDates(coupleId: string): Promise<RegionPhotoDate[]> {
   const { data, error } = await supabase
     .from('travel_region_photos')
-    .select('region_code, updated_at')
+    .select('region_code, created_at')
     .eq('couple_id', coupleId)
   if (error) throw error
   return data ?? []

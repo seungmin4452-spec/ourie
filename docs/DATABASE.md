@@ -299,10 +299,16 @@ RLS는 select만 커플 범위다.
 | photo_path | text | `travel-maps` 버킷의 `{couple_id}/regions/...`. **공개 URL이 아니다** |
 | updated_by | uuid (FK → profiles.id, on delete set null) | |
 | updated_at | timestamptz | default now() |
+| created_at | timestamptz | default now(). **이 지역에 처음 사진을 건 시각** — 그 뒤로 몇 번을 바꿔도 그대로다 |
 
 기본키가 `(couple_id, region_code)`다 — **한 지역에 한 장**이라, 새로 올리는 것은 쌓는 게
 아니라 갈아 끼우는 것이다(`upsert` + 이전 파일 삭제). 조회 인덱스를 따로 두지 않는 이유는
 `travel_visits`와 같다.
+
+`created_at`이 `updated_at`과 따로 있는 이유는 연간 결산(`src/features/recap`)이 "이 해에
+**새로** 채운 곳"을 세야 하기 때문이다. `setRegionPhoto`의 upsert가 이 컬럼을 SET 목록에
+넣지 않으므로, INSERT일 때만 기본값이 들어가고 그 뒤로는 `on conflict do update`가 건드리지
+않는다 — 사진을 갈아 끼운 해에도 "새로 채운 곳"으로 다시 잡히는 일이 없다.
 
 `travel_maps`에 컬럼을 붙이지 않은 이유: 그건 커플당 한 줄(1:1)이고 이건 커플 × 지역이다.
 `travel_visits`와 잇지 않은 이유: "사진을 걸었다"와 "다녀왔다"는 사용자가 따로 하는 말이라,
