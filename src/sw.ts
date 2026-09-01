@@ -7,7 +7,21 @@ declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<PrecacheEntry | string>
 }
 
-precacheAndRoute(self.__WB_MANIFEST)
+// index.html은 프리캐시 라우팅 후보에서 뺀다. 워크박스가 그대로 등록하면
+// "/"(navigate) 요청마다 자기 라우트가 디렉토리 인덱스 규칙으로 그 엔트리에
+// 먼저 매칭돼 event.respondWith()를 선점해버린다 -- 아래 fetch 리스너가 같은
+// 이벤트에 다시 respondWith()를 걸어도 이미 늦어 무시된다. 그 결과 "/"만은
+// personalizeNavigation을 한 번도 못 거치고 빌드 시점의 정적 index.html(기본
+// 아이콘을 가리키는 /manifest.webmanifest)이 그대로 나갔다 -- 안드로이드가
+// start_url("/")에서 매니페스트를 주기적으로 다시 읽을 때마다 커플 사진이
+// 아니라 기본 로고를 보게 되던 원인이 이거였다. 나머지 자산의 프리캐시는
+// 그대로 두고 이 엔트리 하나만 라우팅에서 제외한다.
+precacheAndRoute(
+  self.__WB_MANIFEST.filter((entry) => {
+    const url = typeof entry === 'string' ? entry : entry.url
+    return url !== 'index.html'
+  }),
+)
 
 // 새 서비스워커는 원래 "자기가 담당할 화면이 전부 닫힐 때까지" 대기한다. 홈
 // 화면 앱에서 그 조건은 앱 스위처에서 완전히 밀어 종료하는 것이라, 배포를
