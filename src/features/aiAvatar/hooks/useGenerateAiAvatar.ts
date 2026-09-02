@@ -27,15 +27,20 @@ import { usePuterTokens } from './usePuterTokens'
 const PUTER_DRIVER_ENDPOINT = 'https://api.puter.com/drivers/call'
 
 /**
- * Puter가 부르는 이름은 "나노바나나"지만, 라우팅은 우리가 직접 짠다 — 위
- * 이유로 SDK의 모델→드라이버 매핑(node_modules/@heyputer/puter.js/src/
- * modules/AI.js의 txt2img)도 더는 거치지 않기 때문이다. 그 매핑을 그대로
- * 옮기면: model이 "gemini-2.5-flash-image-preview"일 때만 driver가
- * "gemini-image-generation"이고, 그 외(나노바나나 프로/2 포함)엔 매핑이
- * 없어 엉뚱한 driver("openai-image-generation")로 빠진다. 그래서 이 모델
- * 문자열과 DRIVER_NAME은 항상 짝을 맞춰야 한다.
+ * 나노바나나 **프로**(Gemini 3 Pro Image)로 부른다.
+ *
+ * SDK의 낡은 모델→드라이버 매핑(node_modules/@heyputer/puter.js/src/
+ * modules/AI.js의 txt2img)은 "gemini-2.5-flash-image-preview"(원조
+ * 나노바나나)만 알아서, 처음엔 그 모델로 시작했다. 그런데 SDK를 아예 안
+ * 거치고 우리가 직접 `/drivers/call`을 부르는 지금은 그 매핑에 매일
+ * 이유가 없다 — driver는 모델 버전과 무관하게 "gemini-image-generation"
+ * 하나로 같을 것으로 보고(같은 Google 이미지 생성 드라이버가 model 필드로
+ * 버전을 구분하는 구조로 추정), 모델만 프로로 올렸다. 실제 결과 품질이
+ * 원조보다 나아서 바꿨다 — 프로는 나노바나나 계열 중 정지브리·픽사 같은
+ * 스타일 트랜스퍼에 특히 강하다는 평가가 있다. 드라이버 이름이 실제로
+ * 다르면 에러 메시지(callPuterImageGeneration)에 그대로 나타난다.
  */
-const MODEL = 'gemini-2.5-flash-image-preview'
+const MODEL = 'gemini-3-pro-image-preview'
 const DRIVER_INTERFACE = 'puter-image-generation'
 const DRIVER_NAME = 'gemini-image-generation'
 const DRIVER_METHOD = 'generate'
