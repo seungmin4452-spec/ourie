@@ -47,12 +47,8 @@ Do not make the character overly cartoonish.
 The final image should feel like a carefully hand-painted frame from a beautiful Japanese animated feature film while remaining clearly recognizable as the person in the original photo.`,
   },
   {
-    // id는 'pixar'로 남겨둔다 — 이미 만들어진 기록의 theme_id가 이 값을
-    // 그대로 참조하고 있어서, 여기서 바꾸면 예전 기록의 제목이 "아바타"로
-    // 떨어진다(findAiAvatarTheme이 못 찾음). 화면에 보이는 이름(title)만
-    // "디즈니"로 바꾼다.
     id: 'pixar',
-    title: '디즈니',
+    title: '픽사',
     prompt: `Transform the uploaded photo into a high-quality Disney-inspired animated movie character portrait.
 
 Preserve the identity and recognizable characteristics of the person in the original photo, including:
@@ -74,38 +70,6 @@ Do not change the person's age, gender, hairstyle, or clothing unnecessarily.
 Do not distort the face or create unnatural facial features.
 
 The final image should look like a professionally produced animated movie character while still clearly resembling the person in the uploaded photo.`,
-  },
-  {
-    id: 'spring',
-    title: '우리들의 봄',
-    prompt:
-      '이 사진 속 사람(들)을 따뜻한 봄 분위기의 일러스트로 바꿔줘. 벚꽃이 흩날리는 ' +
-      '배경과 화사한 파스텔톤으로 채우되, 원래 사진 속 사람들의 얼굴과 표정은 그대로 ' +
-      '알아볼 수 있게 유지해줘.',
-  },
-  {
-    id: 'summer',
-    title: '우리들의 여름',
-    prompt:
-      '이 사진 속 사람(들)을 싱그러운 여름 분위기의 일러스트로 바꿔줘. 푸른 하늘과 ' +
-      '초록빛, 시원한 여름 햇살이 느껴지는 배경으로 채우되, 원래 사진 속 사람들의 ' +
-      '얼굴과 표정은 그대로 알아볼 수 있게 유지해줘.',
-  },
-  {
-    id: 'autumn',
-    title: '우리들의 가을',
-    prompt:
-      '이 사진 속 사람(들)을 포근한 가을 분위기의 일러스트로 바꿔줘. 노랗고 붉게 ' +
-      '물든 단풍이 있는 배경과 따뜻한 색감으로 채우되, 원래 사진 속 사람들의 얼굴과 ' +
-      '표정은 그대로 알아볼 수 있게 유지해줘.',
-  },
-  {
-    id: 'winter',
-    title: '우리들의 겨울',
-    prompt:
-      '이 사진 속 사람(들)을 아늑한 겨울 분위기의 일러스트로 바꿔줘. 하얀 눈이 ' +
-      '내리는 배경과 따뜻한 조명이 느껴지는 색감으로 채우되, 원래 사진 속 사람들의 ' +
-      '얼굴과 표정은 그대로 알아볼 수 있게 유지해줘.',
   },
 ] as const
 
