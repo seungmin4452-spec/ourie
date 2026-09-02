@@ -3,11 +3,12 @@ import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
+import { IconButton } from '@astryxdesign/core/IconButton'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
-import { Sparkles } from 'lucide-react'
+import { Download, Sparkles } from 'lucide-react'
 import { useRef, useState, type ChangeEvent } from 'react'
 
 import type { AiAvatarGenerationWithUrl } from '../api/aiAvatar'
@@ -141,22 +142,79 @@ function dateLabel(createdAt: string): string {
   return new Date(createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
 }
 
+/**
+ * 신호 URL이 가리키는 이미지를 실제로 폰에 남긴다.
+ *
+ * `<a download>`을 안 쓰는 이유: Storage 서명 URL은 다른 origin이라, iOS
+ * Safari/PWA는 `download` 속성을 무시하고 그냥 이미지를 새 탭에 열어버린다
+ * (그러면 "사진 앱에 저장"까지 가려면 사용자가 직접 길게 눌러야 한다). Web
+ * Share API로 파일 자체를 공유 시트에 넘기면, 그 시트의 "이미지 저장"이
+ * 갤러리/사진 앱에 바로 남겨준다 — 안드로이드 크롬도 같은 시트를 띄운다.
+ * `navigator.share`가 없는 경우(데스크톱 등)만 `<a download>`으로 대체한다.
+ */
+async function saveAiAvatarToDevice(url: string, fileName: string): Promise<void> {
+  const response = await fetch(url)
+  const blob = await response.blob()
+  const file = new File([blob], fileName, { type: blob.type || 'image/png' })
+
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] })
+    } catch {
+      // 사용자가 공유 시트를 닫았을 뿐 — 에러가 아니다 (InviteCodeCard와 같은 판단).
+    }
+    return
+  }
+
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
 function AiAvatarThumbnail({ generation }: { generation: AiAvatarGenerationWithUrl }) {
+  const showToast = useToast()
   const theme = findAiAvatarTheme(generation.theme_id)
+  const [isSaving, setIsSaving] = useState(false)
+
+  async function handleSave() {
+    if (!generation.url) return
+    setIsSaving(true)
+    try {
+      await saveAiAvatarToDevice(generation.url, `ourie-ai-avatar-${generation.id}.png`)
+    } catch {
+      showToast({ type: 'error', body: '이미지를 저장하지 못했어요.' })
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
-    <HStack gap={3} vAlign="center">
-      {generation.url && (
-        <img
-          src={generation.url}
-          alt=""
-          className="size-16 shrink-0 rounded-md border border-border object-cover"
-        />
-      )}
-      <VStack gap={0}>
-        <Text weight="medium">{theme?.title ?? '아바타'}</Text>
-        <Text type="supporting">{dateLabel(generation.created_at)}</Text>
-      </VStack>
+    <HStack gap={2} hAlign="between" vAlign="center">
+      <HStack gap={3} vAlign="center">
+        {generation.url && (
+          <img
+            src={generation.url}
+            alt=""
+            className="size-16 shrink-0 rounded-md border border-border object-cover"
+          />
+        )}
+        <VStack gap={0}>
+          <Text weight="medium">{theme?.title ?? '아바타'}</Text>
+          <Text type="supporting">{dateLabel(generation.created_at)}</Text>
+        </VStack>
+      </HStack>
+
+      <IconButton
+        label="폰에 저장"
+        tooltip="폰에 저장"
+        variant="secondary"
+        size="sm"
+        icon={<Download className="size-4" />}
+        isDisabled={!generation.url || isSaving}
+        onClick={handleSave}
+      />
     </HStack>
   )
 }
