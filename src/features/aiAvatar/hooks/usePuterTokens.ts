@@ -9,9 +9,12 @@ import { supabase } from '@/lib/supabase'
 const TOKEN_FETCH_TIMEOUT_MS = 15 * 1000
 
 /**
- * 공용 Puter 계정의 개인 액세스 토큰을 서버(api/puter-token.ts)에서 받아온다.
+ * 공용 Puter 계정들의 개인 액세스 토큰을 서버(api/puter-token.ts)에서
+ * 순서대로 받아온다 — 계정 하나(월 1,000 크레딧)로는 금방 바닥나서 여러
+ * 계정을 두고, 앞 계정이 소진되면 다음 걸로 넘어가게 한다(useGenerateAiAvatar.ts
+ * 참고). 목록의 순서가 곧 시도 순서다.
  *
- * 이 토큰을 클라이언트 번들에 정적으로 박아두지 않는 이유: 빌드된 JS 파일은
+ * 이 토큰들을 클라이언트 번들에 정적으로 박아두지 않는 이유: 빌드된 JS 파일은
  * 로그인 여부와 무관하게 그 URL에 접속하는 누구나 받아볼 수 있는 정적
  * 자산이다. 로그인한 사용자에게만 내려주면 최소한 우리 앱 사용자 범위로는
  * 좁혀진다 (api/puter-token.ts 머리말 참고).
@@ -19,9 +22,9 @@ const TOKEN_FETCH_TIMEOUT_MS = 15 * 1000
  * staleTime을 길게 잡는 이유: 토큰은 자주 바뀌는 값이 아니라서, 아바타를 만들
  * 때마다 매번 새로 받으면 왕복만 하나 늘어난다.
  */
-export function usePuterToken() {
+export function usePuterTokens() {
   return useQuery({
-    queryKey: ['puter-token'],
+    queryKey: ['puter-tokens'],
     queryFn: async () => {
       const { data } = await supabase.auth.getSession()
       const accessToken = data.session?.access_token
@@ -36,8 +39,8 @@ export function usePuterToken() {
         })
         if (!response.ok) throw new Error('Puter 인증에 실패했어요.')
 
-        const payload = (await response.json()) as { token: string }
-        return payload.token
+        const payload = (await response.json()) as { tokens: string[] }
+        return payload.tokens
       } finally {
         clearTimeout(timer)
       }

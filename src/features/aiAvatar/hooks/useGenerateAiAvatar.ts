@@ -5,7 +5,7 @@ import { downscaleImage } from '@/lib/image'
 import { saveAiAvatarGeneration } from '../api/aiAvatar'
 import type { AiAvatarTheme } from '../themes'
 import { withTimeout } from '../withTimeout'
-import { usePuterToken } from './usePuterToken'
+import { usePuterTokens } from './usePuterTokens'
 
 /**
  * Puter의 드라이버 호출 엔드포인트. `@heyputer/puter.js`(1.0.1)의
@@ -180,6 +180,38 @@ async function callPuterImageGeneration(
 }
 
 /**
+ * 계정 하나(월 1,000 크레딧)로는 금방 바닥나서, 여러 공용 계정을 순서대로
+ * 두고 앞 계정이 실패하면 다음 계정으로 넘어간다. 실패 사유를 크레딧 소진과
+ * 그 외로 구분하지 않는 이유: Puter가 "크레딧 부족"을 어떤 모양으로
+ * 돌려주는지 아직 확인된 바가 없다 — 대신 어떤 이유로든 실패하면 다음
+ * 계정으로 넘어가고, 마지막 계정까지 다 실패했을 때만 그 에러를 보여준다.
+ * 토큰 목록의 순서가 곧 시도 순서다(api/puter-token.ts 참고).
+ */
+async function callPuterImageGenerationWithFallback(
+  tokens: string[],
+  args: Record<string, unknown>,
+): Promise<Blob> {
+  let lastError: unknown = null
+
+  for (let index = 0; index < tokens.length; index++) {
+    try {
+      const blob = await callPuterImageGeneration(tokens[index], args)
+      if (index > 0) {
+        console.log(`[ai-avatar] ${index + 1}번째 계정에서 성공했어요 (앞 계정들은 실패)`)
+      }
+      return blob
+    } catch (error) {
+      lastError = error
+      console.log(
+        `[ai-avatar] ${index + 1}번째 계정 실패: ${error instanceof Error ? error.message : error}`,
+      )
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('모든 Puter 계정에서 실패했어요.')
+}
+
+/**
  * 사진 한 장 + 주제 하나로 아바타를 만든다.
  *
  * 이 기능은 이 프로젝트에서 유일하게 **서버를 거치지 않는** 외부 호출이다.
@@ -191,7 +223,7 @@ async function callPuterImageGeneration(
  * 주석 참고, SDK를 그대로 썼을 때 실제로 겪은 문제 때문이다).
  */
 export function useGenerateAiAvatar() {
-  const { data: puterToken } = usePuterToken()
+  const { data: puterTokens } = usePuterTokens()
   const [stage, setStage] = useState<AiAvatarStage | null>(null)
 
   function goTo(next: AiAvatarStage) {
@@ -201,7 +233,7 @@ export function useGenerateAiAvatar() {
 
   const mutation = useMutation({
     mutationFn: async ({ coupleId, userId, theme, file }: GenerateArgs) => {
-      if (!puterToken) {
+      if (!puterTokens || puterTokens.length === 0) {
         throw new Error('Puter 인증을 아직 받지 못했어요. 잠시 후 다시 시도해주세요.')
       }
 
@@ -212,7 +244,7 @@ export function useGenerateAiAvatar() {
       goTo('generating')
       const generatedAt = Date.now()
       const imageBlob = await withTimeout(
-        callPuterImageGeneration(puterToken, {
+        callPuterImageGenerationWithFallback(puterTokens, {
           prompt: theme.prompt,
           model: MODEL,
           input_image: base64,
