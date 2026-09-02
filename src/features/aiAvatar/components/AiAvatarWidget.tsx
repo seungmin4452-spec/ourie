@@ -17,7 +17,7 @@ interface AiAvatarWidgetProps {
 }
 
 /**
- * 홈 위젯 "AI 아바타"의 본문.
+ * 홈 위젯 "AI 이미지 생성"의 본문.
  *
  * 주제 선택·생성·갤러리는 전부 다이얼로그로 밀어둔다 — 타일에는 가장 최근에
  * 만든 아바타 미리보기 한 장과 버튼 하나만 둔다 (WishWidget과 같은 판단).
@@ -32,7 +32,7 @@ export function AiAvatarWidget({ profile, isCompact }: AiAvatarWidgetProps) {
   if (coupleId == null || user == null) {
     return (
       <Text type="supporting" justify="center">
-        커플이 연결되면 함께 AI 아바타를 만들 수 있어요.
+        커플이 연결되면 함께 AI 이미지를 만들 수 있어요.
       </Text>
     )
   }
@@ -73,7 +73,7 @@ export function AiAvatarWidget({ profile, isCompact }: AiAvatarWidgetProps) {
         <>
           {preview}
           <Button
-            label="AI 아바타 만들기"
+            label="AI 이미지 생성하기"
             variant="primary"
             width="100%"
             onClick={() => setIsDialogOpen(true)}

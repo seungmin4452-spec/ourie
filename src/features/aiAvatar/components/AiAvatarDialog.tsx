@@ -114,7 +114,7 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange} width={420}>
       <Layout
-        header={<DialogHeader title="AI 아바타" onOpenChange={() => onOpenChange(false)} />}
+        header={<DialogHeader title="AI 이미지 생성" onOpenChange={() => onOpenChange(false)} />}
         content={
           <LayoutContent>
             <VStack gap={5}>

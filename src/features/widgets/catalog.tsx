@@ -73,7 +73,7 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
   },
   aiAvatar: {
     id: 'aiAvatar',
-    title: 'AI 아바타',
+    title: 'AI 이미지 생성',
     description: '사진을 올리면 고른 주제 스타일로 바꿔줘요.',
     isReady: true,
     defaultSize: 'half',
