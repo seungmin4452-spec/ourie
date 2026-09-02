@@ -31,8 +31,13 @@ export const AI_AVATAR_THEMES: readonly AiAvatarTheme[] = [
     id: 'pixar',
     title: '픽사풍',
     prompt:
-      '이 사진 속 사람(들)을 픽사 애니메이션 영화에 나올 법한 3D 캐릭터 스타일로 ' +
-      '바꿔줘. 원래 얼굴의 특징과 표정, 분위기는 그대로 알아볼 수 있게 유지해줘.',
+      '이 사진 속 사람(들)을 다음 스타일로 완전히 다시 그려줘: Pixar style, Disney ' +
+      'Pixar, 3d animation, CGI, high quality 3d render, octane render, smooth ' +
+      'textures, subsurface scattering, vivid soft colors, cinematic lighting, magical ' +
+      'and warm atmosphere, masterpiece, best quality, highres. 사진 같은 사실적 ' +
+      '디테일은 남기지 말고, 배경도 원본을 그대로 두지 말고 이 분위기에 어울리는 새로운 ' +
+      '배경으로 함께 다시 그려줘. 다만 원래 사진 속 사람들과 같은 사람이라는 걸 알아볼 ' +
+      '수 있게 헤어스타일과 전체적인 인상은 유지해줘.',
   },
   {
     id: 'spring',
