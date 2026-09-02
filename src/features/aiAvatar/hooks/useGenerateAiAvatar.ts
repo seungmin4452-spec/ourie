@@ -3,11 +3,20 @@ import { useMutation } from '@tanstack/react-query'
 import { downscaleImage } from '@/lib/image'
 import { saveAiAvatarGeneration } from '../api/aiAvatar'
 import type { AiAvatarTheme } from '../themes'
+import { withTimeout } from '../withTimeout'
 import { usePuterToken } from './usePuterToken'
 
 /** Puter에 보낼 사진의 긴 변 최대 길이. 원본을 그대로 보내면 요청이 무거워지고
  * 응답도 느려진다 — 스타일 변환은 이 정도 해상도로도 충분하다. */
 const MAX_SOURCE_SIDE = 1024
+
+/**
+ * 생성 호출 하나를 기다리는 상한. 보통 몇십 초 안에 끝나지만, 공용 무료
+ * 계정이라 다른 사용자 트래픽에 밀리면 이보다 훨씬 오래 걸릴 수 있다(실제로
+ * 2분 넘게 응답이 없던 사례가 있었다). 그 시점부터는 "느리다"가 아니라 화면을
+ * 계속 붙들 이유가 없다고 보고 실패로 처리해, 사용자가 다시 시도할 수 있게 한다.
+ */
+const GENERATION_TIMEOUT_MS = 90 * 1000
 
 /**
  * Puter가 부르는 이름은 "나노바나나"지만, 클라이언트 SDK(@heyputer/puter.js
@@ -75,11 +84,15 @@ export function useGenerateAiAvatar() {
       const { default: puter } = await import('@heyputer/puter.js')
       puter.setAuthToken(puterToken)
 
-      const result = await puter.ai.txt2img(theme.prompt, {
-        model: MODEL,
-        input_image: base64,
-        input_image_mime_type: 'image/jpeg',
-      })
+      const result = await withTimeout(
+        puter.ai.txt2img(theme.prompt, {
+          model: MODEL,
+          input_image: base64,
+          input_image_mime_type: 'image/jpeg',
+        }),
+        GENERATION_TIMEOUT_MS,
+        '이미지 생성이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.',
+      )
 
       // txt2img는 브라우저에서 <img> 엘리먼트를 돌려준다(src가 blob: URL).
       // Storage에 올리려면 실제 바이트가 필요해서 그 src를 다시 fetch한다.
