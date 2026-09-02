@@ -1,3 +1,4 @@
+import type { AppVisitRecord } from '@/features/appVisit'
 import type { CalendarEvent } from '@/features/calendar'
 import type { PokeRecord } from '@/features/poke'
 import { TRAVEL_DISTRICTS, type RegionPhotoDate, type TravelBadge, type TravelVisit } from '@/features/travel'
@@ -95,6 +96,7 @@ export interface RecapData {
   travelBadges: TravelBadge[]
   wishes: Wish[]
   pokes: PokeRecord[]
+  appVisits: AppVisitRecord[]
 }
 
 export interface RecapCounts {
@@ -109,11 +111,21 @@ export interface RecapCounts {
   partnerWishCount: number
   pokesSent: number
   pokesReceived: number
+  myAppVisitCount: number
+  partnerAppVisitCount: number
 }
 
 export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts {
-  const { selfId, calendarEvents, travelVisits, regionPhotoDates, travelBadges, wishes, pokes } =
-    data
+  const {
+    selfId,
+    calendarEvents,
+    travelVisits,
+    regionPhotoDates,
+    travelBadges,
+    wishes,
+    pokes,
+    appVisits,
+  } = data
 
   const knownVisits = travelVisits.filter((visit) => KNOWN_REGION_CODES.has(visit.region_code))
   const knownPhotoDates = regionPhotoDates.filter((photo) =>
@@ -130,9 +142,13 @@ export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts 
   const periodBadges = travelBadges.filter((badge) => matchesPeriod(new Date(badge.earned_at), period))
   const periodWishes = wishes.filter((wish) => matchesPeriod(new Date(wish.created_at), period))
   const periodPokes = pokes.filter((poke) => matchesPeriod(new Date(poke.created_at), period))
+  const periodAppVisits = appVisits.filter((visit) =>
+    matchesPeriod(new Date(visit.created_at), period),
+  )
 
   const myWishCount = periodWishes.filter((wish) => wish.owner_id === selfId).length
   const pokesSent = periodPokes.filter((poke) => poke.sender_id === selfId).length
+  const myAppVisitCount = periodAppVisits.filter((visit) => visit.user_id === selfId).length
 
   return {
     calendarEventCount: periodEvents.length,
@@ -145,5 +161,7 @@ export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts 
     partnerWishCount: periodWishes.length - myWishCount,
     pokesSent,
     pokesReceived: periodPokes.length - pokesSent,
+    myAppVisitCount,
+    partnerAppVisitCount: periodAppVisits.length - myAppVisitCount,
   }
 }

@@ -7,6 +7,7 @@ import { ColorModeToggle } from '@/components/common/ColorModeToggle'
 import { AuthProvider } from '@/features/auth'
 import { AdminFlipStage } from './AdminFlipStage'
 import { AppMetaSync } from './AppMetaSync'
+import { AppVisitTracker } from './AppVisitTracker'
 import { ColorModeProvider } from './ColorModeProvider'
 import { useColorMode } from './useColorMode'
 import { PushSubscriptionSync } from './PushSubscriptionSync'
@@ -40,6 +41,7 @@ function ThemedApp({ children }: { children: ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <AppMetaSync />
+            <AppVisitTracker />
             <SocialAvatarSync />
             <PushSubscriptionSync />
             <div className="min-h-screen bg-body text-primary">

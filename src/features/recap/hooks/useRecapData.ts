@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
+import { useAppVisitHistory } from '@/features/appVisit'
 import { useCalendarEvents } from '@/features/calendar'
 import { getCoupleCreatedAt } from '@/features/couple'
 import { usePokeHistory } from '@/features/poke'
@@ -25,6 +26,7 @@ export function useRecapData(
   const travelBadges = useTravelBadges(coupleId)
   const wishBoard = useWishBoard(coupleId)
   const pokeHistory = usePokeHistory(coupleId)
+  const appVisitHistory = useAppVisitHistory(coupleId)
   const coupleCreatedAt = useQuery({
     queryKey: coupleCreatedAtQueryKey(coupleId),
     queryFn: () => getCoupleCreatedAt(coupleId!),
@@ -39,6 +41,7 @@ export function useRecapData(
     travelBadges.isLoading ||
     wishBoard.isLoading ||
     pokeHistory.isLoading ||
+    appVisitHistory.isLoading ||
     coupleCreatedAt.isLoading
 
   return {
@@ -50,5 +53,6 @@ export function useRecapData(
     travelBadges: travelBadges.badges,
     wishes: wishBoard.wishes,
     pokes: pokeHistory.data ?? [],
+    appVisits: appVisitHistory.data ?? [],
   }
 }

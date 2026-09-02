@@ -914,6 +914,24 @@ create trigger calendar_events_set_updated_at
   execute function public.set_updated_at();
 
 -- ------------------------------------------------------------
+-- app_visits — 앱을 열 때마다 한 줄. 결산(src/features/recap)이 "이번
+-- 달/올해 몇 번 앱을 열었나"를 세는 데만 쓴다. 하루에 여러 번 열면 그만큼
+-- 쌓인다 — travel_visits처럼 "켜고 끄는" 상태가 아니라 pokes처럼 지나간
+-- 사실을 있는 그대로 쌓는 로그다.
+-- ------------------------------------------------------------
+create table public.app_visits (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  -- 연 사람. "받는 사람" 개념이 없는 테이블이라 sender_id가 아니라 user_id다.
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+-- 결산이 커플 범위로 통째로 읽는다 (pokes_couple_created_idx와 같은 이유).
+create index app_visits_couple_created_idx
+  on public.app_visits (couple_id, created_at desc);
+
+-- ------------------------------------------------------------
 -- app_effects — 관리자가 켜고 끄면 모든 사용자의 홈 화면에 적용되는 특수효과
 -- (벚꽃, 눈). 커플 범위도 개인 범위도 아니라 앱 전체 범위인 값이라 기존
 -- 테이블 어디에도 안 맞는다. key-value 한 줄이 효과 하나다 — 새 효과를
@@ -1113,6 +1131,7 @@ alter table public.wish_quota_requests enable row level security;
 -- 이 줄은 실제 DB에는 2026-08-19-calendar.sql로 이미 있었는데 이 참고
 -- 파일에는 빠져 있었다 — 여기서 같이 채워 넣는다(운영 DB는 영향 없음).
 alter table public.calendar_events enable row level security;
+alter table public.app_visits enable row level security;
 alter table public.app_effects enable row level security;
 
 -- couples: only the two members can see/manage their own couple row
@@ -1459,6 +1478,19 @@ create policy "calendar_events_delete_shared_or_own"
     couple_id = public.current_couple_id()
     and (is_shared or created_by = auth.uid())
   );
+
+-- app_visits: 읽기는 커플 범위 — 상대가 몇 번 열었는지도 결산에서 같이 본다.
+-- 쓰기는 본인 것만. 내가 상대방 대신 접속 기록을 남길 이유가 없다 —
+-- travel_visits(둘이 같이 채우는 지도)와 다르게 이건 "누가 열었나"를 있는
+-- 그대로 세는 로그라, 상대 이름으로 꽂을 수 있으면 그 숫자를 못 믿게 된다.
+-- update/delete 정책은 없다 (pokes와 같은 이유로 지나간 로그는 손대지 않는다).
+create policy "app_visits_select_couple"
+  on public.app_visits for select
+  using (couple_id = public.current_couple_id());
+
+create policy "app_visits_insert_self"
+  on public.app_visits for insert
+  with check (couple_id = public.current_couple_id() and user_id = auth.uid());
 
 -- app_effects: 누구나 읽는다. 쓰기 정책은 두지 않는다 — 서버(service role)만
 -- 쓴다 (위 app_effects 테이블 주석 참고).

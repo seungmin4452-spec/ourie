@@ -26,6 +26,7 @@ couples ◄───────┘ (couple_id로 연결)
     ├──► wishes           (소원권 — 쓴 한 장이 한 row)
     ├──► wish_quota_requests (소원권 장수 추가 요청 — 상대 승인이 있어야 늘어난다)
     ├──► memories.location ─► 핀 지도에서 활용 (별도 테이블 없이 memories 재사용)
+    ├──► app_visits        (앱 접속 로그 — 결산의 "앱 접속" 카드)
     └──► couple_settings  (커스터마이징)
 ```
 
@@ -352,6 +353,23 @@ RLS는 select만 커플 범위다.
 | cover_photo_path | text (nullable) | 홈 화면 대표 이미지 |
 | updated_at | timestamptz | default now() |
 
+### 2.7 `app_visits` (앱 접속 로그)
+
+앱을 열 때마다 한 row. 결산(`src/features/recap`)의 "앱 접속" 카드가 이 표를 세서 "이번 달/올해 몇 번 열었나"를 나/상대 나눠 보여준다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| id | uuid (PK) | |
+| couple_id | uuid (FK → couples.id) | |
+| user_id | uuid (FK → profiles.id) | 연 사람. "받는 사람" 개념이 없는 테이블이라 `pokes`의 `sender_id`가 아니라 `user_id`다 |
+| created_at | timestamptz | default now() |
+
+**하루에 여러 번 열면 그만큼 쌓인다.** `travel_visits`처럼 "칠했는지"를 켜고 끄는 상태가 아니라 `pokes`처럼 지나간 사실을 있는 그대로 로그로 쌓는다 — 하루 중복 제거를 하지 않는 것은 의도적인 선택이다.
+
+기록은 `src/app/AppVisitTracker.tsx`가 남긴다. `AppMetaSync`·`SocialAvatarSync`·`PushSubscriptionSync`와 같은 자리(`providers.tsx`)에서 로그인한 사용자가 앱을 열 때마다(세션당 한 번, React `attempted` ref로 중복 호출을 막는다) 조용히 insert하고 실패해도 화면에 드러내지 않는다. `couple_id`가 있어야 하는 로그라, 아직 커플로 연결되지 않은 사용자의 접속은 기록하지 않는다.
+
+RLS는 읽기가 커플 범위 전체(select) — 상대가 몇 번 열었는지도 결산에서 같이 봐야 하기 때문이다. 쓰기는 본인 것만(insert, `user_id = auth.uid()`) — 내가 상대방 대신 접속 기록을 남길 이유가 없고, 허용하면 그 숫자를 못 믿게 된다. update/delete 정책은 없다 — `pokes`와 같은 이유로 지나간 로그는 손대지 않는다.
+
 ## 3. Storage 버킷
 
 | 버킷명 | 용도 | 접근 정책 |
@@ -412,6 +430,7 @@ create policy "couple members can insert"
 - `wishes(couple_id, created_at desc)` — 목록(최신순), `wishes(couple_id, owner_id)` — 잔량 검사가 사람별로 센다. `wish_quotas`는 기본키 `(couple_id, owner_id)`가 곧 조회 인덱스다 (§2.3.4)
 - `wish_quota_requests(couple_id, target_owner_id) where status = 'pending'` unique — 대기 중인 요청 중복 방지 및 조회 인덱스 겸용. `wish_quota_requests(couple_id, created_at desc)` — 목록(최신순) (§2.3.4.1)
 - `couples(invite_code)` unique — 코드 조회 성능 및 중복 방지
+- `app_visits(couple_id, created_at desc)` — 결산이 커플 범위로 통째로 읽는다 (§2.7)
 
 ## 6. 미결 사항
 - 커플 연결 해제 시 `couples`, 하위 데이터 처리 정책 (soft delete vs hard delete)

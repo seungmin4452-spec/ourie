@@ -55,6 +55,10 @@ type Granularity = RecapPeriod['granularity']
  * 보는 결산은 카드 구성이 다를 수 있다 — 각자 자기 홈 화면을 보는 것과 같은
  * 원칙이다.
  *
+ * "앱 접속" 카드만 예외다. 특정 위젯을 켜야 쌓이는 기록이 아니라 앱을 여는
+ * 것 자체를 세므로 대응하는 위젯이 없다 — 그래서 showGrid(그리드가 뜰 만큼
+ * 위젯을 하나라도 쓰는 커플)이면 무조건 넣는다.
+ *
  * 카드 한 켠의 작은 화살표는 바로 이전 기간(월간이면 지난달, 연간이면
  * 작년) 대비 늘었는지 줄었는지다 — 절대 숫자만으로는 "많이 한 편인지"를 알
  * 수 없어서, 결산이 매번 답해야 하는 두 번째 질문이다.
@@ -118,6 +122,7 @@ export function RecapPage() {
             travelBadges: recap.travelBadges,
             wishes: recap.wishes,
             pokes: recap.pokes,
+            appVisits: recap.appVisits,
           },
     [profile, recap],
   )
@@ -160,17 +165,22 @@ export function RecapPage() {
   const previousWishTotal = previousCounts.myWishCount + previousCounts.partnerWishCount
   const pokeTotal = counts.pokesSent + counts.pokesReceived
   const previousPokeTotal = previousCounts.pokesSent + previousCounts.pokesReceived
+  const appVisitTotal = counts.myAppVisitCount + counts.partnerAppVisitCount
+  const previousAppVisitTotal = previousCounts.myAppVisitCount + previousCounts.partnerAppVisitCount
 
   // 그리드에 실제로 뜰 카드만 보고 "이 기간엔 기록이 없어요"를 판단한다.
   // counts 자체에는 안 올려둔 위젯의 수치도 들어 있어서, 그걸 그대로 쓰면
-  // 카드 하나 없는 화면에 "기록이 있다"고 나오는 모순이 생긴다.
+  // 카드 하나 없는 화면에 "기록이 있다"고 나오는 모순이 생긴다. 앱 접속은
+  // 아래 두 배열과 달리 특정 위젯에 매이지 않으므로(showX 토글이 없다)
+  // showGrid가 켜져 있으면 무조건 셈에 넣는다.
   const visibleHasActivity =
     (showCalendar && counts.calendarEventCount > 0) ||
     (showTravel && counts.newRegionCount > 0) ||
     (showPhotomap && counts.newRegionPhotoCount > 0) ||
     (showBadges && counts.newBadgeCount > 0) ||
     (showWish && wishTotal > 0) ||
-    (showPoke && pokeTotal > 0)
+    (showPoke && pokeTotal > 0) ||
+    (showGrid && appVisitTotal > 0)
 
   const comparisonLabel = granularity === 'year' ? '작년' : '지난달'
 
@@ -255,6 +265,15 @@ export function RecapPage() {
               />
             ) : (
               <Grid columns={2} gap={3}>
+                {showGrid && (
+                  <RecapCard
+                    label="앱 접속"
+                    value={`${appVisitTotal}번`}
+                    caption={`나 ${counts.myAppVisitCount} · ${partnerName} ${counts.partnerAppVisitCount}`}
+                    current={appVisitTotal}
+                    previous={previousAppVisitTotal}
+                  />
+                )}
                 {showCalendar && (
                   <RecapCard
                     label="등록한 일정"
