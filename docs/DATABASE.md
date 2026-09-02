@@ -370,6 +370,19 @@ RLS는 select만 커플 범위다.
 
 RLS는 읽기가 커플 범위 전체(select) — 상대가 몇 번 열었는지도 결산에서 같이 봐야 하기 때문이다. 쓰기는 본인 것만(insert, `user_id = auth.uid()`) — 내가 상대방 대신 접속 기록을 남길 이유가 없고, 허용하면 그 숫자를 못 믿게 된다. update/delete 정책은 없다 — `pokes`와 같은 이유로 지나간 로그는 손대지 않는다.
 
+### 2.8 `ai_avatar_generations` (AI 아바타 위젯)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| id | uuid (PK) | |
+| couple_id | uuid (FK → couples.id) | |
+| requested_by | uuid (FK → profiles.id) | 만든 사람. RLS는 커플 범위라 상대가 만든 것도 같이 본다 |
+| theme_id | text | `src/features/aiAvatar/themes.ts` 프리셋의 id (프롬프트 본문은 여기 없다) |
+| storage_path | text | `ai-avatars` 버킷 내 경로 |
+| created_at | timestamptz | default now() |
+
+생성 자체는 서버(`api/`)를 거치지 않는다 — 클라이언트가 공용 Puter 계정으로 직접 부른다(`ARCHITECTURE.md` §6.4). 이 테이블은 그 결과 기록일 뿐이라 service role을 쓰는 코드가 없고, insert도 RLS로 `requested_by = auth.uid()`만 막을 뿐 나머지는 커플이 직접 쓴다. 한 번 만든 이미지는 갈아 끼우지 않으므로(생성마다 새 경로) update 정책이 없다.
+
 ## 3. Storage 버킷
 
 | 버킷명 | 용도 | 접근 정책 |
@@ -377,6 +390,7 @@ RLS는 읽기가 커플 범위 전체(select) — 상대가 몇 번 열었는지
 | `memory-photos` | 추억 사진 원본 | 커플 단위 RLS (해당 couple_id 소속 사용자만) |
 | `profile-avatars` | 프로필 이미지 | **공개 버킷.** 본인 폴더(`{user_id}/`)에만 쓰기 |
 | `travel-maps` | 지도 사진 (두 위젯이 나눠 쓴다) | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |
+| `ai-avatars` | AI 아바타 원본·결과 이미지 | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |
 
 `travel-maps`만 비공개인 이유: 아바타는 어차피 상대에게 보여주려고 올리는 작은 썸네일이지만,
 지도에 걸리는 사진은 "둘만의 공간"(`PRD.md` §1)의 핵심인 커플 사진 원본이다. URL만 알면

@@ -6,6 +6,7 @@ import {
   MapPinned,
   Pointer,
   Ticket,
+  Wand2,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -70,6 +71,13 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     isReady: true,
     defaultSize: 'half',
   },
+  aiAvatar: {
+    id: 'aiAvatar',
+    title: 'AI 아바타',
+    description: '사진을 올리면 고른 주제 스타일로 바꿔줘요.',
+    isReady: true,
+    defaultSize: 'half',
+  },
 }
 
 const HANGUL_FIRST = 0xac00
@@ -105,6 +113,7 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   memories: <Images className="size-4" />,
   travel: <MapPin className="size-4" />,
   photomap: <MapPinned className="size-4" />,
+  aiAvatar: <Wand2 className="size-4" />,
 }
 
 /** 상대방 이름이 있을 때 쓰는 제목. "우리"를 그 사람 이름으로 바꾼다. */

@@ -212,6 +212,29 @@ src/features/travel/{regions,districts}.ts  (292KB, 저장소에 커밋)
 - **도형 데이터는 지연 로딩**이다. 두 위젯 모두 `@/features/travel` 배럴을 동적으로
   가져오므로 청크가 하나로 합쳐진다 — 둘 다 홈에 올려도 263KB를 두 번 받지 않는다.
 
+### 6.4 AI 아바타 (Puter, 서버를 거치지 않는 유일한 외부 호출)
+
+홈 위젯 "AI 아바타". 커플 사진을 고른 주제(지브리풍/수채화 등) 스타일로 바꿔준다.
+
+```
+위젯: 주제 버튼 선택 → 사진첩 열림 → 사진 선택
+        │
+        ▼  (서버를 거치지 않는다)
+브라우저가 직접 Puter 호출 (@heyputer/puter.js, puter.ai.txt2img)
+        │  puter.setAuthToken(공용 계정 토큰) — GET /api/puter-token으로 받음
+        ▼
+결과 <img>.src(blob: URL) → fetch로 바이트 추출 → Supabase Storage 업로드
+        │
+        ▼
+ai_avatar_generations row 기록, 위젯이 즉시 미리보기 갱신
+```
+
+- **왜 이 기능만 서버(`api/`)를 거치지 않나**: 원래는 다른 위젯들처럼 Node 함수에서 서버 쪽 자격으로 Puter를 부르려 했다. 그런데 `@heyputer/puter.js`(1.0.1)의 `puter.ai.txt2img`는 결과를 항상 `new Image()`(브라우저 전용 DOM 타입)로 감싸 반환하도록 짜여 있어서, Node 런타임에서 부르면 `Image is not defined`로 죽는다 (공식 저장소의 미해결 이슈 [HeyPuter/puter#1900](https://github.com/HeyPuter/puter/issues/1900)). 그래서 이 기능만 `src/features/aiAvatar/hooks/useGenerateAiAvatar.ts`에서 브라우저가 직접 부른다.
+- **무료로 쓰는 이유**: Google AI Studio(나노바나나 원 소스)는 이미지 생성 모델에 Free tier가 아예 없어 어느 티어로 붙여도 실비가 청구된다. Puter는 "User-Pays" 모델로 계정 하나에 매달 무료 크레딧(가입 시점 기준 1,000 크레딧)을 주고 그 안에서 나노바나나를 그대로 쓸 수 있어, 이 앱 같은 개인용 저트래픽 서비스에 맞는 방향이다. 둘이서만 쓰는 앱이라 계정도 공용 하나면 충분하다(각자 만들 이유가 없다).
+- **로그인 팝업이 안 뜨는 이유**: Puter.js는 기본적으로 브라우저 팝업으로 사용자를 로그인시키는 SDK다(`puter.authToken`이 비어 있으면 자동으로 뜬다). 공용 계정에서 발급한 **개인 액세스 토큰**을 서버 환경변수(`PUTER_SHARED_TOKEN`)로 들고 있다가, `api/puter-token.ts`가 로그인한 사용자에게만 그 값을 내려주고, 클라이언트가 `puter.setAuthToken(token)`으로 미리 인증해두면 그 팝업 분기 자체가 안 걸린다. 토큰을 클라이언트 번들에 그대로 박아두지 않는 이유는 빌드된 정적 파일이 로그인 여부와 무관하게 그 URL에 접속하는 누구나 받아볼 수 있어서다 — `api/puter-token.ts`는 문자열 하나만 돌려주고, 실제 생성 호출은 하지 않는다.
+- **모델은 `gemini-2.5-flash-image-preview`(나노바나나 원버전)를 쓴다.** Puter 웹앱(puter.com의 "AI Image Project")에서는 나노바나나 프로/2까지 고를 수 있지만, 이건 이 npm 패키지를 거치지 않는 별도 경로다. `@heyputer/puter.js`의 클라이언트 쪽 모델→드라이버 라우팅(`node_modules/@heyputer/puter.js/src/modules/AI.js`)이 아직 `gemini-2.5-flash-image-preview`(및 별칭 `nano-banana`)만 알아서, 신형 모델 문자열을 넘기면 엉뚱한 드라이버로 빠진다. SDK가 업데이트되면 상수(`MODEL`)만 올리면 된다.
+- **쿼터 캡을 따로 두지 않는다.** 비용이 우리 Vercel/Supabase 인프라가 아니라 공용 Puter 계정 자체에 붙으므로, 다른 위젯들처럼 하루/월 한도를 DB로 강제할 이유가 없다 — 계정의 무료 월간 크레딧이 자연스러운 상한이다.
+
 ## 7. 배포 구조
 
 - 프론트엔드: Vercel (main 브랜치 자동 배포)

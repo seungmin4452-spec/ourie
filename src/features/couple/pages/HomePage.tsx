@@ -19,6 +19,7 @@ import {
   summarizeAll,
   useAnniversaries,
 } from '@/features/anniversary'
+import { AiAvatarWidget } from '@/features/aiAvatar'
 import { useAuth } from '@/features/auth'
 import { CalendarWidget } from '@/features/calendar'
 import { EffectsLayer } from '@/features/effects'
@@ -82,7 +83,13 @@ const TRAVEL_RELATED: WidgetId[] = ['travel', 'photomap']
  * 위젯들. 콕 찌르기는 버튼 자체가 안에 있어 카드를 누르는 동작이 따로
  * 필요 없다.
  */
-const OPENS_ON_TAP: ReadonlySet<WidgetId> = new Set(['wish', 'calendar', 'travel', 'photomap'])
+const OPENS_ON_TAP: ReadonlySet<WidgetId> = new Set([
+  'wish',
+  'calendar',
+  'travel',
+  'photomap',
+  'aiAvatar',
+])
 
 /** 도형 데이터 청크를 받는 동안 위젯 자리에 두는 한 줄. */
 function MapLoading() {
@@ -180,6 +187,8 @@ export function HomePage() {
         return <PokeWidget profile={profile} isCompact={isCompact} />
       case 'wish':
         return <WishWidget profile={profile} isCompact={isCompact} />
+      case 'aiAvatar':
+        return <AiAvatarWidget profile={profile} isCompact={isCompact} />
       case 'calendar':
         return <CalendarWidget profile={profile} isCompact={isCompact} />
       case 'memories':
