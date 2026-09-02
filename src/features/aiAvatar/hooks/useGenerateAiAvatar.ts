@@ -39,6 +39,20 @@ const GENERATION_TIMEOUT_MS = 5 * 60 * 1000
  */
 const MODEL = 'gemini-2.5-flash-image-preview'
 
+/**
+ * 출력 이미지 크기. 실제 운영에서 확인된 문제 하나 — Puter의 이미지 생성
+ * SDK는 완성된 이미지 전체를 한 번의 XHR 응답(`responseType: 'blob'`)으로
+ * 받는 방식이라(node_modules/@heyputer/puter.js/src/lib/utils.js의
+ * driverCall_), 기본 해상도로 받으면 완성된 뒤에도 그 큰 파일 전체가 폰
+ * 연결로 끝까지 내려와야 한다. 모바일 데이터가 불안정하면 이 마지막 다운로드
+ * 구간에서 에러 없이 그냥 멈춰버리는 것으로 보인다(Puter 사용량 대시보드엔
+ * output:image 크레딧이 이미 찍혀 있었다 — 서버는 다 만들어서 과금했는데
+ * 응답이 못 왔다는 뜻). 갤러리 썸네일(64px)과 위젯 미리보기 정도에는 굳이
+ * 큰 해상도가 필요 없으니, 작게 요청해서 생성 시간과 다운로드 용량을 함께
+ * 줄인다.
+ */
+const OUTPUT_RATIO = { w: 768, h: 768 }
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -134,6 +148,7 @@ export function useGenerateAiAvatar() {
           model: MODEL,
           input_image: base64,
           input_image_mime_type: 'image/jpeg',
+          ratio: OUTPUT_RATIO,
         }),
         GENERATION_TIMEOUT_MS,
         '이미지 생성이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.',

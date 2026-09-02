@@ -11,6 +11,7 @@ declare module '@heyputer/puter.js' {
     model?: string
     input_image?: string
     input_image_mime_type?: string
+    ratio?: { w: number; h: number }
   }
 
   interface PuterAI {
