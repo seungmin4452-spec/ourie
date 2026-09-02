@@ -1,11 +1,16 @@
 import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { downscaleImage } from '@/lib/image'
 import { saveAiAvatarGeneration } from '../api/aiAvatar'
 import type { AiAvatarTheme } from '../themes'
 import { withTimeout } from '../withTimeout'
+import { formatXhrTrace, traceXhrTo, type XhrTrace } from '../xhrTrace'
 import { usePuterToken } from './usePuterToken'
+
+/** Puter API의 기본 도메인. node_modules/@heyputer/puter.js/src/index.js의
+ * `defaultAPIOrigin = globalThis.PUTER_API_ORIGIN ?? 'https://api.puter.com'`. */
+const PUTER_API_HOST = 'api.puter.com'
 
 /** Puter에 보낼 사진의 긴 변 최대 길이. 원본을 그대로 보내면 요청이 무거워지고
  * 응답도 느려진다 — 스타일 변환은 이 정도 해상도로도 충분하다. */
@@ -91,6 +96,23 @@ export function aiAvatarStageLabel(stage: AiAvatarStage): string {
   return STAGE_LABEL[stage]
 }
 
+/**
+ * 실패 시 "어디서 막혔는지"를 사람이 읽을 수 있는 네트워크 기록과 함께
+ * 던지는 에러. xhrTrace.ts가 관찰한 open/send/progress/load/error 이벤트를
+ * 그대로 들고 있어서, 화면(AiAvatarDialog.tsx)이 이걸 그대로 보여주면
+ * 콘솔 없이도 "요청이 나갔는지, 응답이 왔는지, 몇 바이트나 받았는지"를 볼 수
+ * 있다.
+ */
+export class AiAvatarGenerationError extends Error {
+  readonly traceLines: string[]
+
+  constructor(message: string, traceLines: string[]) {
+    super(message)
+    this.name = 'AiAvatarGenerationError'
+    this.traceLines = traceLines
+  }
+}
+
 /** 콘솔에서 이 위젯만 걸러 보고 싶을 때 쓰는 접두사(claude-in-chrome 등으로
  * 확인할 때 pattern: "\\[ai-avatar\\]"로 필터링하면 된다). */
 function logStage(stage: AiAvatarStage) {
@@ -117,12 +139,19 @@ function logStage(stage: AiAvatarStage) {
 export function useGenerateAiAvatar() {
   const { data: puterToken } = usePuterToken()
   const [stage, setStage] = useState<AiAvatarStage | null>(null)
+  const traceRef = useRef<XhrTrace | null>(null)
 
   // 어느 단계에서 실패했는지 에러 메시지에 그대로 남긴다 — 실패 시점의
   // stage 값은 mutationFn이 던질 때 이미 최신이라 그걸 그대로 읽으면 된다.
   function goTo(next: AiAvatarStage) {
     setStage(next)
     logStage(next)
+  }
+
+  /** 화면이 1초마다 이걸 불러 지금까지의 네트워크 기록을 그려준다(진행 중에도,
+   * 실패한 뒤에도 같은 함수로 읽는다). */
+  function getTraceLines(): string[] {
+    return traceRef.current ? formatXhrTrace(traceRef.current) : []
   }
 
   const mutation = useMutation({
@@ -143,29 +172,42 @@ export function useGenerateAiAvatar() {
 
       goTo('generating')
       const generatedAt = Date.now()
-      const result = await withTimeout(
-        puter.ai.txt2img(theme.prompt, {
-          model: MODEL,
-          input_image: base64,
-          input_image_mime_type: 'image/jpeg',
-          ratio: OUTPUT_RATIO,
-        }),
-        GENERATION_TIMEOUT_MS,
-        '이미지 생성이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.',
-      )
-      console.log(`[ai-avatar] generating done in ${Date.now() - generatedAt}ms`)
+      const trace = traceXhrTo(PUTER_API_HOST)
+      traceRef.current = trace
+      try {
+        const result = await withTimeout(
+          puter.ai.txt2img(theme.prompt, {
+            model: MODEL,
+            input_image: base64,
+            input_image_mime_type: 'image/jpeg',
+            ratio: OUTPUT_RATIO,
+          }),
+          GENERATION_TIMEOUT_MS,
+          '이미지 생성이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.',
+        )
+        console.log(`[ai-avatar] generating done in ${Date.now() - generatedAt}ms`)
 
-      goTo('uploading')
-      // txt2img는 브라우저에서 <img> 엘리먼트를 돌려준다(src가 blob: URL).
-      // Storage에 올리려면 실제 바이트가 필요해서 그 src를 다시 fetch한다.
-      const response = await fetch(result.src)
-      const imageBlob = await response.blob()
+        goTo('uploading')
+        // txt2img는 브라우저에서 <img> 엘리먼트를 돌려준다(src가 blob: URL).
+        // Storage에 올리려면 실제 바이트가 필요해서 그 src를 다시 fetch한다.
+        const response = await fetch(result.src)
+        const imageBlob = await response.blob()
 
-      const saved = await saveAiAvatarGeneration(coupleId, userId, theme.id, imageBlob)
-      setStage(null)
-      return saved
+        const saved = await saveAiAvatarGeneration(coupleId, userId, theme.id, imageBlob)
+        setStage(null)
+        return saved
+      } catch (error) {
+        const traceLines = formatXhrTrace(trace)
+        console.log('[ai-avatar] xhr trace:\n' + traceLines.join('\n'))
+        throw new AiAvatarGenerationError(
+          error instanceof Error ? error.message : '아바타를 만들지 못했어요.',
+          traceLines,
+        )
+      } finally {
+        trace.stop()
+      }
     },
   })
 
-  return { ...mutation, stage }
+  return { ...mutation, stage, getTraceLines }
 }

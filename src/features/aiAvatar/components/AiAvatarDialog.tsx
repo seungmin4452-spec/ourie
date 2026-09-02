@@ -13,7 +13,11 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 
 import type { AiAvatarGenerationWithUrl } from '../api/aiAvatar'
 import { useAiAvatarGenerations } from '../hooks/useAiAvatarGenerations'
-import { aiAvatarStageLabel, useGenerateAiAvatar } from '../hooks/useGenerateAiAvatar'
+import {
+  AiAvatarGenerationError,
+  aiAvatarStageLabel,
+  useGenerateAiAvatar,
+} from '../hooks/useGenerateAiAvatar'
 import { aiAvatarPhotoFileProblem } from '../photoFile'
 import { AI_AVATAR_THEMES, findAiAvatarTheme, type AiAvatarTheme } from '../themes'
 
@@ -47,21 +51,25 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
   const [pendingSince, setPendingSince] = useState<number | null>(null)
   const [isSlow, setIsSlow] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [traceLines, setTraceLines] = useState<string[]>([])
 
   const { generations, refresh } = useAiAvatarGenerations(coupleId)
   const generate = useGenerateAiAvatar()
 
   // pendingSince가 있는 동안만 돈다 — 생성이 끝나면(성공/실패 모두) 아래
-  // mutate의 onSettled가 null로 되돌려 정리한다.
+  // mutate의 onSettled가 null로 되돌려 정리한다. 실패 후에도 traceLines는
+  // 일부러 안 지운다 — 무슨 일이 있었는지 읽어보고 알려줘야 하니, 다음
+  // 시도를 새로 누를 때만(handleFileChange) 지운다.
   useEffect(() => {
     if (pendingSince == null) return
     const timer = setInterval(() => {
       const elapsed = Date.now() - pendingSince
       setElapsedSeconds(Math.floor(elapsed / 1000))
       if (elapsed >= SLOW_NOTICE_MS) setIsSlow(true)
+      setTraceLines(generate.getTraceLines())
     }, 1000)
     return () => clearInterval(timer)
-  }, [pendingSince])
+  }, [pendingSince, generate])
 
   function pickTheme(theme: AiAvatarTheme) {
     setPendingTheme(theme)
@@ -84,6 +92,7 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
     setPendingSince(Date.now())
     setIsSlow(false)
     setElapsedSeconds(0)
+    setTraceLines([])
 
     generate.mutate(
       { coupleId, userId, theme, file },
@@ -94,12 +103,17 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
         },
         onError: (error) => {
           // generate.stage는 실패 시점에 멈춰 있는 마지막 단계다 — 어디서
-          // 막혔는지를 에러 문구에 그대로 남긴다.
+          // 막혔는지를 에러 문구에 그대로 남긴다. AiAvatarGenerationError면
+          // 그 순간의 네트워크 기록도 같이 들고 있어서, 토스트가 사라진
+          // 뒤에도 화면에 남겨 원인을 읽어볼 수 있게 한다.
           const stageLabel = generate.stage ? `${aiAvatarStageLabel(generate.stage)} — ` : ''
           showToast({
             type: 'error',
             body: `${stageLabel}${error instanceof Error ? error.message : '아바타를 만들지 못했어요.'}`,
           })
+          if (error instanceof AiAvatarGenerationError) {
+            setTraceLines(error.traceLines)
+          }
         },
         onSettled: () => {
           setPendingSince(null)
@@ -156,6 +170,23 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
                     평소보다 오래 걸리고 있어요. 이 화면을 나가도 계속 만들어지고,
                     완성되면 갤러리에 나타나요.
                   </Text>
+                )}
+
+                {/* Puter로 나간 요청의 실제 진행 상황 — 콘솔 없이 폰에서 바로
+                    "요청이 나갔는지, 응답이 왔는지, 몇 바이트 받았는지"를 읽을 수
+                    있게 그대로 보여준다(xhrTrace.ts). 실패한 뒤에도 남겨둬서
+                    그대로 캡처해 전달할 수 있게 한다. */}
+                {traceLines.length > 0 && (
+                  <VStack gap={0}>
+                    <Text type="supporting" weight="medium">
+                      요청 기록
+                    </Text>
+                    {traceLines.map((line, index) => (
+                      <Text key={index} type="supporting">
+                        {line}
+                      </Text>
+                    ))}
+                  </VStack>
                 )}
               </VStack>
 
