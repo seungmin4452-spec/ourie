@@ -18,14 +18,62 @@ export const AI_AVATAR_THEMES: readonly AiAvatarTheme[] = [
   {
     id: 'ghibli',
     title: '지브리',
-    prompt:
-      'A Studio Ghibli style anime still frame, hand-painted watercolor background, soft cel shading, delicate linework, warm cozy atmosphere, nostalgic mood, 90s retro anime aesthetic.',
+    prompt: `Transform the uploaded photo into a beautiful hand-painted Japanese animated film scene inspired by the warm, whimsical aesthetic of classic Japanese animation.
+
+Preserve the identity and recognizable characteristics of the person in the original photo, including:
+- facial structure and proportions
+- hairstyle and hair color
+- skin tone
+- eye shape and color
+- clothing and accessories
+- pose and overall composition
+
+Reimagine the person as a charming hand-drawn animated character with soft facial features, expressive eyes, natural proportions, delicate linework, and beautifully painted details.
+
+Use a warm watercolor-like color palette, soft natural lighting, subtle textures, gentle shadows, detailed backgrounds, and a nostalgic cinematic atmosphere.
+
+Create a peaceful, emotional, and magical feeling similar to a beautifully illustrated Japanese animated movie.
+
+Keep the original facial expression and emotional feeling as close to the source photo as possible.
+
+Preserve the original composition and important environmental details.
+
+Do not add extra people or objects.
+Do not change the person's age or gender.
+Do not unnecessarily change the hairstyle, clothing, or accessories.
+Do not distort the face, hands, or body proportions.
+Do not make the character overly cartoonish.
+
+The final image should feel like a carefully hand-painted frame from a beautiful Japanese animated feature film while remaining clearly recognizable as the person in the original photo.`,
   },
   {
+    // id는 'pixar'로 남겨둔다 — 이미 만들어진 기록의 theme_id가 이 값을
+    // 그대로 참조하고 있어서, 여기서 바꾸면 예전 기록의 제목이 "아바타"로
+    // 떨어진다(findAiAvatarTheme이 못 찾음). 화면에 보이는 이름(title)만
+    // "디즈니"로 바꾼다.
     id: 'pixar',
-    title: '픽사',
-    prompt:
-      'A 3D animated character in Pixar and Disney style, vibrant colors, highly detailed textures, expressive big eyes, soft cinematic lighting, clay rendering, subsurface scattering, Unreal Engine 5 render, cute and whimsical.',
+    title: '디즈니',
+    prompt: `Transform the uploaded photo into a high-quality Disney-inspired animated movie character portrait.
+
+Preserve the identity and recognizable characteristics of the person in the original photo, including:
+- facial structure and proportions
+- hairstyle and hair color
+- skin tone
+- eye shape and color
+- clothing and accessories
+- pose and overall composition
+
+Reimagine the person as a charming 3D animated character with expressive eyes, soft facial features, polished character design, and a warm cinematic appearance.
+
+Use soft cinematic lighting, subtle depth of field, beautiful colors, detailed hair, smooth skin rendering, and a magical family-friendly animated movie atmosphere.
+
+Keep the person's expression and emotional feeling as close to the original photo as possible.
+
+Do not add extra people or objects.
+Do not change the person's age, gender, hairstyle, or clothing unnecessarily.
+Do not distort the face or create unnatural facial features.
+
+The final image should look like a professionally produced animated movie character while still clearly resembling the person in the uploaded photo.`,
   },
   {
     id: 'spring',
