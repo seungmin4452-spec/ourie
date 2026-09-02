@@ -31,6 +31,13 @@ function describeBody(body: unknown): string {
   return '(body)'
 }
 
+/** 로그 한 줄에 넣기엔 너무 긴 응답 본문은 여기까지만 남긴다. */
+const MAX_BODY_PREVIEW = 300
+
+function truncate(text: string): string {
+  return text.length > MAX_BODY_PREVIEW ? `${text.slice(0, MAX_BODY_PREVIEW)}…` : text
+}
+
 function describeResponse(response: unknown): string {
   if (response == null) return '(no response)'
   if (response instanceof Blob) return `blob ${response.size} bytes`
@@ -72,9 +79,33 @@ export function traceXhrTo(urlSubstring: string): XhrTrace {
       log(`send (${describeBody(body)})`)
       this.addEventListener('loadstart', () => log('loadstart (요청이 실제로 나갔다)'))
       this.addEventListener('progress', (e) => log(`progress ${e.loaded}/${e.total || '?'} bytes`))
-      this.addEventListener('load', () =>
-        log(`load — status ${this.status}, ${describeResponse(this.response)}`),
-      )
+      this.addEventListener('load', () => {
+        log(`load — status ${this.status}, ${describeResponse(this.response)}`)
+        // 실패 상태일 때만 본문 내용까지 읽는다 — 왜 실패했는지 사람이 읽을
+        // 말이 그 안에 들어있는 경우가 많다(예: 세션 만료, 토큰 문제). blob
+        // 응답이어도 작은 에러 본문은 어차피 텍스트라 .text()로 읽을 수 있다.
+        if (this.status >= 400) {
+          const response: unknown = this.response
+          if (response instanceof Blob) {
+            response
+              .text()
+              .then((text) => log(`  ↳ body: ${truncate(text)}`))
+              .catch(() => {})
+          } else if (typeof response === 'string') {
+            log(`  ↳ body: ${truncate(response)}`)
+          } else {
+            // responseType이 'blob'이 아닌 다른 값(예: '')일 때만 여기 온다.
+            // responseType이 'blob'인 상태에서 .responseText를 읽으면
+            // InvalidStateError가 나므로 try로 감싼다.
+            try {
+              log(`  ↳ body: ${truncate(this.responseText)}`)
+            } catch {
+              // 못 읽으면 조용히 넘어간다 — 위의 status/size 줄만으로도
+              // 어느 정도는 알 수 있다.
+            }
+          }
+        }
+      })
       this.addEventListener('error', () => log('error (네트워크 자체가 끊겼다)'))
       this.addEventListener('timeout', () => log('timeout (브라우저/네트워크 자체 타임아웃)'))
       this.addEventListener('abort', () => log('abort'))
