@@ -19,13 +19,13 @@ export const AI_AVATAR_THEMES: readonly AiAvatarTheme[] = [
     id: 'ghibli',
     title: '지브리',
     prompt:
-      'Change this photo into a Studio Ghibli style.',
+      'A Studio Ghibli style anime still frame, hand-painted watercolor background, soft cel shading, delicate linework, warm cozy atmosphere, nostalgic mood, 90s retro anime aesthetic.',
   },
   {
     id: 'pixar',
     title: '픽사',
     prompt:
-      'Change this photo into a Pixar style.',
+      'A 3D animated character in Pixar and Disney style, vibrant colors, highly detailed textures, expressive big eyes, soft cinematic lighting, clay rendering, subsurface scattering, Unreal Engine 5 render, cute and whimsical.',
   },
   {
     id: 'spring',
