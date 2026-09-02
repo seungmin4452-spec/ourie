@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
 
 import { downscaleImage } from '@/lib/image'
 import { saveAiAvatarGeneration } from '../api/aiAvatar'
@@ -11,12 +12,20 @@ import { usePuterToken } from './usePuterToken'
 const MAX_SOURCE_SIDE = 1024
 
 /**
- * 생성 호출 하나를 기다리는 상한. 보통 몇십 초 안에 끝나지만, 공용 무료
- * 계정이라 다른 사용자 트래픽에 밀리면 이보다 훨씬 오래 걸릴 수 있다(실제로
- * 2분 넘게 응답이 없던 사례가 있었다). 그 시점부터는 "느리다"가 아니라 화면을
- * 계속 붙들 이유가 없다고 보고 실패로 처리해, 사용자가 다시 시도할 수 있게 한다.
+ * 생성 호출 하나를 기다리는 진짜 최후의 상한.
+ *
+ * 처음엔 90초로 짧게 잡았다가 실제 운영에서 문제를 봤다 — 화면은 90초 만에
+ * 실패로 끝났는데 Puter 사용량(크레딧)은 계속 늘어났다. 즉 요청은 그 뒤로도
+ * 계속 진행돼 결국 성공했다는 뜻이고, 우리가 먼저 포기해버려서 **크레딧만
+ * 쓰고 결과물은 못 받은** 셈이었다 — 공용 무료 계정이라 다른 사용자 트래픽에
+ * 밀리면 몇 분씩 걸리는 게 이 백엔드에선 예외가 아니라 정상 범위다.
+ *
+ * 그래서 여기서는 값을 훨씬 넉넉히 잡아 "진짜 죽은 요청"만 걸러내는
+ * 최후의 안전장치로만 쓰고, "오래 걸린다"는 안내는 대신 화면 쪽에서
+ * 요청을 그대로 살려둔 채 메시지만 바꿔서 보여준다(AiAvatarDialog.tsx의
+ * SLOW_NOTICE_MS 참고) — 그래야 느리게라도 성공한 요청의 결과를 버리지 않는다.
  */
-const GENERATION_TIMEOUT_MS = 90 * 1000
+const GENERATION_TIMEOUT_MS = 5 * 60 * 1000
 
 /**
  * Puter가 부르는 이름은 "나노바나나"지만, 클라이언트 SDK(@heyputer/puter.js
@@ -51,6 +60,30 @@ interface GenerateArgs {
 }
 
 /**
+ * 생성 한 번이 실제로 어느 단계에 있는지. 폰으로 쓰는 사람은 콘솔을 열어볼
+ * 수 없으니, 이 값을 화면(AiAvatarDialog.tsx)에 그대로 보여줘서 "느린 건지
+ * 멈춘 건지, 멈췄다면 어디서 멈췄는지"를 눈으로 볼 수 있게 한다.
+ */
+export type AiAvatarStage = 'resizing' | 'connecting' | 'generating' | 'uploading'
+
+const STAGE_LABEL: Record<AiAvatarStage, string> = {
+  resizing: '사진 준비하는 중',
+  connecting: 'Puter에 연결하는 중',
+  generating: '이미지 생성 요청 중',
+  uploading: '결과 저장하는 중',
+}
+
+export function aiAvatarStageLabel(stage: AiAvatarStage): string {
+  return STAGE_LABEL[stage]
+}
+
+/** 콘솔에서 이 위젯만 걸러 보고 싶을 때 쓰는 접두사(claude-in-chrome 등으로
+ * 확인할 때 pattern: "\\[ai-avatar\\]"로 필터링하면 된다). */
+function logStage(stage: AiAvatarStage) {
+  console.log(`[ai-avatar] ${stage} (${STAGE_LABEL[stage]})`)
+}
+
+/**
  * 사진 한 장 + 주제 하나로 아바타를 만든다.
  *
  * 이 기능은 이 프로젝트에서 유일하게 **서버를 거치지 않는** 외부 호출이다.
@@ -69,21 +102,33 @@ interface GenerateArgs {
  */
 export function useGenerateAiAvatar() {
   const { data: puterToken } = usePuterToken()
+  const [stage, setStage] = useState<AiAvatarStage | null>(null)
 
-  return useMutation({
+  // 어느 단계에서 실패했는지 에러 메시지에 그대로 남긴다 — 실패 시점의
+  // stage 값은 mutationFn이 던질 때 이미 최신이라 그걸 그대로 읽으면 된다.
+  function goTo(next: AiAvatarStage) {
+    setStage(next)
+    logStage(next)
+  }
+
+  const mutation = useMutation({
     mutationFn: async ({ coupleId, userId, theme, file }: GenerateArgs) => {
       if (!puterToken) {
         throw new Error('Puter 인증을 아직 받지 못했어요. 잠시 후 다시 시도해주세요.')
       }
 
+      goTo('resizing')
       const resized = await downscaleImage(file, MAX_SOURCE_SIDE)
       const base64 = await blobToBase64(resized)
 
+      goTo('connecting')
       // 모듈 최상단에서 import하면 이 위젯을 한 번도 안 쓴 사람도 그 초기화
       // 코드(전역 메시지 리스너 등록 등)를 매번 받는다. 실제로 쓸 때만 받는다.
       const { default: puter } = await import('@heyputer/puter.js')
       puter.setAuthToken(puterToken)
 
+      goTo('generating')
+      const generatedAt = Date.now()
       const result = await withTimeout(
         puter.ai.txt2img(theme.prompt, {
           model: MODEL,
@@ -93,13 +138,19 @@ export function useGenerateAiAvatar() {
         GENERATION_TIMEOUT_MS,
         '이미지 생성이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.',
       )
+      console.log(`[ai-avatar] generating done in ${Date.now() - generatedAt}ms`)
 
+      goTo('uploading')
       // txt2img는 브라우저에서 <img> 엘리먼트를 돌려준다(src가 blob: URL).
       // Storage에 올리려면 실제 바이트가 필요해서 그 src를 다시 fetch한다.
       const response = await fetch(result.src)
       const imageBlob = await response.blob()
 
-      return saveAiAvatarGeneration(coupleId, userId, theme.id, imageBlob)
+      const saved = await saveAiAvatarGeneration(coupleId, userId, theme.id, imageBlob)
+      setStage(null)
+      return saved
     },
   })
+
+  return { ...mutation, stage }
 }

@@ -9,13 +9,22 @@ import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { Download, Sparkles } from 'lucide-react'
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 
 import type { AiAvatarGenerationWithUrl } from '../api/aiAvatar'
 import { useAiAvatarGenerations } from '../hooks/useAiAvatarGenerations'
-import { useGenerateAiAvatar } from '../hooks/useGenerateAiAvatar'
+import { aiAvatarStageLabel, useGenerateAiAvatar } from '../hooks/useGenerateAiAvatar'
 import { aiAvatarPhotoFileProblem } from '../photoFile'
 import { AI_AVATAR_THEMES, findAiAvatarTheme, type AiAvatarTheme } from '../themes'
+
+/**
+ * 이 정도 지나면 "느리다" 안내를 보여준다.
+ *
+ * 요청 자체를 끊지는 않는다 — useGenerateAiAvatar.ts의 GENERATION_TIMEOUT_MS
+ * 주석 참고. 여기서는 그저 사용자가 "멈춘 건가?" 싶어할 시점에 미리 말해주는
+ * 것뿐이라, 짧게(20초) 잡아도 된다.
+ */
+const SLOW_NOTICE_MS = 20 * 1000
 
 interface AiAvatarDialogProps {
   isOpen: boolean
@@ -35,9 +44,24 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
   const showToast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingTheme, setPendingTheme] = useState<AiAvatarTheme | null>(null)
+  const [pendingSince, setPendingSince] = useState<number | null>(null)
+  const [isSlow, setIsSlow] = useState(false)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
   const { generations, refresh } = useAiAvatarGenerations(coupleId)
   const generate = useGenerateAiAvatar()
+
+  // pendingSince가 있는 동안만 돈다 — 생성이 끝나면(성공/실패 모두) 아래
+  // mutate의 onSettled가 null로 되돌려 정리한다.
+  useEffect(() => {
+    if (pendingSince == null) return
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - pendingSince
+      setElapsedSeconds(Math.floor(elapsed / 1000))
+      if (elapsed >= SLOW_NOTICE_MS) setIsSlow(true)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [pendingSince])
 
   function pickTheme(theme: AiAvatarTheme) {
     setPendingTheme(theme)
@@ -57,6 +81,10 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
       return
     }
 
+    setPendingSince(Date.now())
+    setIsSlow(false)
+    setElapsedSeconds(0)
+
     generate.mutate(
       { coupleId, userId, theme, file },
       {
@@ -65,10 +93,18 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
           showToast({ type: 'info', body: `${theme.title} 아바타를 만들었어요.` })
         },
         onError: (error) => {
+          // generate.stage는 실패 시점에 멈춰 있는 마지막 단계다 — 어디서
+          // 막혔는지를 에러 문구에 그대로 남긴다.
+          const stageLabel = generate.stage ? `${aiAvatarStageLabel(generate.stage)} — ` : ''
           showToast({
             type: 'error',
-            body: error instanceof Error ? error.message : '아바타를 만들지 못했어요.',
+            body: `${stageLabel}${error instanceof Error ? error.message : '아바타를 만들지 못했어요.'}`,
           })
+        },
+        onSettled: () => {
+          setPendingSince(null)
+          setIsSlow(false)
+          setElapsedSeconds(0)
         },
       },
     )
@@ -102,6 +138,25 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
                     </VStack>
                   ))}
                 </VStack>
+
+                {/* 지금 어느 단계인지 그대로 보여준다 — 폰으로 쓰면 콘솔을 열어볼
+                    수 없으니, "멈췄나?" 싶을 때 어디서 안 넘어가고 있는지를
+                    여기서 눈으로 확인할 수 있어야 한다. */}
+                {generate.isPending && generate.stage && (
+                  <Text type="supporting">
+                    {aiAvatarStageLabel(generate.stage)} · {elapsedSeconds}초째
+                  </Text>
+                )}
+
+                {/* 요청을 끊지 않고 그대로 기다린다(useGenerateAiAvatar.ts의
+                    GENERATION_TIMEOUT_MS 주석 참고) — 그러니 여기서도 "실패"가
+                    아니라 "기다려도, 나가도 된다"고 말해준다. */}
+                {isSlow && (
+                  <Text type="supporting">
+                    평소보다 오래 걸리고 있어요. 이 화면을 나가도 계속 만들어지고,
+                    완성되면 갤러리에 나타나요.
+                  </Text>
+                )}
               </VStack>
 
               {generations.length === 0 ? (
