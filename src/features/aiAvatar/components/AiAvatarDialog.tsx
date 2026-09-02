@@ -241,6 +241,7 @@ function AiAvatarThumbnail({ generation, onDeleted }: AiAvatarThumbnailProps) {
   const showToast = useToast()
   const theme = findAiAvatarTheme(generation.theme_id)
   const [isSaving, setIsSaving] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const remove = useMutation({
     mutationFn: () => deleteAiAvatarGeneration(generation.id, generation.storage_path),
@@ -261,41 +262,65 @@ function AiAvatarThumbnail({ generation, onDeleted }: AiAvatarThumbnailProps) {
   }
 
   return (
-    <HStack gap={2} hAlign="between" vAlign="center">
-      <HStack gap={3} vAlign="center">
-        {generation.url && (
+    <VStack gap={2}>
+      {/* 크게 볼 땐 오른쪽 썸네일 자리 대신 여기 전체 폭으로 띄운다 — 같은
+          이미지를 눌러 다시 접으면 원래 썸네일 크기로 돌아간다. */}
+      {isExpanded && generation.url && (
+        <button
+          type="button"
+          className="w-full cursor-pointer border-0 bg-transparent p-0"
+          onClick={() => setIsExpanded(false)}
+        >
           <img
             src={generation.url}
             alt=""
-            className="size-16 shrink-0 rounded-md border border-border object-cover"
+            className="aspect-square w-full rounded-lg border border-border object-cover"
           />
-        )}
-        <VStack gap={0}>
-          <Text weight="medium">{theme?.title ?? '아바타'}</Text>
-          <Text type="supporting">{dateLabel(generation.created_at)}</Text>
-        </VStack>
-      </HStack>
+        </button>
+      )}
 
-      <HStack gap={1}>
-        <IconButton
-          label="폰에 저장"
-          tooltip="폰에 저장"
-          variant="secondary"
-          size="sm"
-          icon={<Download className="size-4" />}
-          isDisabled={!generation.url || isSaving}
-          onClick={handleSave}
-        />
-        <IconButton
-          label="아바타 지우기"
-          tooltip="지우기"
-          variant="secondary"
-          size="sm"
-          icon={<Trash2 className="size-4" />}
-          isDisabled={remove.isPending}
-          onClick={() => remove.mutate()}
-        />
+      <HStack gap={2} hAlign="between" vAlign="center">
+        <HStack gap={3} vAlign="center">
+          {generation.url && !isExpanded && (
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer border-0 bg-transparent p-0"
+              onClick={() => setIsExpanded(true)}
+            >
+              <img
+                src={generation.url}
+                alt=""
+                className="size-16 rounded-md border border-border object-cover"
+              />
+            </button>
+          )}
+          <VStack gap={0}>
+            <Text weight="medium">{theme?.title ?? '아바타'}</Text>
+            <Text type="supporting">{dateLabel(generation.created_at)}</Text>
+          </VStack>
+        </HStack>
+
+        <HStack gap={1}>
+          <IconButton
+            label="폰에 저장"
+            tooltip="폰에 저장"
+            variant="secondary"
+            size="sm"
+            icon={<Download className="size-4" />}
+            isDisabled={!generation.url || isSaving}
+            onClick={handleSave}
+          />
+          <IconButton
+            label="아바타 지우기"
+            tooltip="지우기"
+            variant="secondary"
+            size="sm"
+            icon={<Trash2 className="size-4" />}
+            isDisabled={remove.isPending}
+            onClick={() => remove.mutate()}
+          />
+        </HStack>
       </HStack>
-    </HStack>
+    </VStack>
   )
 }
