@@ -79,3 +79,16 @@ export async function saveAiAvatarGeneration(
   if (error) throw error
   return data
 }
+
+/**
+ * 만든 아바타 하나를 지운다. row를 먼저 지우고 나서 파일을 지우는 이유는
+ * removeRegionPhoto(travel)와 같다 — row가 사라지면 사용자가 원한 일은 이미
+ * 끝난 것이고, 파일 삭제가 실패해도 안 쓰이는 파일 하나만 남을 뿐 되돌릴
+ * 필요는 없다.
+ */
+export async function deleteAiAvatarGeneration(id: string, storagePath: string): Promise<void> {
+  const { error } = await supabase.from('ai_avatar_generations').delete().eq('id', id)
+  if (error) throw error
+
+  await supabase.storage.from(BUCKET).remove([storagePath])
+}

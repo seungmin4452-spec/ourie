@@ -383,6 +383,8 @@ RLS는 읽기가 커플 범위 전체(select) — 상대가 몇 번 열었는지
 
 생성 자체는 서버(`api/`)를 거치지 않는다 — 클라이언트가 공용 Puter 계정으로 직접 부른다(`ARCHITECTURE.md` §6.4). 이 테이블은 그 결과 기록일 뿐이라 service role을 쓰는 코드가 없고, insert도 RLS로 `requested_by = auth.uid()`만 막을 뿐 나머지는 커플이 직접 쓴다. 한 번 만든 이미지는 갈아 끼우지 않으므로(생성마다 새 경로) update 정책이 없다.
 
+지울 수는 있다(delete, `2026-09-02-ai-avatar-delete.sql`) — `travel_visits`와 같은 이유로 상대가 만든 것도 지울 수 있다(둘이 같이 보는 갤러리라 "내가 만든 것만"으로 좁히면 상대가 없을 때 못 지운다). Storage 쪽 delete 정책도 같은 범위로 같이 열어야 실제 파일까지 지워진다.
+
 ## 3. Storage 버킷
 
 | 버킷명 | 용도 | 접근 정책 |

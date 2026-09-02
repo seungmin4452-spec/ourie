@@ -8,10 +8,11 @@ import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
-import { Download, Sparkles } from 'lucide-react'
+import { useMutation } from '@tanstack/react-query'
+import { Download, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 
-import type { AiAvatarGenerationWithUrl } from '../api/aiAvatar'
+import { deleteAiAvatarGeneration, type AiAvatarGenerationWithUrl } from '../api/aiAvatar'
 import { useAiAvatarGenerations } from '../hooks/useAiAvatarGenerations'
 import { aiAvatarStageLabel, useGenerateAiAvatar } from '../hooks/useGenerateAiAvatar'
 import { aiAvatarPhotoFileProblem } from '../photoFile'
@@ -125,17 +126,15 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
 
                 <VStack gap={2}>
                   {AI_AVATAR_THEMES.map((theme) => (
-                    <VStack key={theme.id} gap={1}>
-                      <Button
-                        label={theme.title}
-                        variant="secondary"
-                        width="100%"
-                        isLoading={generate.isPending && pendingTheme?.id === theme.id}
-                        isDisabled={generate.isPending && pendingTheme?.id !== theme.id}
-                        onClick={() => pickTheme(theme)}
-                      />
-                      <Text type="supporting">{theme.description}</Text>
-                    </VStack>
+                    <Button
+                      key={theme.id}
+                      label={theme.title}
+                      variant="secondary"
+                      width="100%"
+                      isLoading={generate.isPending && pendingTheme?.id === theme.id}
+                      isDisabled={generate.isPending && pendingTheme?.id !== theme.id}
+                      onClick={() => pickTheme(theme)}
+                    />
                   ))}
                 </VStack>
 
@@ -171,7 +170,11 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
                   <Heading level={2}>만든 아바타들</Heading>
                   <VStack gap={3}>
                     {generations.map((generation) => (
-                      <AiAvatarThumbnail key={generation.id} generation={generation} />
+                      <AiAvatarThumbnail
+                        key={generation.id}
+                        generation={generation}
+                        onDeleted={refresh}
+                      />
                     ))}
                   </VStack>
                 </VStack>
@@ -228,10 +231,22 @@ async function saveAiAvatarToDevice(url: string, fileName: string): Promise<void
   URL.revokeObjectURL(link.href)
 }
 
-function AiAvatarThumbnail({ generation }: { generation: AiAvatarGenerationWithUrl }) {
+interface AiAvatarThumbnailProps {
+  generation: AiAvatarGenerationWithUrl
+  /** 지운 뒤 위젯의 갤러리까지 같이 맞춘다(useAiAvatarGenerations의 refresh). */
+  onDeleted: () => Promise<unknown>
+}
+
+function AiAvatarThumbnail({ generation, onDeleted }: AiAvatarThumbnailProps) {
   const showToast = useToast()
   const theme = findAiAvatarTheme(generation.theme_id)
   const [isSaving, setIsSaving] = useState(false)
+
+  const remove = useMutation({
+    mutationFn: () => deleteAiAvatarGeneration(generation.id, generation.storage_path),
+    onSuccess: () => onDeleted(),
+    onError: () => showToast({ type: 'error', body: '아바타를 지우지 못했어요.' }),
+  })
 
   async function handleSave() {
     if (!generation.url) return
@@ -261,15 +276,26 @@ function AiAvatarThumbnail({ generation }: { generation: AiAvatarGenerationWithU
         </VStack>
       </HStack>
 
-      <IconButton
-        label="폰에 저장"
-        tooltip="폰에 저장"
-        variant="secondary"
-        size="sm"
-        icon={<Download className="size-4" />}
-        isDisabled={!generation.url || isSaving}
-        onClick={handleSave}
-      />
+      <HStack gap={1}>
+        <IconButton
+          label="폰에 저장"
+          tooltip="폰에 저장"
+          variant="secondary"
+          size="sm"
+          icon={<Download className="size-4" />}
+          isDisabled={!generation.url || isSaving}
+          onClick={handleSave}
+        />
+        <IconButton
+          label="아바타 지우기"
+          tooltip="지우기"
+          variant="secondary"
+          size="sm"
+          icon={<Trash2 className="size-4" />}
+          isDisabled={remove.isPending}
+          onClick={() => remove.mutate()}
+        />
+      </HStack>
     </HStack>
   )
 }
