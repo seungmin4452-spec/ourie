@@ -101,18 +101,39 @@ function logStage(stage: AiAvatarStage) {
   console.log(`[ai-avatar] ${stage} (${STAGE_LABEL[stage]})`)
 }
 
-interface PuterDriverErrorBody {
+interface PuterDriverBody {
   success?: boolean
+  /** 성공이면 이 자리에 이미지가 온다 — "data:image/png;base64,..." 형태의
+   * data URI 문자열로 온다는 걸 실제 응답을 보고 나서야 알았다(원래
+   * parseResponse의 content-type 분기만 보고 raw 바이너리를 예상했었다). */
+  result?: unknown
   error?: { code?: string; message?: string } | string
+}
+
+/** "data:image/png;base64,...." 형태의 data URI를 실제 Blob으로 되돌린다. */
+function dataUriToBlob(dataUri: string): Blob {
+  const commaIndex = dataUri.indexOf(',')
+  const header = dataUri.slice(0, commaIndex)
+  const base64 = dataUri.slice(commaIndex + 1)
+  const mimeMatch = /^data:([^;]+);base64$/.exec(header)
+  const mime = mimeMatch?.[1] ?? 'image/png'
+
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
 }
 
 /**
  * `/drivers/call`을 직접 두드려 이미지를 만든다.
  *
  * Puter의 driverCall_이 하던 것과 같은 모양의 요청이다 — 인증은 헤더가
- * 아니라 **본문의 `auth_token` 필드**로 보낸다(SDK도 그렇게 한다). 실패
- * 응답은 보통 JSON이라 content-type으로 갈라서 사람이 읽을 메시지를
- * 뽑아내고, 성공(이미지 content-type)이면 그대로 Blob으로 받는다.
+ * 아니라 **본문의 `auth_token` 필드**로 보낸다(SDK도 그렇게 한다).
+ *
+ * **응답은 항상 JSON이다.** 처음엔 "JSON이면 에러, 이미지 content-type이면
+ * 성공"이라고 짰었는데 틀렸다 — 실제로는 성공해도 `{"success":true,"result":
+ * "data:image/png;base64,..."}`처럼 **JSON 안에 이미지가 data URI로
+ * 들어있다.** `success` 값으로만 갈라야 한다.
  */
 async function callPuterImageGeneration(
   token: string,
@@ -134,29 +155,28 @@ async function callPuterImageGeneration(
     }),
   })
 
-  const contentType = response.headers.get('content-type') ?? ''
-  if (contentType.includes('application/json')) {
-    // 실제 본문을 그대로 던진다 — 어설프게 요약하면 다음에 다른 이유로
-    // 실패했을 때 또 뭐가 문제인지 못 보고 이 함수부터 다시 고쳐야 한다.
-    const text = await response.text()
-    let extracted: string | null = null
-    try {
-      const parsed = JSON.parse(text) as PuterDriverErrorBody
-      extracted = typeof parsed.error === 'string' ? parsed.error : (parsed.error?.message ?? null)
-    } catch {
-      // JSON이 아니었다 — text를 그대로 아래에서 보여준다.
-    }
+  const text = await response.text()
+  let body: PuterDriverBody | null = null
+  try {
+    body = JSON.parse(text) as PuterDriverBody
+  } catch {
+    // JSON이 아니었다 — 아래에서 원본 텍스트를 그대로 보여준다.
+  }
+
+  if (body?.success === true && typeof body.result === 'string' && body.result.startsWith('data:')) {
+    return dataUriToBlob(body.result)
+  }
+
+  if (!response.ok || body?.success === false) {
+    const message = typeof body?.error === 'string' ? body.error : body?.error?.message
     throw new Error(
-      `Puter가 이미지 대신 오류를 돌려줬어요 (status ${response.status}): ` +
-        (extracted ?? (text || '(빈 응답)')),
+      message ?? `Puter가 오류를 돌려줬어요 (status ${response.status}): ${text.slice(0, 300) || '(빈 응답)'}`,
     )
   }
 
-  if (!response.ok) {
-    throw new Error(`Puter 요청이 실패했어요 (status ${response.status}).`)
-  }
-
-  return await response.blob()
+  // success도 error도 아닌, 예상 못한 모양 — 짐작으로 넘어가지 않고 원본을
+  // 그대로 보여준다.
+  throw new Error(`Puter 응답을 이해하지 못했어요: ${text.slice(0, 300)}`)
 }
 
 /**
