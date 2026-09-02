@@ -136,11 +136,20 @@ async function callPuterImageGeneration(
 
   const contentType = response.headers.get('content-type') ?? ''
   if (contentType.includes('application/json')) {
-    const body = (await response.json().catch(() => null)) as PuterDriverErrorBody | null
-    const message =
-      (typeof body?.error === 'string' ? body.error : body?.error?.message) ??
-      `Puter가 이미지 대신 오류를 돌려줬어요 (status ${response.status}).`
-    throw new Error(message)
+    // 실제 본문을 그대로 던진다 — 어설프게 요약하면 다음에 다른 이유로
+    // 실패했을 때 또 뭐가 문제인지 못 보고 이 함수부터 다시 고쳐야 한다.
+    const text = await response.text()
+    let extracted: string | null = null
+    try {
+      const parsed = JSON.parse(text) as PuterDriverErrorBody
+      extracted = typeof parsed.error === 'string' ? parsed.error : (parsed.error?.message ?? null)
+    } catch {
+      // JSON이 아니었다 — text를 그대로 아래에서 보여준다.
+    }
+    throw new Error(
+      `Puter가 이미지 대신 오류를 돌려줬어요 (status ${response.status}): ` +
+        (extracted ?? (text || '(빈 응답)')),
+    )
   }
 
   if (!response.ok) {
