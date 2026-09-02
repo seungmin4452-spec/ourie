@@ -8,9 +8,18 @@ import { withTimeout } from '../withTimeout'
 import { formatXhrTrace, traceXhrTo, type XhrTrace } from '../xhrTrace'
 import { usePuterToken } from './usePuterToken'
 
-/** Puter API의 기본 도메인. node_modules/@heyputer/puter.js/src/index.js의
- * `defaultAPIOrigin = globalThis.PUTER_API_ORIGIN ?? 'https://api.puter.com'`. */
-const PUTER_API_HOST = 'api.puter.com'
+/**
+ * 이미지 생성 요청이 실제로 나가는 엔드포인트만 잡는다.
+ * (node_modules/@heyputer/puter.js/src/lib/utils.js의 driverCall_이
+ * `initXhr('/drivers/call', ...)`로 만든다.)
+ *
+ * 처음엔 `api.puter.com` 전체로 잡았다가 실제 기록을 보니 SDK가 백그라운드로
+ * 계속 돌리는 socket.io 실시간 연결(끊임없이 재연결·400 에러를 내며 도는
+ * 것으로 보인다 — 아마 filesystem/실시간 기능용)까지 다 섞여 들어와서, 정작
+ * 봐야 할 이미지 생성 요청 한 줄이 소음에 묻혔다. 경로까지 좁혀서 그 소음을
+ * 걷어낸다.
+ */
+const PUTER_API_HOST = '/drivers/call'
 
 /** Puter에 보낼 사진의 긴 변 최대 길이. 원본을 그대로 보내면 요청이 무거워지고
  * 응답도 느려진다 — 스타일 변환은 이 정도 해상도로도 충분하다. */
