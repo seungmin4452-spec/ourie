@@ -48,6 +48,8 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
   const [pendingSince, setPendingSince] = useState<number | null>(null)
   const [isSlow, setIsSlow] = useState(false)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  // 한 번에 하나만 크게 볼 수 있다 — 다른 걸 누르면 그게 대신 커진다.
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const { generations, refresh } = useAiAvatarGenerations(coupleId)
   const generate = useGenerateAiAvatar()
@@ -174,6 +176,12 @@ export function AiAvatarDialog({ isOpen, onOpenChange, coupleId, userId }: AiAva
                         key={generation.id}
                         generation={generation}
                         onDeleted={refresh}
+                        isExpanded={expandedId === generation.id}
+                        onToggleExpand={() =>
+                          setExpandedId((current) =>
+                            current === generation.id ? null : generation.id,
+                          )
+                        }
                       />
                     ))}
                   </VStack>
@@ -235,13 +243,22 @@ interface AiAvatarThumbnailProps {
   generation: AiAvatarGenerationWithUrl
   /** 지운 뒤 위젯의 갤러리까지 같이 맞춘다(useAiAvatarGenerations의 refresh). */
   onDeleted: () => Promise<unknown>
+  /** 지금 이 항목이 크게 펼쳐져 있는지 — 어느 게 펼쳐질지는 부모(AiAvatarDialog)가
+   * expandedId 하나로 관리한다. 한 번에 하나만 커질 수 있어야 하니 형제
+   * 항목들끼리 상태를 공유해야 하고, 그건 각자 로컬 상태로는 못 한다. */
+  isExpanded: boolean
+  onToggleExpand: () => void
 }
 
-function AiAvatarThumbnail({ generation, onDeleted }: AiAvatarThumbnailProps) {
+function AiAvatarThumbnail({
+  generation,
+  onDeleted,
+  isExpanded,
+  onToggleExpand,
+}: AiAvatarThumbnailProps) {
   const showToast = useToast()
   const theme = findAiAvatarTheme(generation.theme_id)
   const [isSaving, setIsSaving] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
 
   const remove = useMutation({
     mutationFn: () => deleteAiAvatarGeneration(generation.id, generation.storage_path),
@@ -269,7 +286,7 @@ function AiAvatarThumbnail({ generation, onDeleted }: AiAvatarThumbnailProps) {
         <button
           type="button"
           className="w-full cursor-pointer border-0 bg-transparent p-0"
-          onClick={() => setIsExpanded(false)}
+          onClick={onToggleExpand}
         >
           <img
             src={generation.url}
@@ -285,7 +302,7 @@ function AiAvatarThumbnail({ generation, onDeleted }: AiAvatarThumbnailProps) {
             <button
               type="button"
               className="shrink-0 cursor-pointer border-0 bg-transparent p-0"
-              onClick={() => setIsExpanded(true)}
+              onClick={onToggleExpand}
             >
               <img
                 src={generation.url}
