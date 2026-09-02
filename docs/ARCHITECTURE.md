@@ -220,19 +220,20 @@ src/features/travel/{regions,districts}.ts  (292KB, 저장소에 커밋)
 위젯: 주제 버튼 선택 → 사진첩 열림 → 사진 선택
         │
         ▼  (서버를 거치지 않는다)
-브라우저가 직접 Puter 호출 (@heyputer/puter.js, puter.ai.txt2img)
-        │  puter.setAuthToken(공용 계정 토큰) — GET /api/puter-token으로 받음
+브라우저가 Puter의 /drivers/call을 직접 fetch (SDK 없이, useGenerateAiAvatar.ts)
+        │  auth_token은 헤더가 아니라 요청 본문에 — GET /api/puter-token으로 받은 값
         ▼
-결과 <img>.src(blob: URL) → fetch로 바이트 추출 → Supabase Storage 업로드
+응답 이미지(Blob) → Supabase Storage 업로드
         │
         ▼
 ai_avatar_generations row 기록, 위젯이 즉시 미리보기 갱신
 ```
 
-- **왜 이 기능만 서버(`api/`)를 거치지 않나**: 원래는 다른 위젯들처럼 Node 함수에서 서버 쪽 자격으로 Puter를 부르려 했다. 그런데 `@heyputer/puter.js`(1.0.1)의 `puter.ai.txt2img`는 결과를 항상 `new Image()`(브라우저 전용 DOM 타입)로 감싸 반환하도록 짜여 있어서, Node 런타임에서 부르면 `Image is not defined`로 죽는다 (공식 저장소의 미해결 이슈 [HeyPuter/puter#1900](https://github.com/HeyPuter/puter/issues/1900)). 그래서 이 기능만 `src/features/aiAvatar/hooks/useGenerateAiAvatar.ts`에서 브라우저가 직접 부른다.
+- **왜 이 기능만 서버(`api/`)를 거치지 않나**: 원래는 다른 위젯들처럼 Node 함수에서 서버 쪽 자격으로 Puter를 부르려 했다. 공식 SDK(`@heyputer/puter.js`)의 `puter.ai.txt2img`는 결과를 항상 `new Image()`(브라우저 전용 DOM 타입)로 감싸 반환하도록 짜여 있어서, Node 런타임에서 부르면 `Image is not defined`로 죽는다 (공식 저장소의 미해결 이슈 [HeyPuter/puter#1900](https://github.com/HeyPuter/puter/issues/1900)). 그래서 브라우저가 직접 부른다.
+- **SDK를 아예 안 쓰고 `/drivers/call`을 직접 두드리는 이유**: 처음엔 SDK(`puter.ai.txt2img`)를 그대로 썼는데, 실제 운영에서 이미지 생성 HTTP 요청 자체는 12초 만에 정상 응답(status 200, 완성된 이미지)을 받았는데도 화면은 몇 분씩 "생성 중"에서 멈춰 있는 사례가 반복됐다. 원인을 SDK 소스까지 따라가보니, `import puter from '@heyputer/puter.js'` 한 줄만으로 우리가 전혀 쓰지 않는 실시간 파일시스템 동기화 기능(`FSRelayService`)까지 자동 초기화되고, 이게 socket.io 연결을 끝없이 재시도하며 계속 400 에러를 내고 있었다 — 이 배경 소음이 브라우저를 바쁘게 만들어 정작 이미지 응답을 처리할 콜백이 실행될 차례를 못 얻는 것으로 보였다. SDK가 내부적으로 두드리는 엔드포인트(`https://api.puter.com/drivers/call`)와 요청 모양(본문에 `interface`/`driver`/`method`/`args`/`auth_token`)은 그대로 흉내 내되, SDK 자체는 import하지 않으면 이 문제의 기능도 아예 초기화되지 않는다. 그래서 `@heyputer/puter.js`는 의존성에서도 뺐다.
 - **무료로 쓰는 이유**: Google AI Studio(나노바나나 원 소스)는 이미지 생성 모델에 Free tier가 아예 없어 어느 티어로 붙여도 실비가 청구된다. Puter는 "User-Pays" 모델로 계정 하나에 매달 무료 크레딧(가입 시점 기준 1,000 크레딧)을 주고 그 안에서 나노바나나를 그대로 쓸 수 있어, 이 앱 같은 개인용 저트래픽 서비스에 맞는 방향이다. 둘이서만 쓰는 앱이라 계정도 공용 하나면 충분하다(각자 만들 이유가 없다).
-- **로그인 팝업이 안 뜨는 이유**: Puter.js는 기본적으로 브라우저 팝업으로 사용자를 로그인시키는 SDK다(`puter.authToken`이 비어 있으면 자동으로 뜬다). 공용 계정에서 발급한 **개인 액세스 토큰**을 서버 환경변수(`PUTER_SHARED_TOKEN`)로 들고 있다가, `api/puter-token.ts`가 로그인한 사용자에게만 그 값을 내려주고, 클라이언트가 `puter.setAuthToken(token)`으로 미리 인증해두면 그 팝업 분기 자체가 안 걸린다. 토큰을 클라이언트 번들에 그대로 박아두지 않는 이유는 빌드된 정적 파일이 로그인 여부와 무관하게 그 URL에 접속하는 누구나 받아볼 수 있어서다 — `api/puter-token.ts`는 문자열 하나만 돌려주고, 실제 생성 호출은 하지 않는다.
-- **모델은 `gemini-2.5-flash-image-preview`(나노바나나 원버전)를 쓴다.** Puter 웹앱(puter.com의 "AI Image Project")에서는 나노바나나 프로/2까지 고를 수 있지만, 이건 이 npm 패키지를 거치지 않는 별도 경로다. `@heyputer/puter.js`의 클라이언트 쪽 모델→드라이버 라우팅(`node_modules/@heyputer/puter.js/src/modules/AI.js`)이 아직 `gemini-2.5-flash-image-preview`(및 별칭 `nano-banana`)만 알아서, 신형 모델 문자열을 넘기면 엉뚱한 드라이버로 빠진다. SDK가 업데이트되면 상수(`MODEL`)만 올리면 된다.
+- **로그인 팝업 자체가 없다**: SDK를 거치지 않으니 SDK의 자동 로그인 팝업 분기도 애초에 존재하지 않는다. 공용 계정에서 발급한 **개인 액세스 토큰**을 서버 환경변수(`PUTER_SHARED_TOKEN`)로 들고 있다가, `api/puter-token.ts`가 로그인한 사용자에게만 그 값을 내려주고, 클라이언트는 그 토큰을 `/drivers/call` 요청 본문의 `auth_token` 필드에 그대로 실어 보낸다. 토큰을 클라이언트 번들에 그대로 박아두지 않는 이유는 빌드된 정적 파일이 로그인 여부와 무관하게 그 URL에 접속하는 누구나 받아볼 수 있어서다 — `api/puter-token.ts`는 문자열 하나만 돌려주고, 실제 생성 호출은 하지 않는다.
+- **모델은 `gemini-2.5-flash-image-preview`(나노바나나 원버전)를 쓴다.** Puter 웹앱(puter.com의 "AI Image Project")에서는 나노바나나 프로/2까지 고를 수 있지만, 그건 이 경로(`/drivers/call`에 직접 넘기는 `driver` 필드)와 별개로 웹앱 자체가 다르게 라우팅하는 것으로 보인다. 우리가 흉내 낸 SDK의 모델→드라이버 매핑(`gemini-2.5-flash-image-preview` → driver `gemini-image-generation`)은 이 모델 하나만 검증됐다 — 다른 모델 문자열을 쓰려면 실제 driver 이름을 먼저 확인해야 한다.
 - **쿼터 캡을 따로 두지 않는다.** 비용이 우리 Vercel/Supabase 인프라가 아니라 공용 Puter 계정 자체에 붙으므로, 다른 위젯들처럼 하루/월 한도를 DB로 강제할 이유가 없다 — 계정의 무료 월간 크레딧이 자연스러운 상한이다.
 
 ## 7. 배포 구조
