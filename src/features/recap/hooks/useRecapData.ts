@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
+import { useAiAvatarGenerations } from '@/features/aiAvatar'
 import { useAppVisitHistory } from '@/features/appVisit'
 import { useCalendarEvents } from '@/features/calendar'
 import { getCoupleCreatedAt } from '@/features/couple'
@@ -27,6 +28,7 @@ export function useRecapData(
   const wishBoard = useWishBoard(coupleId)
   const pokeHistory = usePokeHistory(coupleId)
   const appVisitHistory = useAppVisitHistory(coupleId)
+  const aiAvatarGenerations = useAiAvatarGenerations(coupleId)
   const coupleCreatedAt = useQuery({
     queryKey: coupleCreatedAtQueryKey(coupleId),
     queryFn: () => getCoupleCreatedAt(coupleId!),
@@ -42,6 +44,7 @@ export function useRecapData(
     wishBoard.isLoading ||
     pokeHistory.isLoading ||
     appVisitHistory.isLoading ||
+    aiAvatarGenerations.isLoading ||
     coupleCreatedAt.isLoading
 
   return {
@@ -54,5 +57,6 @@ export function useRecapData(
     wishes: wishBoard.wishes,
     pokes: pokeHistory.data ?? [],
     appVisits: appVisitHistory.data ?? [],
+    aiImageGenerations: aiAvatarGenerations.generations,
   }
 }

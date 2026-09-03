@@ -1,3 +1,4 @@
+import type { AiAvatarGeneration } from '@/features/aiAvatar'
 import type { AppVisitRecord } from '@/features/appVisit'
 import type { CalendarEvent } from '@/features/calendar'
 import type { PokeRecord } from '@/features/poke'
@@ -97,6 +98,7 @@ export interface RecapData {
   wishes: Wish[]
   pokes: PokeRecord[]
   appVisits: AppVisitRecord[]
+  aiImageGenerations: AiAvatarGeneration[]
 }
 
 export interface RecapCounts {
@@ -113,6 +115,8 @@ export interface RecapCounts {
   pokesReceived: number
   myAppVisitCount: number
   partnerAppVisitCount: number
+  myAiImageCount: number
+  partnerAiImageCount: number
 }
 
 export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts {
@@ -125,6 +129,7 @@ export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts 
     wishes,
     pokes,
     appVisits,
+    aiImageGenerations,
   } = data
 
   const knownVisits = travelVisits.filter((visit) => KNOWN_REGION_CODES.has(visit.region_code))
@@ -145,10 +150,16 @@ export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts 
   const periodAppVisits = appVisits.filter((visit) =>
     matchesPeriod(new Date(visit.created_at), period),
   )
+  const periodAiImages = aiImageGenerations.filter((generation) =>
+    matchesPeriod(new Date(generation.created_at), period),
+  )
 
   const myWishCount = periodWishes.filter((wish) => wish.owner_id === selfId).length
   const pokesSent = periodPokes.filter((poke) => poke.sender_id === selfId).length
   const myAppVisitCount = periodAppVisits.filter((visit) => visit.user_id === selfId).length
+  const myAiImageCount = periodAiImages.filter(
+    (generation) => generation.requested_by === selfId,
+  ).length
 
   return {
     calendarEventCount: periodEvents.length,
@@ -163,5 +174,7 @@ export function computeRecap(data: RecapData, period: RecapPeriod): RecapCounts 
     pokesReceived: periodPokes.length - pokesSent,
     myAppVisitCount,
     partnerAppVisitCount: periodAppVisits.length - myAppVisitCount,
+    myAiImageCount,
+    partnerAiImageCount: periodAiImages.length - myAiImageCount,
   }
 }

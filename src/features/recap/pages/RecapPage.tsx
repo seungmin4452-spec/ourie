@@ -90,7 +90,9 @@ export function RecapPage() {
   const showBadges = showTravel || showPhotomap
   const showWish = addedWidgets.has('wish')
   const showPoke = addedWidgets.has('poke')
-  const showGrid = showCalendar || showTravel || showPhotomap || showWish || showPoke
+  const showAiAvatar = addedWidgets.has('aiAvatar')
+  const showGrid =
+    showCalendar || showTravel || showPhotomap || showWish || showPoke || showAiAvatar
   const hasAnyWidget = showDday || showGrid
 
   const [granularity, setGranularity] = useState<Granularity>('month')
@@ -123,6 +125,7 @@ export function RecapPage() {
             wishes: recap.wishes,
             pokes: recap.pokes,
             appVisits: recap.appVisits,
+            aiImageGenerations: recap.aiImageGenerations,
           },
     [profile, recap],
   )
@@ -167,6 +170,8 @@ export function RecapPage() {
   const previousPokeTotal = previousCounts.pokesSent + previousCounts.pokesReceived
   const appVisitTotal = counts.myAppVisitCount + counts.partnerAppVisitCount
   const previousAppVisitTotal = previousCounts.myAppVisitCount + previousCounts.partnerAppVisitCount
+  const aiImageTotal = counts.myAiImageCount + counts.partnerAiImageCount
+  const previousAiImageTotal = previousCounts.myAiImageCount + previousCounts.partnerAiImageCount
 
   // 그리드에 실제로 뜰 카드만 보고 "이 기간엔 기록이 없어요"를 판단한다.
   // counts 자체에는 안 올려둔 위젯의 수치도 들어 있어서, 그걸 그대로 쓰면
@@ -180,6 +185,7 @@ export function RecapPage() {
     (showBadges && counts.newBadgeCount > 0) ||
     (showWish && wishTotal > 0) ||
     (showPoke && pokeTotal > 0) ||
+    (showAiAvatar && aiImageTotal > 0) ||
     (showGrid && appVisitTotal > 0)
 
   const comparisonLabel = granularity === 'year' ? '작년' : '지난달'
@@ -328,6 +334,15 @@ export function RecapPage() {
                     caption={`보낸 ${counts.pokesSent} · 받은 ${counts.pokesReceived}`}
                     current={pokeTotal}
                     previous={previousPokeTotal}
+                  />
+                )}
+                {showAiAvatar && (
+                  <RecapCard
+                    label="AI 이미지 생성"
+                    value={`${aiImageTotal}장`}
+                    caption={`나 ${counts.myAiImageCount} · ${partnerName} ${counts.partnerAiImageCount}`}
+                    current={aiImageTotal}
+                    previous={previousAiImageTotal}
                   />
                 )}
               </Grid>
