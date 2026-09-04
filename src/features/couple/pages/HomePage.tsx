@@ -158,7 +158,7 @@ export function HomePage() {
       case 'dday':
         return highlight ? (
           <VStack gap={3}>
-            <DdayHighlight summary={highlight} />
+            <DdayHighlight summary={highlight} summaries={summaries} />
             <Button
               label={
                 summaries.length > 1 ? `기념일 ${summaries.length}개 모두 보기` : '기념일 관리'

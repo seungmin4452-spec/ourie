@@ -122,14 +122,7 @@ export function pickHighlight(summaries: DdaySummary[]): DdaySummary | null {
   const chosen = summaries.find((summary) => summary.anniversary.is_primary)
   if (chosen) return chosen
 
-  // 가장 가까이 다가온 것. 목록이 등록 순으로 오므로 여기서 직접 고른다.
-  let nearest: DdaySummary | null = null
-  for (const summary of summaries) {
-    if (summary.daysUntil == null) continue
-    if (nearest?.daysUntil == null || summary.daysUntil < nearest.daysUntil) {
-      nearest = summary
-    }
-  }
+  const nearest = nearestUpcoming(summaries)
   if (nearest) return nearest
 
   // 다가오는 게 하나도 없는 경우 (반복하지 않는 기념일만 있고 전부 지났다).
@@ -141,6 +134,23 @@ export function pickHighlight(summaries: DdaySummary[]): DdaySummary | null {
     }
   }
   return latest
+}
+
+/**
+ * 지나지 않은 기념일 중 가장 먼저 다가오는 것. `pickHighlight`의 자동 선택
+ * 규칙과 위젯 보조 문구(`formatUpcomingLabel`)가 함께 쓴다 — 후자는 커플이
+ * 직접 고른 기념일이 있어도 그와 무관하게 "다음으로 뭐가 오는지"를 알려줘야
+ * 하기 때문이다.
+ */
+export function nearestUpcoming(summaries: DdaySummary[]): DdaySummary | null {
+  let nearest: DdaySummary | null = null
+  for (const summary of summaries) {
+    if (summary.daysUntil == null) continue
+    if (nearest?.daysUntil == null || summary.daysUntil < nearest.daysUntil) {
+      nearest = summary
+    }
+  }
+  return nearest
 }
 
 /**
@@ -172,4 +182,26 @@ export function formatDateKey(key: DateKey): string {
 /** "3주년". 기준일이 있는 해와 일회성 기념일은 null. */
 export function formatMilestone(yearsAt: number | null): string | null {
   return yearsAt != null && yearsAt > 0 ? `${yearsAt}주년` : null
+}
+
+/**
+ * 디데이 위젯 큰 숫자 아래 보조 문구.
+ *
+ * `highlighted`는 위젯이 크게 보여주는 기념일(커플이 직접 고른 것, 없으면
+ * 자동 선택). `upcoming`은 그와 별개로 등록된 기념일 전체 중 지나지 않고
+ * 가장 먼저 다가오는 것 — 둘이 같은 기념일이면 그 주년("1주년까지 D-N")을,
+ * 다르면 더 가까운 쪽 이름("생일까지 D-N")을 알려준다. 크게 뜬 기념일을
+ * 고정해서 봐도 정작 다음으로 뭐가 다가오는지는 놓치지 않게 하려는 것이다.
+ */
+export function formatUpcomingLabel(
+  highlighted: DdaySummary,
+  upcoming: DdaySummary | null,
+): string | null {
+  if (upcoming == null || upcoming.daysUntil == null) return null
+
+  const isSame = upcoming.anniversary.id === highlighted.anniversary.id
+  const label = isSame ? formatMilestone(upcoming.yearsAt) : upcoming.anniversary.title
+  if (label == null) return null
+
+  return upcoming.daysUntil === 0 ? `오늘이 ${label}이에요` : `${label}까지 ${formatDday(upcoming.daysUntil)}`
 }
