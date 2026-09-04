@@ -13,11 +13,12 @@ import { BackButton } from '@/components/common/BackButton'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
 import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
-import { NotificationSettings } from '@/features/notification'
+import { NotificationSettings, pickBaseAnniversary } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { deleteAnniversary, setPrimaryAnniversary } from '../api/anniversary'
 import { AnniversaryFormDialog } from '../components/AnniversaryFormDialog'
 import { AnniversaryList } from '../components/AnniversaryList'
+import { UpcomingMilestones } from '../components/UpcomingMilestones'
 import { pickHighlight, startOfToday, summarizeAll } from '../dday'
 import { anniversariesQueryKey, useAnniversaries } from '../hooks/useAnniversaries'
 import type { Anniversary } from '../types'
@@ -52,6 +53,11 @@ export function AnniversaryPage() {
   // 같은 규칙으로 떨어지므로, 라디오는 언제나 "지금 홈에 떠 있는 그것"을 켠 채로
   // 열린다 — 비어 있는 라디오 그룹을 보여주지 않으려는 것이다.
   const primaryId = pickHighlight(summaries)?.anniversary.id
+
+  // 다가오는 마일스톤은 위젯의 "크게 뜨는 것"이 아니라 알림이 세는 기준
+  // 기념일 하나로 계산한다 — 그래야 여기 보이는 다음 마일스톤과 실제로 오는
+  // 알림이 같은 날을 가리킨다 (`notification/baseAnniversary.ts`).
+  const baseAnniversary = pickBaseAnniversary(anniversaries ?? [])
 
   const primarySelection = useMutation({
     mutationFn: (anniversary: Anniversary) => setPrimaryAnniversary(anniversary.id),
@@ -145,6 +151,10 @@ export function AnniversaryPage() {
             width="100%"
             onClick={openCreate}
           />
+
+          {baseAnniversary && (
+            <UpcomingMilestones anniversary={baseAnniversary} today={startOfToday()} />
+          )}
         </>
       )}
 
