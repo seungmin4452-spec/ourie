@@ -164,9 +164,8 @@ export function pickHighlight(summaries: DdaySummary[]): DdaySummary | null {
 
 /**
  * 지나지 않은 기념일 중 가장 먼저 다가오는 것. `pickHighlight`의 자동 선택
- * 규칙과 위젯 보조 문구(`formatUpcomingLabel`)가 함께 쓴다 — 후자는 커플이
- * 직접 고른 기념일이 있어도 그와 무관하게 "다음으로 뭐가 오는지"를 알려줘야
- * 하기 때문이다.
+ * 규칙과 `nextUpcomingEvent`가 함께 쓴다 — 후자는 커플이 직접 고른 기념일이
+ * 있어도 그와 무관하게 "다음으로 뭐가 오는지"를 알려줘야 하기 때문이다.
  */
 export function nearestUpcoming(summaries: DdaySummary[]): DdaySummary | null {
   let nearest: DdaySummary | null = null
@@ -228,28 +227,6 @@ export function formatDateKey(key: DateKey): string {
 /** "3주년". 기준일이 있는 해와 일회성 기념일은 null. */
 export function formatMilestone(yearsAt: number | null): string | null {
   return yearsAt != null && yearsAt > 0 ? `${yearsAt}주년` : null
-}
-
-/**
- * 디데이 위젯 큰 숫자 아래 보조 문구.
- *
- * `highlighted`는 위젯이 크게 보여주는 기념일(커플이 직접 고른 것, 없으면
- * 자동 선택). `upcoming`은 그와 별개로 등록된 기념일 전체 중 지나지 않고
- * 가장 먼저 다가오는 것 — 둘이 같은 기념일이면 그 주년("1주년까지 D-N")을,
- * 다르면 더 가까운 쪽 이름("생일까지 D-N")을 알려준다. 크게 뜬 기념일을
- * 고정해서 봐도 정작 다음으로 뭐가 다가오는지는 놓치지 않게 하려는 것이다.
- */
-export function formatUpcomingLabel(
-  highlighted: DdaySummary,
-  upcoming: DdaySummary | null,
-): string | null {
-  if (upcoming == null || upcoming.daysUntil == null) return null
-
-  const isSame = upcoming.anniversary.id === highlighted.anniversary.id
-  const label = isSame ? formatMilestone(upcoming.yearsAt) : upcoming.anniversary.title
-  if (label == null) return null
-
-  return upcoming.daysUntil === 0 ? `오늘이 ${label}이에요` : `${label}까지 ${formatDday(upcoming.daysUntil)}`
 }
 
 /** 100일 단위 마일스톤 간격 — 국내 커플 앱들의 관례 (`notification/message.ts`와 같은 규칙). */
@@ -319,4 +296,56 @@ export function upcomingMilestones(anniversary: Anniversary, today: Date, count:
   }
 
   return deduped.slice(0, count)
+}
+
+export interface UpcomingEvent {
+  label: string
+  /** 오늘부터 이 날까지 남은 일수. 0이면 오늘. */
+  daysUntil: number
+}
+
+/**
+ * 디데이 위젯 큰 숫자 아래에 보여줄 "다음으로 다가오는 것".
+ *
+ * 두 후보 중 더 가까운 쪽을 고른다.
+ * 1. `highlighted`가 커플이 직접 고른 기준 기념일(`is_primary`)이면, 그
+ *    자신의 다음 마일스톤(100일 단위·1년 단위, `upcomingMilestones`) —
+ *    매일 알림이 세는 것과 같은 규칙이라 여기 보이는 것과 실제로 오는
+ *    알림이 어긋나지 않는다. 100일·1년 단위 기념일을 따로 등록해두지
+ *    않아도 이 계산만으로 항상 다음 것이 나온다.
+ * 2. 그 외 등록된 기념일(`highlighted` 제외) 중 지나지 않고 가장 가까운 것.
+ *
+ * `is_primary`가 아닌 기념일(생일처럼 기준으로 고르지 않은 것)엔 100일·1년
+ * 단위 마일스톤을 붙이지 않는다 — `formatDayCount`가 그런 기념일을 누적이
+ * 아니라 주기로 세는 것과 같은 이유로, "태어난 지 500일"은 의미가 없다.
+ */
+export function nextUpcomingEvent(
+  highlighted: DdaySummary,
+  summaries: DdaySummary[],
+  today: Date,
+): UpcomingEvent | null {
+  const others = summaries.filter(
+    (summary) => summary.anniversary.id !== highlighted.anniversary.id,
+  )
+  const otherNearest = nearestUpcoming(others)
+  const otherCandidate: UpcomingEvent | null =
+    otherNearest?.daysUntil != null
+      ? { label: otherNearest.anniversary.title, daysUntil: otherNearest.daysUntil }
+      : null
+
+  const milestoneCandidate: UpcomingEvent | null = highlighted.anniversary.is_primary
+    ? (upcomingMilestones(highlighted.anniversary, today, 1)[0] ?? null)
+    : null
+
+  if (!milestoneCandidate) return otherCandidate
+  if (!otherCandidate) return milestoneCandidate
+  return milestoneCandidate.daysUntil <= otherCandidate.daysUntil ? milestoneCandidate : otherCandidate
+}
+
+/** `nextUpcomingEvent`의 결과를 "OO까지 D-N" 문구로. */
+export function formatUpcomingLabel(event: UpcomingEvent | null): string | null {
+  if (event == null) return null
+  return event.daysUntil === 0
+    ? `오늘이 ${event.label}이에요`
+    : `${event.label}까지 ${formatDday(event.daysUntil)}`
 }

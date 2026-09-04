@@ -6,7 +6,8 @@ import {
   formatDateKey,
   formatDayCount,
   formatUpcomingLabel,
-  nearestUpcoming,
+  nextUpcomingEvent,
+  startOfToday,
   type DdaySummary,
 } from '../dday'
 
@@ -15,9 +16,9 @@ import {
  *
  * 카드는 감싸지 않는다 — 이 컴포넌트를 담는 WidgetCard가 이미 카드이고,
  * 카드를 겹치면 안 된다. 큰 숫자는 기준일을 1일째로 센 D+N이고, 그 아래
- * 보조 문구는 `summaries` 전체에서 지나지 않고 가장 먼저 다가오는 기념일을
- * 알려준다 (`formatUpcomingLabel` 주석 참고) — 이 기념일 자신이 가장
- * 가까우면 다음 주년을, 아니면 더 가까운 다른 기념일 이름을 보여준다.
+ * 보조 문구는 다음으로 다가오는 것을 알려준다 (`nextUpcomingEvent` 주석
+ * 참고) — 기준 기념일이면 다음 100일·1년 단위 마일스톤을, 다른 기념일이
+ * 더 가까우면 그 이름을 보여준다. 둘 다 등록해두지 않아도 계산만으로 나온다.
  */
 export function DdayHighlight({
   summary,
@@ -27,7 +28,7 @@ export function DdayHighlight({
   summaries: DdaySummary[]
 }) {
   const { anniversary } = summary
-  const upcomingLabel = formatUpcomingLabel(summary, nearestUpcoming(summaries))
+  const upcomingLabel = formatUpcomingLabel(nextUpcomingEvent(summary, summaries, startOfToday()))
 
   return (
     <VStack gap={1} hAlign="center">
