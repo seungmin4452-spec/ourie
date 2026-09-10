@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 
 import { createCalendarEvent, updateCalendarEvent } from '../api/calendar'
+import { notifyCalendarEvent } from '../api/calendarNotify'
 import { calendarEventsQueryKey } from '../hooks/useCalendarEvents'
 import { startOfToday, toDateKey } from '../schedule'
 import { CALENDAR_LOCATION_MAX, CALENDAR_TITLE_MAX } from '../types'
@@ -113,9 +114,14 @@ function CalendarEventForm({
   const mutation = useMutation({
     mutationFn: (input: CalendarEventInput) =>
       event ? updateCalendarEvent(event.id, input) : createCalendarEvent(coupleId, userId, input),
-    onSuccess: async () => {
+    onSuccess: async (savedEvent) => {
       await queryClient.invalidateQueries({ queryKey: calendarEventsQueryKey(coupleId) })
       showToast({ type: 'info', body: event ? '일정을 수정했어요.' : '일정을 등록했어요.' })
+      // 새로 "우리 약속"이 된 순간에만 알린다 — 이미 공유 중인 약속을 다시
+      // 고쳐 저장할 때마다 상대방 기기를 울리면 안 된다.
+      if (savedEvent.is_shared && !event?.is_shared) {
+        void notifyCalendarEvent(savedEvent.id)
+      }
       onClose()
     },
     onError: (error) => {

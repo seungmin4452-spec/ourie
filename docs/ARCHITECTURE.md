@@ -236,6 +236,30 @@ ai_avatar_generations row 기록, 위젯이 즉시 미리보기 갱신
 - **모델은 `gemini-2.5-flash-image-preview`(나노바나나 원버전)를 쓴다.** Puter 웹앱(puter.com의 "AI Image Project")에서는 나노바나나 프로/2까지 고를 수 있지만, 그건 이 경로(`/drivers/call`에 직접 넘기는 `driver` 필드)와 별개로 웹앱 자체가 다르게 라우팅하는 것으로 보인다. 우리가 흉내 낸 SDK의 모델→드라이버 매핑(`gemini-2.5-flash-image-preview` → driver `gemini-image-generation`)은 이 모델 하나만 검증됐다 — 다른 모델 문자열을 쓰려면 실제 driver 이름을 먼저 확인해야 한다.
 - **쿼터 캡을 따로 두지 않는다.** 비용이 우리 Vercel/Supabase 인프라가 아니라 공용 Puter 계정 자체에 붙으므로, 다른 위젯들처럼 하루/월 한도를 DB로 강제할 이유가 없다 — 계정의 무료 월간 크레딧이 자연스러운 상한이다.
 
+### 6.5 캘린더 "우리 약속" 알림
+
+지역 뱃지(§6.3 알림)·소원권과 형제 구조다. "우리 약속"(`calendar_events.is_shared`)을 켠 채 등록하면 상대방 기기가 울린다.
+
+```
+CalendarEventFormDialog가 브라우저 RLS로 calendar_events insert/update
+        │  is_shared가 새로 켜졌을 때만
+        ▼  fetch POST /api/calendar (Authorization: 사용자 access token, body: eventId만)
+api/calendar.ts (Node 런타임)
+        │  ① auth.getUser(token) — 보낸 사람이 누구인지 확정
+        │  ② calendar_events를 eventId로 조회 — created_by가 본인인지, is_shared인지, 방금(5분 이내) 바뀐 것인지 확인
+        │  ③ service role로 상대방의 poke_opt_in·push_subscriptions 조회
+        ▼
+api/_push.ts → 푸시 서비스 → src/sw.ts의 push 리스너
+```
+
+- **일정 생성/수정 자체는 이 함수가 하지 않는다.** 브라우저가 RLS 아래 직접 쓰고, 이 함수는 이미 들어간 row를 두고 알림만 쏜다 (지역 뱃지·소원권과 같은 판단 — 알림이 실패해도 일정은 이미 등록된 것이 맞다).
+- **문구는 요청 본문으로 받지 않는다.** eventId만 받고 제목·날짜·장소·문구는 서버가 조회해 붙인다 — 안 그러면 아무나 상대방 잠금화면에 아무 말이나 띄울 수 있다.
+- **알리는 조건은 "새로 우리 약속이 된 순간"뿐이다.** 새로 등록하며 바로 켰든, 개인 일정을 나중에 "우리 약속"으로 토글했든 알린다. 이미 공유 중인 약속을 내용만 고쳐 저장하는 것(제목·시간 변경 등)은 알리지 않는다 — `CalendarEventFormDialog`가 저장 전후의 `is_shared`를 비교해서 판단한다.
+- **본인 확인**: `is_shared`를 켤 수 있는 사람은 애초에 `created_by`뿐이다(`canToggleShared`, `calendar_events_update_shared_or_own` RLS와 같은 규칙). 서버도 조회한 일정의 `created_by`가 요청자 본인인지 다시 확인해, 남의 일정 id로 이 엔드포인트를 불러 파트너 기기를 대신 울리는 것을 막는다.
+- **신선도 창(5분)**: `updated_at` 기준. 새로 등록·토글하는 순간 트리거(`calendar_events_set_updated_at`)가 이 값을 갱신하므로, 오래된 eventId로 다시 불러 상대방을 반복해서 울리는 것을 막는다.
+- **수신 동의**: `profiles.poke_opt_in`을 그대로 쓴다. 콕 찌르기·소원권·지역 뱃지와 같은 값이고 뜻도 같다 — "상대방이 내 기기를 울려도 된다".
+- **문구**: `src/features/calendar/message.ts`. 지금은 서버만 쓰지만 다른 알림 문구 모듈과 같은 규칙(순수 함수만, import 없음)을 따른다 — 나중에 브라우저에서도 그대로 가져다 쓸 수 있게.
+
 ## 7. 배포 구조
 
 - 프론트엔드: Vercel (main 브랜치 자동 배포)
