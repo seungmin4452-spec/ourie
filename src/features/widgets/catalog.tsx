@@ -4,6 +4,7 @@ import {
   Images,
   MapPin,
   MapPinned,
+  MessageCircleQuestion,
   Pointer,
   Ticket,
   Wand2,
@@ -78,6 +79,13 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     isReady: true,
     defaultSize: 'half',
   },
+  dailyQuestion: {
+    id: 'dailyQuestion',
+    title: '오늘의 질문',
+    description: '매일 같은 질문에 각자 답하고, 오늘 하루만 서로 볼 수 있어요.',
+    isReady: true,
+    defaultSize: 'half',
+  },
 }
 
 const HANGUL_FIRST = 0xac00
@@ -114,6 +122,7 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   travel: <MapPin className="size-4" />,
   photomap: <MapPinned className="size-4" />,
   aiAvatar: <Wand2 className="size-4" />,
+  dailyQuestion: <MessageCircleQuestion className="size-4" />,
 }
 
 /** 상대방 이름이 있을 때 쓰는 제목. "우리"를 그 사람 이름으로 바꾼다. */

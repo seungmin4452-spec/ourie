@@ -22,6 +22,7 @@ import {
 import { AiAvatarWidget } from '@/features/aiAvatar'
 import { useAuth } from '@/features/auth'
 import { CalendarWidget } from '@/features/calendar'
+import { DailyQuestionWidget } from '@/features/dailyQuestion'
 import { EffectsLayer } from '@/features/effects'
 import { NotificationPromptDialog } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
@@ -89,6 +90,7 @@ const OPENS_ON_TAP: ReadonlySet<WidgetId> = new Set([
   'travel',
   'photomap',
   'aiAvatar',
+  'dailyQuestion',
 ])
 
 /** 도형 데이터 청크를 받는 동안 위젯 자리에 두는 한 줄. */
@@ -191,6 +193,8 @@ export function HomePage() {
         return <AiAvatarWidget profile={profile} isCompact={isCompact} />
       case 'calendar':
         return <CalendarWidget profile={profile} isCompact={isCompact} />
+      case 'dailyQuestion':
+        return <DailyQuestionWidget profile={profile} isCompact={isCompact} />
       case 'memories':
         return (
           <Text type="supporting" justify="center">
