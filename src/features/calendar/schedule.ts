@@ -1,4 +1,4 @@
-import type { CalendarEvent, DateKey } from './types'
+import type { CalendarEvent, DateKey } from './types.js'
 
 /**
  * `event_date` 컬럼 값을 로컬 자정으로 파싱한다. UTC로 읽으면
