@@ -14,7 +14,7 @@ export interface SignupStats {
 /**
  * 가입자 현황판이 보는 숫자 네 개.
  *
- * 서버(api/admin/stats.ts)가 이 토큰을 Supabase에 되물어 나온 이메일을
+ * 서버(api/admin/_stats.ts)가 이 토큰을 Supabase에 되물어 나온 이메일을
  * 다시 확인한다 — 관리자 계정이 아니면 여기서 403이 난다 (access.ts 참고).
  */
 export async function getSignupStats(): Promise<SignupStats> {

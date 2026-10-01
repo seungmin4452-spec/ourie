@@ -124,7 +124,7 @@ export function CustomizeForm() {
         // 이미 홈 화면 앱 안이면 설치 페이지로 보내봐야 아무 일도 일어나지
         // 않는다: standalone에는 공유 버튼이 없어 그 페이지의 안내를 따를 수
         // 없고, 그 페이지는 standalone을 "아이콘으로 실행한 것"으로 보고 앱으로
-        // 곧장 되돌려보낸다 (api/pwa-install.ts). 저장은 됐는데 화면만 홈으로
+        // 곧장 되돌려보낸다 (api/_pwa-install.ts). 저장은 됐는데 화면만 홈으로
         // 튀어 아이콘이 안 바뀐 것처럼 보이던 자리라, 지금 남은 일을 설명하고
         // 브라우저로 나가는 링크까지 쥐여준다.
         const handoff = await createSessionHandoffToken()

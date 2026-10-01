@@ -85,7 +85,7 @@ features/<name>/
 2. 최초 로그인 시 `profiles` 테이블에 프로필 row 생성 (트리거 또는 클라이언트 로직)
 3. `RequireOnboarding`(`features/onboarding`)이 `/` 진입 시 남은 단계로 리다이렉트한다. 순서는 **앱 꾸미기 → 커플 연결**: `nickname`이 없으면 `/onboarding/customize`, 그 다음 `couple_id`가 없으면 `/onboarding/couple`
 4. 초대 코드 생성 → 상대방이 코드 입력 → `couples` row 생성 및 양쪽 `profiles.couple_id` 업데이트
-5. 연결이 감지되면 마지막 단계인 홈 화면 추가 페이지(`/add-to-home`, `api/pwa-install.ts`)로 이동하고, 거기서 앱(`/`)으로 복귀한다
+5. 연결이 감지되면 마지막 단계인 홈 화면 추가 페이지(`/add-to-home`, `api/_pwa-install.ts`)로 이동하고, 거기서 앱(`/`)으로 복귀한다
 6. 이후 모든 도메인 데이터(추억, 디데이 등)는 `couple_id` 기준으로 조회/기록 (자세한 스키마는 `DATABASE.md` 참고)
 
 초대 링크(`/onboarding/couple?code=...`)로 바로 들어온 사용자는 코드 파라미터를 잃지 않도록 연결을 먼저 하고, 이름이 없으면 그 뒤에 꾸미기로 보낸다.
@@ -104,7 +104,7 @@ features/<name>/
 
 아이콘은 **커플마다 다르다**. 정적 매니페스트 하나로는 안 되므로 경로가 셋이다.
 
-- **설치할 때**: `/add-to-home`(`api/pwa-install.ts`)이 요청마다 커플의 값을 HTML 바이트에 박아 렌더한다. iOS Safari의 "홈 화면에 추가"는 서버가 준 원본 바이트만 읽고 JS의 DOM 조작은 무시하므로, 아이콘이 커플의 이름을 가지려면 **반드시 이 페이지에서** 추가해야 한다. 매니페스트도 `/api/manifest?title=&icon=`로 같이 넘겨 안드로이드 설치와 iOS 16.4+를 함께 덮는다.
+- **설치할 때**: `/add-to-home`(`api/_pwa-install.ts`)이 요청마다 커플의 값을 HTML 바이트에 박아 렌더한다. iOS Safari의 "홈 화면에 추가"는 서버가 준 원본 바이트만 읽고 JS의 DOM 조작은 무시하므로, 아이콘이 커플의 이름을 가지려면 **반드시 이 페이지에서** 추가해야 한다. 매니페스트도 `/api/manifest?title=&icon=`로 같이 넘겨 안드로이드 설치와 iOS 16.4+를 함께 덮는다.
 - **앱을 열 때**: 서비스워커(`src/sw.ts`)의 `personalizeNavigation`이 내비게이션 응답 HTML에서 `apple-mobile-web-app-title` / `apple-touch-icon` / `<link rel="manifest">` 세 태그를 커플의 값으로 갈아 끼운다. 값의 출처는 IndexedDB 사본(`appMetaDb.ts`)이고, `index.html`의 인라인 스크립트가 같은 값을 localStorage에서 읽어 한 번 더 즉시 반영한다.
 - **매니페스트 링크를 갈아 끼우는 이유**(안드로이드): Chrome은 설치된 앱의 이름·아이콘을 `start_url`(`/`)에서 매니페스트를 주기적으로 다시 읽어 갱신한다. 빌드된 `index.html`에 박혀 나가는 건 `vite-plugin-pwa`의 정적 `/manifest.webmanifest`(이름 "Ourie", 기본 아이콘)이고, 양쪽 `id`가 다 `/`라 Chrome은 같은 앱으로 본다. 그대로 두면 커플 사진으로 설치한 앱이 **다음 갱신 때 기본 아이콘으로 되돌아간다.**
 
@@ -265,6 +265,7 @@ api/_push.ts → 푸시 서비스 → src/sw.ts의 push 리스너
 - 프론트엔드: Vercel (main 브랜치 자동 배포)
 - 백엔드: Supabase 프로젝트 (개발/운영 환경 분리 여부 검토 — 초기에는 단일 프로젝트로 시작 가능)
 - 환경변수: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — Vercel 프로젝트 설정에 등록, 로컬은 `.env.local`
+- **서버리스 함수는 배포당 12개까지** (Vercel Hobby 플랜). `api/` 아래에서 이름이 밑줄로 시작하지 않는 파일 하나가 함수 하나이고, 넘으면 빌드는 끝나도 "Deploying outputs"에서 배포가 거부된다 (2026-09-30에 16개가 되어 실제로 막혔다). 지금은 11개다. 그래서 엔드포인트 여럿을 함수 하나가 받는 입구가 둘 있다 — 관리자용 `api/admin/[action].ts`(Node)와 요청마다 그리는 페이지용 `api/pages.ts`(edge, `vercel.json`의 rewrite로 주소 유지). 실제 핸들러는 그 옆의 `_*.ts`다. 새 엔드포인트를 만들 땐 남은 자리를 먼저 세고, 모자라면 같은 식으로 묶는다
 
 ## 8. 미결 사항
 - 핀 지도(`docs/PRD.md` §3.4.2)용 지도 API 벤더 선정 (국내 Kakao/Naver, 글로벌 Mapbox). 스크래치 지도는 §6.3대로 벤더 없이 끝났다

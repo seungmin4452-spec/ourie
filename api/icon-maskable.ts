@@ -2,7 +2,7 @@
 // real image response at its own URL -- not inlined as a data: URI inside
 // manifest.json (that made the manifest large enough that Android's WebAPK
 // signing step silently gave up and fell back to a favicon shortcut instead
-// of a real installed app). See api/manifest.ts for how this URL is wired in.
+// of a real installed app). See api/_manifest.ts for how this URL is wired in.
 //
 // **핸들러를 `export default`로 바꾸지 말 것**, **아래 상대 import의 `.js`
 // 확장자를 지우지 말 것.** 둘 다 api/notify-dday.ts의 같은 주석 참고 -- 이

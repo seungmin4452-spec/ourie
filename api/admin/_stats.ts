@@ -1,11 +1,11 @@
 // 관리자 전용 — 가입자 현황판이 보는 숫자 네 개.
 //
-// 인증·권한 검사는 api/admin/broadcast.ts와 완전히 같은 뼈대다 (그 파일의
+// 인증·권한 검사는 api/admin/_broadcast.ts와 완전히 같은 뼈대다 (그 파일의
 // 주석 참고). 다른 건 쓰기가 아니라 읽기뿐이라는 것 — service role 키로
 // 몇 개 테이블의 개수만 센다.
 //
 // Node 런타임, 명명 export `GET`, 상대 import의 `.js` 확장자를 지우지
-// 말 것 — 전부 api/poke.ts·api/admin/broadcast.ts와 같은 이유다.
+// 말 것 — 전부 api/poke.ts·api/admin/_broadcast.ts와 같은 이유다.
 
 import { createClient } from '@supabase/supabase-js'
 

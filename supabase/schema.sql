@@ -939,7 +939,7 @@ create index app_visits_couple_created_idx
 -- icon처럼, id에 허용 목록을 check로 박지 않는다).
 --
 -- 쓰기 정책이 없는 건 실수가 아니다. update는 오직 관리자 계정으로 인증한
--- api/admin/effects.ts가 service role 키로 한다 (api/admin/broadcast.ts와
+-- api/admin/_effects.ts가 service role 키로 한다 (api/admin/_broadcast.ts와
 -- 같은 구조) — 클라이언트가 RLS를 뚫고 직접 켤 수 있으면 아무나 전체
 -- 사용자 화면에 효과를 띄울 수 있다.
 -- ------------------------------------------------------------
@@ -1739,7 +1739,7 @@ create policy "travel_maps_couple_delete"
 -- 화면이 봐야 하고, 커플 사진처럼 지켜야 할 사적인 이미지가 아니다.
 --
 -- 쓰기 정책이 없다. 업로드는 오직 관리자 인증을 거친
--- api/admin/effect-image.ts가 service role로 한다 — 클라이언트가 직접
+-- api/admin/_effect-image.ts가 service role로 한다 — 클라이언트가 직접
 -- 쓸 수 있으면 아무나 전체 사용자 화면에 원하는 이미지를 띄울 수 있다.
 -- ============================================================
 

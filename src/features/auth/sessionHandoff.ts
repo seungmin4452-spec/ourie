@@ -7,7 +7,7 @@
 // 시작하게 된다.
 //
 // 그 첫 실행에 값을 전달할 수 있는 유일한 통로는 실행 URL, 즉 설치할 때마다
-// 새로 만들어 주는 매니페스트의 start_url(api/manifest.ts)이다. 그래서 설치
+// 새로 만들어 주는 매니페스트의 start_url(api/_manifest.ts)이다. 그래서 설치
 // 페이지가 세션의 refresh token을 같이 실어 보내고, start_url이
 // "/?session=<token>"이 되고, 앱은 RequireAuth가 로그인 여부를 판단하기 전에
 // 이 토큰을 실제 세션으로 교환한다.

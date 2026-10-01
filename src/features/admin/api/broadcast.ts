@@ -20,7 +20,7 @@ export interface BroadcastResult {
 /**
  * 가입자 전체에게 푸시 알림을 즉시 보낸다.
  *
- * 서버(api/admin/broadcast.ts)가 이 토큰을 Supabase에 되물어 나온 이메일을
+ * 서버(api/admin/_broadcast.ts)가 이 토큰을 Supabase에 되물어 나온 이메일을
  * 다시 확인한다 — 관리자 계정이 아니면 여기서 403이 난다. 클라이언트 쪽의
  * 어떤 검사도 진짜 권한 검사가 아니다 (access.ts 참고).
  */

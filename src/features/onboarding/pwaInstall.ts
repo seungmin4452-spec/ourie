@@ -3,7 +3,7 @@
 // anything JS does to the DOM afterward, and not from a service-worker
 // rewritten response (both were tried, neither worked). So the couple's own
 // name only lands on the home screen if they add it *from* a page a server
-// rendered with that name baked in: api/pwa-install.ts.
+// rendered with that name baked in: api/_pwa-install.ts.
 //
 // Adding from the SPA at "/" instead always yields the static "Ourie" in
 // index.html, which is exactly the trap this helper exists to keep everyone
@@ -12,7 +12,7 @@
 import { createSessionHandoffToken, SESSION_HANDOFF_PARAM } from '@/features/auth'
 import { PWA_INSTALL_PATH } from '@/lib/pwaInstallPath'
 
-// Platform detection lives on the install page itself (api/pwa-install.ts),
+// Platform detection lives on the install page itself (api/_pwa-install.ts),
 // which is where the per-platform steps are shown -- both platforms are sent
 // there so the icon carries the couple's name either way.
 export function isStandalone(): boolean {
@@ -44,7 +44,7 @@ export function buildPwaInstallUrl(
   const params = new URLSearchParams({ title })
   // Only https icons travel by query string. The offline fallback is a 512px
   // PNG data URL (renderEmojiIcon.ts) -- tens of KB, far past what a URL can
-  // carry -- and api/pwa-install.ts already substitutes the default icon when
+  // carry -- and api/_pwa-install.ts already substitutes the default icon when
   // this parameter is missing.
   if (icon?.startsWith('https://')) params.set('icon', icon)
   // 매니페스트의 start_url까지 그대로 따라가서, 설치된 앱이 로그인 화면이 아니라

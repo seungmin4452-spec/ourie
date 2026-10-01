@@ -6,7 +6,15 @@
   "rewrites": [
     {
       "source": "/add-to-home",
-      "destination": "/api/pwa-install"
+      "destination": "/api/pages?__page=pwa-install"
+    },
+    {
+      "source": "/api/manifest",
+      "destination": "/api/pages?__page=manifest"
+    },
+    {
+      "source": "/api/invite",
+      "destination": "/api/pages?__page=invite"
     },
     {
       "source": "/((?!api/).*)",

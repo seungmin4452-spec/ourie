@@ -13,8 +13,11 @@
 //
 // Name resolution works out on both iOS generations: 16.4+ prefers this
 // manifest's name, older versions ignore the manifest and fall back to the
-// apple-mobile-web-app-title that pwa-install.ts writes. Both are the
+// apple-mobile-web-app-title that _pwa-install.ts writes. Both are the
 // couple's name. Same for icons vs. apple-touch-icon.
+//
+// 함수로 따로 배포되지 않는다 -- /api/manifest는 api/pages.ts가 받아 여기로
+// 넘긴다.
 
 import {
   appLaunchUrl,
@@ -25,8 +28,6 @@ import {
   sanitizeSessionHandoff,
   SESSION_HANDOFF_PARAM,
 } from './_shared.js'
-
-export const config = { runtime: 'edge' }
 
 const BACKGROUND_COLOR = '#F1F4F7'
 

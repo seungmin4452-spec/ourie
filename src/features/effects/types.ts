@@ -1,8 +1,8 @@
 /**
  * 관리자가 켜고 끄면 모든 사용자의 홈 화면에 적용되는 특수효과.
  *
- * 이 배열의 순서가 관리자 화면에 뜨는 순서다. 서버(api/admin/effects.ts,
- * api/admin/effect-image.ts)도 같은 파일을 `.js`로 가져가 "아는 효과인지"를
+ * 이 배열의 순서가 관리자 화면에 뜨는 순서다. 서버(api/admin/_effects.ts,
+ * api/admin/_effect-image.ts)도 같은 파일을 `.js`로 가져가 "아는 효과인지"를
  * 검사한다 — 클라이언트가 보낸 임의의 id로 DB에 없는 row를 만들면 안 되기
  * 때문이다.
  */

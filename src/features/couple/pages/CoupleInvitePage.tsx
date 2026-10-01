@@ -49,7 +49,7 @@ export function CoupleInvitePage() {
     // the second-to-last step and the install page closes the flow. Someone
     // who arrived straight here from an invite link skipped customize, so send
     // them there instead -- installing without a name bakes "Ourie" onto the
-    // home screen, which is exactly what api/pwa-install.ts exists to avoid.
+    // home screen, which is exactly what api/_pwa-install.ts exists to avoid.
     if (!appName) {
       navigate('/onboarding/customize', { replace: true })
     } else {

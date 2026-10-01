@@ -1,5 +1,5 @@
 // 관리자 전용 — "이미지가 회전하며 떨어지는" 특수효과(custom_image)에 올릴
-// 이미지를 받는다. api/admin/effects.ts와 같은 뼈대다: 인증은 사용자의
+// 이미지를 받는다. api/admin/_effects.ts와 같은 뼈대다: 인증은 사용자의
 // Supabase access token으로 하고, 이미지 저장·app_effects 갱신은 service
 // role 키로 한다 — effect-images 버킷과 app_effects 테이블 둘 다 쓰기
 // 정책이 없어 클라이언트 세션으로는 애초에 못 쓴다 (supabase/schema.sql

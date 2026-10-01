@@ -2,7 +2,7 @@
 // worker need this path, and sw.ts is typechecked against the WebWorker lib
 // (see tsconfig.sw.json), where `window` and `Navigator` do not exist.
 //
-// Served by api/pwa-install.ts through a rewrite in vercel.json, but
+// Served by api/_pwa-install.ts through a rewrite in vercel.json, but
 // deliberately addressed at the root rather than under /api/. A home-screen
 // app added without a manifest takes its scope from the directory of the URL
 // that was added: adding /api/pwa-install scopes it to /api/, so the launch

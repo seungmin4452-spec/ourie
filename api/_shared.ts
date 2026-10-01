@@ -1,7 +1,6 @@
 // Shared helpers for the small per-request HTML pages under api/. Not a
-// route itself: Vercel only turns files directly under api/ (and its
-// subdirectories) that export a default handler into endpoints, and this
-// file is imported by those, not routed to.
+// route itself: Vercel skips files under api/ whose name starts with an
+// underscore, and this file is imported by the pages, not routed to.
 //
 // The app is served from the same Vercel origin as these functions, so links
 // back into it are plain root-relative paths -- no hardcoded host. Only

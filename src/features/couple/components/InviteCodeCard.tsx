@@ -11,7 +11,7 @@ import { getProfile } from '@/features/onboarding/api/profile'
 import { createInviteCode, INVITE_CODE_TTL_MS } from '../api/couple'
 
 // Renders the OG preview card (image/title) for the shared link -- the SPA
-// itself can't serve per-request <meta> tags, see api/invite.ts. Absolute
+// itself can't serve per-request <meta> tags, see api/_invite.ts. Absolute
 // (unlike the other api/ calls) because this URL is handed to other apps.
 const INVITE_SHARE_FUNCTION_PATH = '/api/invite'
 
@@ -80,7 +80,7 @@ export function InviteCodeCard() {
   async function handleShare() {
     if (!invite) return
     // 앱 이름이 아니라 사람 이름을 싣는다. 이 링크의 미리보기는 "누가
-    // 초대했다"는 문장이고(api/invite.ts의 og:title과 description), 옆에 붙는
+    // 초대했다"는 문장이고(api/_invite.ts의 og:title과 description), 옆에 붙는
     // 그림도 그 사람의 프로필 사진이다. 앱 이름을 쓰면 "승민 ♥ 진선이(가)
     // 초대했어요"가 되는데, 초대를 보내는 시점엔 그 커플이 아직 없다.
     //

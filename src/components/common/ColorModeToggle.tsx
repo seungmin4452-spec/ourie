@@ -19,7 +19,7 @@ export function ColorModeToggle() {
   // 제스처(useLongPress.ts)를 이 버튼에 그대로 얹었다. 관리자 계정이 아니면
   // isEnabled가 꺼져서 오래 눌러도 그냥 평범한 버튼이다. **이건 UX일 뿐
   // 진짜 권한 검사가 아니다** — 실제 검사는 서버가 한다
-  // (src/features/admin/access.ts, api/admin/broadcast.ts).
+  // (src/features/admin/access.ts, api/admin/_broadcast.ts).
   const longPressProps = useLongPress(toggleAdminMode, isAdminEmail(user?.email))
 
   // 위젯을 편집하는 동안엔 화면 맨 위가 편집 도구 막대의 자리다. 이 버튼은

@@ -3,11 +3,11 @@
 // couple shares their invite link (KakaoTalk, iMessage, SMS...) the receiving
 // app's crawler needs a real server response with og:image/og:title pointing
 // at the inviter's own app photo. This renders that, then forwards a human
-// visitor into the real app. Same reasoning as pwa-install.ts.
+// visitor into the real app. Same reasoning as _pwa-install.ts.
+//
+// 함수로 따로 배포되지 않는다 -- /api/invite는 api/pages.ts가 받아 여기로 넘긴다.
 
 import { DEFAULT_TITLE, escapeHtmlAttr, requestOrigin, sanitizeIconUrl } from './_shared.js'
-
-export const config = { runtime: 'edge' }
 
 function isValidInviteCode(value: string | null): value is string {
   return !!value && /^[A-Z0-9]{4,12}$/.test(value)

@@ -11,7 +11,7 @@ import { RecapPage } from '@/features/recap'
 
 // Onboarding order: /onboarding/customize (name + photo) -> /onboarding/couple
 // (pairing) -> /add-to-home (server-rendered install page, see
-// api/pwa-install.ts) -> /. RequireOnboarding owns the first two hops; each
+// api/_pwa-install.ts) -> /. RequireOnboarding owns the first two hops; each
 // step sends itself to whatever is still missing.
 export const router = createBrowserRouter(
   [

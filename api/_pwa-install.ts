@@ -12,6 +12,9 @@
 // platforms are explained on the spot -- iOS through the Share Sheet (the one
 // route that picks up the couple's name, baked into the bytes below), Android
 // through beforeinstallprompt, which installs in a single tap.
+//
+// 함수로 따로 배포되지 않는다 -- /add-to-home은 api/pages.ts가 받아 여기로
+// 넘긴다.
 
 import {
   appLaunchUrl,
@@ -22,8 +25,6 @@ import {
   sanitizeSessionHandoff,
   SESSION_HANDOFF_PARAM,
 } from './_shared.js'
-
-export const config = { runtime: 'edge' }
 
 function renderHtml(
   title: string,
@@ -48,7 +49,7 @@ function renderHtml(
     <link rel="apple-touch-icon" href="${safeIcon}" />
     <!-- Declares scope "/" so the app added from here covers the whole site.
          Without it iOS infers a narrow scope and bounces the launch into an
-         in-app browser -- see api/manifest.ts. On Android this is also what
+         in-app browser -- see api/_manifest.ts. On Android this is also what
          Chrome installs from, so the icon gets the couple's name too. -->
     <link rel="manifest" href="${safeManifestUrl}" />
     <title>${safeTitle}</title>
