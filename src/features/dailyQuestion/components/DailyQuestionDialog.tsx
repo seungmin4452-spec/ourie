@@ -59,6 +59,10 @@ interface DailyQuestionDialogProps {
  * 소원권과 갈리는 핵심은 하나다 — **공개에 조건이 없다.** 내가 아직 답하지
  * 않았어도 상대가 이미 답했으면 그 내용이 바로 보인다. "둘 다 답해야
  * 보인다"는 이 기능이 요구받은 규칙이 아니다.
+ *
+ * **이미 답했으면 읽는 화면으로 열린다.** 입력칸은 "답변 고치기"를 눌러야
+ * 나온다 — 두 사람 답을 확인하러 들어왔는데 고치는 화면부터 나오면, 보려면
+ * 고쳐야 하는 것처럼 읽힌다. 아직 답하지 않았을 때만 입력칸이 바로 나온다.
  */
 export function DailyQuestionDialog({
   isOpen,
@@ -73,6 +77,23 @@ export function DailyQuestionDialog({
 }: DailyQuestionDialogProps) {
   const showToast = useToast()
   const [content, setContent] = useState(myAnswer?.content ?? '')
+  const [isEditing, setIsEditing] = useState(false)
+
+  // 열릴 때마다 읽는 화면에서, 최신 내 답으로 다시 시작한다 — 다른 기기에서
+  // 먼저 고쳤을 수 있다. 닫을 때가 아니라 열 때 되돌리는 이유는, 닫히는
+  // 애니메이션 도중에 화면이 입력칸에서 읽는 화면으로 바뀌어 보이지 않게
+  // 하기 위해서다. Dialog의 onOpenChange는 닫힐 때만 불리므로 prop이 바뀐
+  // 것을 렌더에서 직접 본다.
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) {
+      setIsEditing(false)
+      setContent(myAnswer?.content ?? '')
+    }
+  }
+
+  const isFormShown = myAnswer == null || isEditing
 
   const trimmed = content.trim()
   const canSubmit = trimmed.length > 0 && trimmed.length <= DAILY_QUESTION_CONTENT_MAX
@@ -89,6 +110,7 @@ export function DailyQuestionDialog({
     },
     onSuccess: async ({ hadAnswerBefore, notified }) => {
       await onChanged()
+      setIsEditing(false)
       showToast({ type: 'info', body: savedMessage(hadAnswerBefore, notified) })
     },
     onError: (error) => {
@@ -100,25 +122,30 @@ export function DailyQuestionDialog({
     },
   })
 
-  /** 열릴 때마다 최신 내 답으로 다시 채운다 — 다른 기기에서 먼저 고쳤을 수 있다. */
-  function handleOpenChange(nextIsOpen: boolean) {
-    if (nextIsOpen) setContent(myAnswer?.content ?? '')
-    onOpenChange(nextIsOpen)
+  function startEditing() {
+    setContent(myAnswer?.content ?? '')
+    setIsEditing(true)
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!canSubmit) return
+    if (!isFormShown || !canSubmit) return
     save.mutate()
   }
 
   const partnerLabel = dailyQuestionOwnerName(partner?.id ?? '', userId, partner?.name)
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={handleOpenChange} purpose="form" width={420}>
+    // 읽는 화면에서는 잃을 입력이 없으니 바깥을 눌러도 닫히게 둔다.
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      purpose={isFormShown ? 'form' : 'info'}
+      width={420}
+    >
       <form onSubmit={handleSubmit}>
         <Layout
-          header={<DialogHeader title="오늘의 질문" onOpenChange={() => handleOpenChange(false)} />}
+          header={<DialogHeader title="오늘의 질문" onOpenChange={() => onOpenChange(false)} />}
           content={
             <LayoutContent>
               <VStack gap={5}>
@@ -133,24 +160,31 @@ export function DailyQuestionDialog({
 
                 <VStack gap={3}>
                   <Heading level={2}>내 답변</Heading>
-                  <TextArea
-                    label="답변 내용"
-                    htmlName="daily-question-content"
-                    placeholder="떠오르는 대로 편하게 적어보세요."
-                    description="자정 전까지는 고쳐 쓸 수 있어요."
-                    isRequired
-                    rows={3}
-                    maxLength={DAILY_QUESTION_CONTENT_MAX}
-                    value={content}
-                    onChange={setContent}
-                  />
+                  {isFormShown ? (
+                    <>
+                      <TextArea
+                        label="답변 내용"
+                        htmlName="daily-question-content"
+                        placeholder="떠오르는 대로 편하게 적어보세요."
+                        description="자정 전까지는 고쳐 쓸 수 있어요."
+                        isRequired
+                        rows={3}
+                        maxLength={DAILY_QUESTION_CONTENT_MAX}
+                        value={content}
+                        onChange={setContent}
+                      />
 
-                  {/* 알림이 갈지를 **쓰기 전에** 알려준다 — WishDialog와 같은 이유로,
-                      다 쓰고 나서 알면 이미 저장된 뒤라 되돌릴 수 없다. */}
-                  {partner != null && !partner.poke_opt_in && (
-                    <Text type="supporting">
-                      {partnerLabel}님이 알림을 켜지 않아, 답해도 알림은 가지 않아요.
-                    </Text>
+                      {/* 알림이 갈지를 **쓰기 전에** 알려준다 — WishDialog와 같은
+                          이유로, 다 쓰고 나서 알면 이미 저장된 뒤라 되돌릴 수 없다.
+                          고쳐 쓸 때는 어차피 알림이 가지 않으니 말하지 않는다. */}
+                      {myAnswer == null && partner != null && !partner.poke_opt_in && (
+                        <Text type="supporting">
+                          {partnerLabel}님이 알림을 켜지 않아, 답해도 알림은 가지 않아요.
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <Text>{myAnswer.content}</Text>
                   )}
                 </VStack>
 
@@ -174,20 +208,46 @@ export function DailyQuestionDialog({
           }
           footer={
             <LayoutFooter>
+              {/* key를 서로 다르게 준다. 같은 자리의 버튼을 React가 재사용하면
+                  "답변 고치기"를 누른 그 클릭 안에서 type이 submit으로 바뀌어,
+                  입력칸을 열자마자 폼이 제출된다. */}
               <HStack gap={2} hAlign="center" justify="end">
-                <Button
-                  type="button"
-                  label="닫기"
-                  variant="secondary"
-                  onClick={() => handleOpenChange(false)}
-                />
-                <Button
-                  type="submit"
-                  label={myAnswer ? '고쳐 쓰기' : '답변 저장'}
-                  variant="primary"
-                  isLoading={save.isPending}
-                  isDisabled={!canSubmit}
-                />
+                {isFormShown && myAnswer != null ? (
+                  <Button
+                    key="cancel"
+                    type="button"
+                    label="취소"
+                    variant="secondary"
+                    isDisabled={save.isPending}
+                    onClick={() => setIsEditing(false)}
+                  />
+                ) : (
+                  <Button
+                    key="close"
+                    type="button"
+                    label="닫기"
+                    variant="secondary"
+                    onClick={() => onOpenChange(false)}
+                  />
+                )}
+                {isFormShown ? (
+                  <Button
+                    key="save"
+                    type="submit"
+                    label={myAnswer ? '고쳐 쓰기' : '답변 저장'}
+                    variant="primary"
+                    isLoading={save.isPending}
+                    isDisabled={!canSubmit}
+                  />
+                ) : (
+                  <Button
+                    key="edit"
+                    type="button"
+                    label="답변 고치기"
+                    variant="secondary"
+                    onClick={startEditing}
+                  />
+                )}
               </HStack>
             </LayoutFooter>
           }

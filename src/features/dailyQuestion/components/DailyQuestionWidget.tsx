@@ -16,7 +16,7 @@ import { DailyQuestionDialog } from './DailyQuestionDialog'
 interface DailyQuestionWidgetProps {
   /** 홈이 이미 가져온 내 프로필. 같은 걸 또 조회하지 않으려고 받아 쓴다. */
   profile: Profile | null | undefined
-  /** 절반 폭 타일일 때 true. 카드 전체를 누르면 다이얼로그가 열린다
+  /** 절반 폭 타일일 때 true. 버튼을 넣을 자리가 없어 질문 줄만 남긴다
    * (WishWidget.tsx와 같은 패턴 — 쉐브런은 WidgetCard가 그린다). */
   isCompact?: boolean
 }
@@ -80,24 +80,23 @@ export function DailyQuestionWidget({ profile, isCompact }: DailyQuestionWidgetP
 
   return (
     <VStack gap={isCompact ? 3 : 4}>
-      {isCompact ? (
-        <button
-          type="button"
-          className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+      {/* 폭과 상관없이 질문 줄을 누르면 열린다. 이미 답했으면 다이얼로그는
+          읽는 화면으로 열리므로, 여기서는 "고치기"가 아니라 "보기"다. */}
+      <button
+        type="button"
+        className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+        onClick={() => setIsDialogOpen(true)}
+      >
+        {statusLine}
+      </button>
+
+      {!isCompact && (
+        <Button
+          label={myAnswer ? '답변 보기' : '오늘의 질문에 답하기'}
+          variant={myAnswer ? 'secondary' : 'primary'}
+          width="100%"
           onClick={() => setIsDialogOpen(true)}
-        >
-          {statusLine}
-        </button>
-      ) : (
-        <>
-          {statusLine}
-          <Button
-            label={myAnswer ? '답변 고치기' : '오늘의 질문에 답하기'}
-            variant={myAnswer ? 'secondary' : 'primary'}
-            width="100%"
-            onClick={() => setIsDialogOpen(true)}
-          />
-        </>
+        />
       )}
 
       <DailyQuestionDialog
