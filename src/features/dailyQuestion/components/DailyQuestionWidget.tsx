@@ -3,6 +3,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useState } from 'react'
 
+import { useWidgetEditMode } from '@/app/widgetEditMode'
 import { useAuth } from '@/features/auth'
 // 배럴이 아니라 훅 파일을 직접 가리킨다 — 배럴에는 홈 화면이 들어 있고, 그
 // 홈이 다시 이 위젯을 가져오므로 순환 import가 된다 (WishWidget.tsx와 같은
@@ -31,6 +32,7 @@ interface DailyQuestionWidgetProps {
 export function DailyQuestionWidget({ profile, isCompact }: DailyQuestionWidgetProps) {
   const { user } = useAuth()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const isWidgetEditing = useWidgetEditMode()
 
   const coupleId = profile?.couple_id
   const { data: partner } = usePartner(profile)
@@ -80,11 +82,18 @@ export function DailyQuestionWidget({ profile, isCompact }: DailyQuestionWidgetP
 
   return (
     <VStack gap={isCompact ? 3 : 4}>
-      {/* 폭과 상관없이 질문 줄을 누르면 열린다. 이미 답했으면 다이얼로그는
-          읽는 화면으로 열리므로, 여기서는 "고치기"가 아니라 "보기"다. */}
+      {/* 폭과 상관없이 카드 어디를 눌러도 열린다. 이미 답했으면 다이얼로그는
+          읽는 화면으로 열리므로, 여기서는 "고치기"가 아니라 "보기"다.
+
+          after:로 이 버튼의 누를 수 있는 영역을 카드 전체로 넓힌다 — 기준은
+          카드를 감싼 position: relative wrapper다(WidgetList.tsx). 질문 줄만
+          받으면 제목이나 여백을 누른 탭이 그냥 사라진다 (실제로 겪었던 문제).
+          편집 중에는 넓히지 않는다 — 손잡이·삭제 버튼·폭 토글을 덮어버린다. */}
       <button
         type="button"
-        className="w-full cursor-pointer border-0 bg-transparent p-0 text-start"
+        className={`w-full cursor-pointer border-0 bg-transparent p-0 text-start${
+          isWidgetEditing ? '' : ' after:absolute after:inset-0'
+        }`}
         onClick={() => setIsDialogOpen(true)}
       >
         {statusLine}
