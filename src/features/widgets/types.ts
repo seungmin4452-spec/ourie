@@ -15,6 +15,7 @@ export const WIDGET_IDS = [
   'photomap',
   'aiAvatar',
   'dailyQuestion',
+  'exercise',
 ] as const
 
 export type WidgetId = (typeof WIDGET_IDS)[number]

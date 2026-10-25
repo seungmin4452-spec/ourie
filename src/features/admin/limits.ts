@@ -12,3 +12,9 @@ export const BROADCAST_BODY_MAX = 150
  * 둘이 따로 적으면 숫자와 라벨이 어긋날 수 있다.
  */
 export const RECENT_SIGNUP_WINDOW_DAYS = 7
+
+/**
+ * 재활운동 관리 위젯이 보여주는 기간(일, 오늘 포함). server(api/admin/_exercise.ts)가
+ * 이 기간의 기록을 읽고, client(ExerciseAdminWidget.tsx)는 그 날짜들을 줄로 그린다.
+ */
+export const EXERCISE_ADMIN_WINDOW_DAYS = 14

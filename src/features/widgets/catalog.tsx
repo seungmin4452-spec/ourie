@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   CalendarHeart,
+  Dumbbell,
   Images,
   MapPin,
   MapPinned,
@@ -86,6 +87,13 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
     isReady: true,
     defaultSize: 'half',
   },
+  exercise: {
+    id: 'exercise',
+    title: '재활운동을 하자!',
+    description: '운동 시작·종료를 상대방에게 알리고, 30일 연속으로 채우면 소원권이 한 장 늘어요.',
+    isReady: true,
+    defaultSize: 'half',
+  },
 }
 
 const HANGUL_FIRST = 0xac00
@@ -123,6 +131,7 @@ const WIDGET_ICONS: Record<WidgetId, ReactNode> = {
   photomap: <MapPinned className="size-4" />,
   aiAvatar: <Wand2 className="size-4" />,
   dailyQuestion: <MessageCircleQuestion className="size-4" />,
+  exercise: <Dumbbell className="size-4" />,
 }
 
 /** 상대방 이름이 있을 때 쓰는 제목. "우리"를 그 사람 이름으로 바꾼다. */

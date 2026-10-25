@@ -23,6 +23,7 @@ import { AiAvatarWidget } from '@/features/aiAvatar'
 import { useAuth } from '@/features/auth'
 import { CalendarWidget } from '@/features/calendar'
 import { DailyQuestionWidget } from '@/features/dailyQuestion'
+import { ExerciseWidget } from '@/features/exercise'
 import { EffectsLayer } from '@/features/effects'
 import { NotificationPromptDialog } from '@/features/notification'
 import { getProfile } from '@/features/onboarding/api/profile'
@@ -195,6 +196,8 @@ export function HomePage() {
         return <CalendarWidget profile={profile} isCompact={isCompact} />
       case 'dailyQuestion':
         return <DailyQuestionWidget profile={profile} isCompact={isCompact} />
+      case 'exercise':
+        return <ExerciseWidget profile={profile} isCompact={isCompact} />
       case 'memories':
         return (
           <Text type="supporting" justify="center">

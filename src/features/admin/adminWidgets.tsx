@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 
 import { BroadcastWidget } from './components/BroadcastWidget'
 import { EffectsWidget } from './components/EffectsWidget'
+import { ExerciseAdminWidget } from './components/ExerciseAdminWidget'
 import { SignupStatsWidget } from './components/SignupStatsWidget'
 
 export interface AdminWidgetMeta {
@@ -40,5 +41,11 @@ export const ADMIN_WIDGETS: AdminWidgetMeta[] = [
     title: '특수효과',
     description: '켜면 그 순간 모든 사용자의 홈 화면에 떨어져요.',
     Component: EffectsWidget,
+  },
+  {
+    id: 'exercise',
+    title: '재활운동 기록',
+    description: '운동은 했는데 시작·종료를 깜빡한 날을 했다고 인정해줘요.',
+    Component: ExerciseAdminWidget,
   },
 ]
