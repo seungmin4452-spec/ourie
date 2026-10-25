@@ -90,7 +90,7 @@ const WIDGET_META: Record<WidgetId, WidgetMeta> = {
   exercise: {
     id: 'exercise',
     title: '재활운동을 하자!',
-    description: '운동 시작·종료를 상대방에게 알리고, 30일 연속으로 채우면 소원권이 한 장 늘어요.',
+    description: '운동 시작·종료를 상대방에게 알리고, 30일 연속이면 소원권 1장, 60일 연속이면 3장이 더 늘어요.',
     isReady: true,
     defaultSize: 'half',
   },

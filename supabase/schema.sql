@@ -1211,10 +1211,11 @@ create trigger daily_question_answers_check_today
 -- ------------------------------------------------------------
 -- exercise_logs / exercise_rewards (재활운동)
 --
--- 운동 시작/종료를 하루에 둘 다 누르면 1회. 30일을 하루도 빠짐없이 채우면
--- 소원권이 한 장 늘고 카운트가 0으로 돌아간다. 연속 일수는 저장하지 않고
--- 세어서 구한다 (exercise_streak). 자세한 경위는
--- supabase/migrations/2026-10-25-exercise.sql 참고.
+-- 운동 시작/종료를 하루에 둘 다 누르면 1회. 하루도 빠짐없이 30일째에
+-- 소원권 1장, 이어서 60일째에 3장이 늘고, 60일째 뒤로는 카운트가 0으로
+-- 돌아간다. 연속 일수는 저장하지 않고 세어서 구한다 (exercise_streak).
+-- 자세한 경위는 supabase/migrations/2026-10-25-exercise.sql,
+-- 2026-10-26-exercise-60day.sql 참고.
 -- ------------------------------------------------------------
 
 -- 1. 운동 기록 — 사람 × 날짜(KST)당 한 줄 ------------------------
@@ -1246,14 +1247,19 @@ create trigger exercise_logs_set_updated_at
   for each row
   execute function public.set_updated_at();
 
--- 2. 30일 달성 기록 — 소원권을 한 장 줄 때마다 한 줄 ---------------
--- reward_date는 30일째 되는 날이다. 연속 일수는 "가장 최근 reward_date
--- 다음 날부터" 센다 — 그래서 소원권을 받으면 카운트가 0으로 돌아가고, 같은
--- 30일로 소원권을 두 번 받는 일도 없다.
+-- 2. 달성 기록 — 30일째·60일째에 소원권을 줄 때마다 한 줄 -----------
+-- reward_date는 30일째(또는 60일째) 되는 날이다. 연속 일수는 "가장 최근
+-- 60일 달성 다음 날부터" 센다 — 그래서 60일을 채우면 카운트가 0으로 돌아가고,
+-- 같은 60일로 소원권을 두 번 받는 일도 없다. 30일 달성은 카운트를 끊지
+-- 않는다 (그대로 60일을 향해 이어진다).
 create table public.exercise_rewards (
   owner_id uuid not null references public.profiles (id) on delete cascade,
   reward_date date not null,
   couple_id uuid not null references public.couples (id) on delete cascade,
+  -- 몇 일째 달성인지 (30 또는 60).
+  milestone int not null default 30 check (milestone in (30, 60)),
+  -- 이 달성으로 늘어난 소원권 장수 (30일째 1장, 60일째 3장).
+  tickets int not null default 1 check (tickets > 0),
   created_at timestamptz not null default now(),
 
   primary key (owner_id, reward_date)
@@ -1281,7 +1287,8 @@ $$;
 -- 4. 지금의 연속 일수 -------------------------------------------
 -- 오늘을 이미 했으면 오늘부터, 아직이면 어제부터 거꾸로 센다 — 오늘은 아직
 -- 끝나지 않았으니 "오늘 안 했음"이 기록을 끊지 않는다. 어제를 빠뜨렸으면 0이다.
--- 가장 최근 소원권을 받은 날(last_reward_date)에서 멈춘다.
+-- 가장 최근 60일 달성일(last_reward_date)에서 멈춘다. 30일 달성일에서는
+-- 멈추지 않는다. rewards는 지금까지 받은 소원권 장수의 합이다.
 --
 -- security invoker다: 화면에서 부르면 RLS(같은 커플만)가 그대로 걸리고,
 -- 아래 security definer 함수들 안에서 부르면 전부 보인다.
@@ -1298,7 +1305,8 @@ declare
   v_day date;
   v_count int := 0;
 begin
-  select max(r.reward_date), count(*)::int
+  select max(r.reward_date) filter (where r.milestone = 60),
+         coalesce(sum(r.tickets), 0)::int
     into v_last, v_rewards
     from public.exercise_rewards r
     where r.owner_id = p_owner_id;
@@ -1318,9 +1326,14 @@ begin
 end;
 $$;
 
--- 5. 30일을 채웠으면 소원권을 준다 ---------------------------------
--- 운동 종료와 관리자 인정 둘 다 끝에 이걸 부른다. 몇 번을 불러도 안전하다
--- — 이미 준 30일은 exercise_streak가 세지 않는다.
+-- 5. 30일·60일을 채웠으면 소원권을 준다 ----------------------------
+-- 운동 종료와 관리자 인정 둘 다 끝에 이걸 부른다. 몇 번을 불러도 안전하다.
+-- - 30일째(1장): 지금 이어지는 연속 기록 안(run_start 이후)에 30일 달성이
+--   이미 있으면 다시 주지 않는다. 관리자 인정으로 시작일이 앞당겨져 30일째
+--   날짜가 바뀌어도 두 번 받지 않게 "날짜 일치"가 아니라 "범위 안"으로 본다.
+-- - 60일째(3장): 이미 준 60일은 exercise_streak가 세지 않는다. 주고 나면
+--   카운트가 0부터 다시 시작한다.
+-- 중간에 끊기면 그때까지 받은 30일 소원권은 그대로 두고 처음부터 다시 센다.
 --
 -- 소원권을 늘리는 길은 원래 resolve_wish_quota_request 하나뿐이다
 -- (check_wish_total_increase_requires_approval). 이 보상은 상대방 승인 없이
@@ -1339,9 +1352,11 @@ declare
   v_couple_id uuid;
   v_streak int;
   v_run_start date;
+  v_milestone int;
+  v_tickets int;
   v_granted int := 0;
 begin
-  -- 종료와 관리자 인정이 동시에 들어와 같은 30일로 두 번 주는 일을 막는다.
+  -- 종료와 관리자 인정이 동시에 들어와 같은 달성으로 두 번 주는 일을 막는다.
   perform pg_advisory_xact_lock(hashtext('exercise:' || p_owner_id::text));
 
   select couple_id into v_couple_id from public.profiles where id = p_owner_id;
@@ -1352,20 +1367,34 @@ begin
   loop
     select s.streak, s.run_start into v_streak, v_run_start
       from public.exercise_streak(p_owner_id) s;
-    exit when v_streak < 30;
 
-    insert into public.exercise_rewards (owner_id, reward_date, couple_id)
-    values (p_owner_id, v_run_start + 29, v_couple_id);
+    if v_streak >= 30 and not exists (
+      select 1 from public.exercise_rewards r
+      where r.owner_id = p_owner_id
+        and r.milestone = 30
+        and r.reward_date >= v_run_start
+    ) then
+      v_milestone := 30;
+      v_tickets := 1;
+    elsif v_streak >= 60 then
+      v_milestone := 60;
+      v_tickets := 3;
+    else
+      exit;
+    end if;
+
+    insert into public.exercise_rewards (owner_id, reward_date, couple_id, milestone, tickets)
+    values (p_owner_id, v_run_start + v_milestone - 1, v_couple_id, v_milestone, v_tickets);
 
     perform set_config('wish.quota_request_approval', 'on', true);
     insert into public.wish_quotas (couple_id, owner_id, total, updated_by)
-    values (v_couple_id, p_owner_id, least(public.wish_default_total() + 1, 99), null)
+    values (v_couple_id, p_owner_id, least(public.wish_default_total() + v_tickets, 99), null)
     on conflict (couple_id, owner_id) do update
-      set total = least(public.wish_quotas.total + 1, 99),
+      set total = least(public.wish_quotas.total + v_tickets, 99),
           updated_at = now();
     perform set_config('wish.quota_request_approval', '', true);
 
-    v_granted := v_granted + 1;
+    v_granted := v_granted + v_tickets;
   end loop;
 
   return v_granted;

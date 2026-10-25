@@ -52,7 +52,7 @@ export async function getExerciseOverview(): Promise<AdminExerciseOverview> {
 
 /**
  * 그날 운동한 것으로 인정하거나(confirm: true) 인정을 취소한다.
- * 인정으로 30일이 채워지면 서버가 소원권까지 준다 — 그 장수가 돌아온다.
+ * 인정으로 30일·60일이 채워지면 서버가 소원권까지 준다 — 그 장수가 돌아온다.
  */
 export async function confirmExercise(input: {
   ownerId: string

@@ -9,9 +9,9 @@ export interface ExerciseBoardRow {
   ended_at: string | null
   /** 오늘(KST)이 완료로 쳐졌는지 — 시작·종료를 다 눌렀거나 관리자가 인정했다. */
   today_done: boolean
-  /** 지금의 연속 일수. 소원권을 받으면 0으로 돌아간다. */
+  /** 지금의 연속 일수. 60일을 채우면 0으로 돌아간다 (30일째는 이어진다). */
   streak: number
-  /** 지금까지 30일을 채워 받은 소원권 수. */
+  /** 지금까지 30일·60일을 채워 받은 소원권 장수의 합. */
   rewards: number
 }
 

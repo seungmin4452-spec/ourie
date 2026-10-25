@@ -19,7 +19,7 @@ import {
   startExercise,
 } from '../api/exercise'
 import { useExerciseBoard } from '../hooks/useExerciseBoard'
-import { EXERCISE_STREAK_GOAL } from '../message'
+import { exerciseRewardMessage, nextExerciseMilestone } from '../message'
 import { exercisePhase, type ExercisePhase } from '../types'
 
 interface ExerciseWidgetProps {
@@ -44,19 +44,21 @@ interface StreakMeterProps {
 
 /** 연속 일수와 소원권까지 남은 거리. 운동하는 쪽과 보는 쪽이 같은 모양을 본다. */
 function StreakMeter({ title, streak, isDone }: StreakMeterProps) {
+  // 30일 전엔 30일(1장)을, 30일을 넘기면 60일(3장)을 향해 채운다.
+  const goal = nextExerciseMilestone(streak)
   return (
     <VStack gap={1}>
       <HStack hAlign="between" vAlign="center" gap={2}>
         <Text weight="medium">{title}</Text>
         <Text type="supporting" hasTabularNumbers>
-          {streak}/{EXERCISE_STREAK_GOAL}
+          {streak}/{goal.days}
         </Text>
       </HStack>
       <ProgressBar
-        label={`소원권까지 ${EXERCISE_STREAK_GOAL}일 중 ${streak}일`}
+        label={`소원권 ${goal.tickets}장까지 ${goal.days}일 중 ${streak}일`}
         isLabelHidden
         value={streak}
-        max={EXERCISE_STREAK_GOAL}
+        max={goal.days}
         variant={isDone ? 'success' : 'accent'}
       />
     </VStack>
@@ -75,9 +77,10 @@ function StreakMeter({ title, streak, isDone }: StreakMeterProps) {
  * - **아직 아무도 안 정했으면**: 누가 하는지 한 번 고른다. 정해진 뒤에는
  *   관리자 화면에서만 바꿀 수 있다.
  *
- * 시작과 종료를 둘 다 눌러야 하루가 1회로 센다. 30일을 하루도 빠짐없이
- * 채우면 소원권이 한 장 늘고 카운트는 0부터 다시 시작한다 (규칙의 실제
- * 정의는 supabase/schema.sql의 exercise_streak).
+ * 시작과 종료를 둘 다 눌러야 하루가 1회로 센다. 하루도 빠짐없이
+ * 30일째에 소원권 1장, 이어서 60일째에 3장이 늘고, 60일째 뒤로 카운트는
+ * 0부터 다시 시작한다 (규칙의 실제 정의는 supabase/schema.sql의
+ * settle_exercise_rewards).
  *
  * 버튼이 위젯 안에 있어 카드 전체를 눌러 여는 동작은 없다 (HomePage.tsx의
  * OPENS_ON_TAP에 넣지 않는다).
@@ -214,7 +217,7 @@ export function ExerciseWidget({ profile, isCompact }: ExerciseWidgetProps) {
         type: 'info',
         body:
           rewarded > 0
-            ? `${EXERCISE_STREAK_GOAL}일 연속 달성! 소원권이 한 장 늘었어요.${told}`
+            ? `${exerciseRewardMessage(rewarded)}${told}`
             : `오늘 운동 완료!${told}`,
       })
     } catch (error) {

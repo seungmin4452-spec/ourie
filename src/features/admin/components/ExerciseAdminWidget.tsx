@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
 import { useState } from 'react'
 
-import { EXERCISE_STREAK_GOAL } from '@/features/exercise/message'
+import { exerciseRewardMessage, nextExerciseMilestone } from '@/features/exercise/message'
 import {
   confirmExercise,
   getExerciseOverview,
@@ -79,7 +79,7 @@ export function ExerciseAdminWidget() {
         type: 'info',
         body:
           rewarded > 0
-            ? `인정했어요. ${EXERCISE_STREAK_GOAL}일을 채워 소원권이 ${rewarded}장 늘었어요.`
+            ? `인정했어요. ${exerciseRewardMessage(rewarded)}`
             : confirm
               ? '운동한 날로 인정했어요.'
               : '인정을 취소했어요.',
@@ -147,7 +147,7 @@ export function ExerciseAdminWidget() {
         <>
           <HStack hAlign="between" vAlign="center" gap={2} wrap="wrap">
             <Text type="supporting">
-              연속 {person.streak}/{EXERCISE_STREAK_GOAL}일 · 지금까지 받은 소원권 {person.rewards}장
+              연속 {person.streak}/{nextExerciseMilestone(person.streak).days}일 · 지금까지 받은 소원권 {person.rewards}장
             </Text>
             {person.isExerciser ? (
               <Token label="운동하는 사람" color="blue" size="sm" />

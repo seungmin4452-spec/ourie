@@ -3,7 +3,7 @@
 // 운동하는 사람 바꾸기(POST /api/admin/exercise-owner).
 //
 // 인증·권한 검사는 api/admin/_stats.ts와 같은 뼈대다. 인정 자체는 DB 함수
-// admin_confirm_exercise가 하고(인정한 뒤 30일을 채웠으면 소원권까지 준다),
+// admin_confirm_exercise가 하고(인정한 뒤 30일·60일을 채웠으면 소원권까지 준다),
 // 이 함수는 service role로만 부를 수 있다 (supabase/schema.sql 참고).
 //
 // Node 런타임, 명명 export, 상대 import의 `.js` 확장자를 지우지 말 것 —

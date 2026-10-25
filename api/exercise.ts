@@ -128,21 +128,23 @@ export async function POST(request: Request): Promise<Response> {
 
   const senderName = profiles?.find((profile) => profile.id === senderId)?.name ?? null
 
-  // 종료일 때만: 지금의 연속 일수와 방금 소원권을 받았는지.
+  // 종료일 때만: 지금의 연속 일수와 방금 늘어난 소원권 장수.
   let streak = 0
-  let rewarded = false
+  let rewardedTickets = 0
   if (action === 'finish') {
     const [{ data: streakRows }, { data: rewardRows }] = await Promise.all([
       supabase.rpc('exercise_streak', { p_owner_id: senderId }),
       supabase
         .from('exercise_rewards')
-        .select('reward_date')
+        .select('tickets')
         .eq('owner_id', senderId)
-        .gte('created_at', new Date(Date.now() - FRESH_WINDOW_MS).toISOString())
-        .limit(1),
+        .gte('created_at', new Date(Date.now() - FRESH_WINDOW_MS).toISOString()),
     ])
     streak = (streakRows as { streak: number }[] | null)?.[0]?.streak ?? 0
-    rewarded = (rewardRows ?? []).length > 0
+    rewardedTickets = ((rewardRows ?? []) as { tickets: number }[]).reduce(
+      (sum, row) => sum + row.tickets,
+      0,
+    )
   }
 
   const { data: subscriptionRows, error: subscriptionError } = await supabase
@@ -155,7 +157,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const payload = {
-    ...buildExerciseNotification(action, log.exercise_date, senderName, streak, rewarded),
+    ...buildExerciseNotification(action, log.exercise_date, senderName, streak, rewardedTickets),
     url: NOTIFICATION_URL,
   }
 

@@ -56,7 +56,7 @@ export async function startExercise(): Promise<void> {
 
 export interface FinishExerciseResult {
   exerciseDate: string
-  /** 이번 종료로 받은 소원권 장수 (보통 0, 30일째면 1). */
+  /** 이번 종료로 받은 소원권 장수 (보통 0, 30일째면 1, 60일째면 3). */
   rewarded: number
 }
 

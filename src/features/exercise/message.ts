@@ -6,10 +6,33 @@
 // 않는다).
 
 /**
- * 며칠을 연속으로 채우면 소원권 한 장인지. DB의 settle_exercise_rewards
- * (supabase/schema.sql)에 적힌 30과 반드시 같은 값이어야 한다.
+ * 며칠을 연속으로 채우면 소원권이 몇 장 늘어나는지. DB의
+ * settle_exercise_rewards(supabase/schema.sql)에 적힌 30일 1장 / 60일 3장과
+ * 반드시 같은 값이어야 한다. 마지막 단계를 채우면 카운트가 0으로 돌아간다.
  */
-export const EXERCISE_STREAK_GOAL = 30
+export const EXERCISE_MILESTONES = [
+  { days: 30, tickets: 1 },
+  { days: 60, tickets: 3 },
+] as const
+
+/** 지금 연속 일수에서 다음으로 노릴 달성 단계. */
+export function nextExerciseMilestone(streak: number): (typeof EXERCISE_MILESTONES)[number] {
+  return (
+    EXERCISE_MILESTONES.find((milestone) => streak < milestone.days) ??
+    EXERCISE_MILESTONES[EXERCISE_MILESTONES.length - 1]
+  )
+}
+
+/**
+ * 소원권을 받았을 때의 축하 문구. 장수로 몇 일째 달성인지 거꾸로 찾는다
+ * (관리자 인정으로 30일·60일을 한 번에 채우면 4장이라 60일로 본다).
+ */
+export function exerciseRewardMessage(tickets: number): string {
+  const days = tickets >= EXERCISE_MILESTONES[1].tickets
+    ? EXERCISE_MILESTONES[1].days
+    : EXERCISE_MILESTONES[0].days
+  return `${days}일 연속 달성! 소원권이 ${tickets}장 늘었어요.`
+}
 
 export type ExerciseAction = 'start' | 'finish'
 
@@ -39,8 +62,8 @@ export function buildExerciseNotification(
   senderName: string | null | undefined,
   /** 종료일 때만 쓴다. 방금 끝낸 날까지 센 연속 일수. */
   streak: number,
-  /** 종료일 때만 쓴다. 이번 종료로 소원권을 받았는지. */
-  rewarded: boolean,
+  /** 종료일 때만 쓴다. 이번 종료로 늘어난 소원권 장수 (없으면 0). */
+  rewardedTickets: number,
 ): ExerciseNotification {
   const name = exerciseNameLabel(senderName)
   const tag = `ourie-exercise-${exerciseDate}`
@@ -56,8 +79,8 @@ export function buildExerciseNotification(
 
   return {
     title: `${name}이 재활운동을 다 했어요`,
-    body: rewarded
-      ? `${EXERCISE_STREAK_GOAL}일 연속 달성! 소원권이 한 장 늘었어요.`
+    body: rewardedTickets > 0
+      ? exerciseRewardMessage(rewardedTickets)
       : `${streak}일째 연속이에요. 수고했다고 말해주세요.`,
     tag,
     renotify: true,
