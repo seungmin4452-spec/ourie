@@ -1372,10 +1372,66 @@ begin
 end;
 $$;
 
--- 6. 운동 시작 ---------------------------------------------------
--- 신원을 인자로 받지 않고 auth.uid()에서 읽는다 (request_wish_quota_add와
--- 같은 모양) — 남의 이름으로 시작할 방법이 없다.
--- 오늘 이미 시작했으면 처음 시작한 시각을 그대로 둔다.
+-- 6. 운동하는 사람 — 커플당 한 명 (2026-10-26-exercise-owner.sql) ---
+-- 커플 범위 값이라 couples에 둔다. null = 아직 안 골랐다.
+alter table public.couples
+  add column exercise_owner_id uuid references public.profiles (id) on delete set null;
+
+-- 7. 처음 한 번 고르기 ---------------------------------------------
+-- 커플 둘 중 누구든 고를 수 있지만, 이미 정해져 있으면 바꾸지 못한다 —
+-- 보는 쪽이 자기를 운동하는 사람으로 바꿔 대신 눌러주는 길을 막는다.
+create or replace function public.set_exercise_owner(p_owner_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_couple_id uuid := public.current_couple_id();
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  if v_couple_id is null then
+    raise exception 'no_couple';
+  end if;
+  if not exists (
+    select 1 from public.profiles where id = p_owner_id and couple_id = v_couple_id
+  ) then
+    raise exception 'invalid_target';
+  end if;
+
+  update public.couples
+    set exercise_owner_id = p_owner_id
+    where id = v_couple_id and exercise_owner_id is null;
+
+  if not found then
+    raise exception 'exercise_owner_already_set';
+  end if;
+
+  return p_owner_id;
+end;
+$$;
+
+-- 8. 시작/종료는 운동하는 사람만 --------------------------------------
+-- 화면도 보는 쪽에는 버튼을 그리지 않지만, 그건 안내다. 실제 차단은 여기서 한다.
+create or replace function public.check_is_exercise_owner()
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.couples
+    where id = public.current_couple_id() and exercise_owner_id = auth.uid()
+  ) then
+    raise exception 'not_exercise_owner';
+  end if;
+end;
+$$;
+
 create or replace function public.start_exercise()
 returns public.exercise_logs
 language plpgsql
@@ -1394,6 +1450,7 @@ begin
   if v_couple_id is null then
     raise exception 'no_couple';
   end if;
+  perform public.check_is_exercise_owner();
 
   insert into public.exercise_logs (owner_id, exercise_date, couple_id, started_at)
   values (v_uid, v_today, v_couple_id, now())
@@ -1406,10 +1463,6 @@ begin
 end;
 $$;
 
--- 7. 운동 종료 ---------------------------------------------------
--- 끝나지 않은 가장 최근 운동을 끝낸다. 어제 밤에 시작해 자정을 넘겨 끝내는
--- 경우를 위해 어제 것까지 본다 — 그 기록은 어제의 1회가 된다.
--- 끝낸 뒤 30일을 채웠는지 보고, 몇 장을 줬는지 함께 돌려준다.
 create or replace function public.finish_exercise()
 returns jsonb
 language plpgsql
@@ -1425,6 +1478,7 @@ begin
   if v_uid is null then
     raise exception 'not_authenticated';
   end if;
+  perform public.check_is_exercise_owner();
 
   select l.exercise_date into v_date
     from public.exercise_logs l
@@ -1450,12 +1504,11 @@ begin
 end;
 $$;
 
--- 8. 위젯이 보는 것 — 커플 두 사람의 오늘 상태와 연속 일수 -----------
--- "지금 진행 중인 운동"은 오늘 기록이 있으면 그것, 없으면 어제 시작해서 아직
--- 안 끝낸 것이다 (finish_exercise와 같은 기준).
+-- 8-1. 위젯이 보는 것 -----------------------------
 create or replace function public.exercise_board()
 returns table (
   owner_id uuid,
+  is_exerciser boolean,
   session_date date,
   started_at timestamptz,
   ended_at timestamptz,
@@ -1470,6 +1523,7 @@ set search_path = public
 as $$
   select
     p.id,
+    coalesce(c.exercise_owner_id = p.id, false),
     l.exercise_date,
     l.started_at,
     l.ended_at,
@@ -1477,6 +1531,7 @@ as $$
     s.streak,
     s.rewards
   from public.profiles p
+  join public.couples c on c.id = p.couple_id
   cross join lateral public.exercise_streak(p.id) s
   left join lateral (
     select e.exercise_date, e.started_at, e.ended_at

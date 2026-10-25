@@ -1,5 +1,5 @@
 // 관리자 전용 엔드포인트들(/api/admin/broadcast · effects · effect-image ·
-// stats · exercise · exercise-confirm)을 함수 하나로 받는 입구. 실제 일은 옆의 `_*.ts`가 그대로 한다.
+// stats · exercise · exercise-confirm · exercise-owner)을 함수 하나로 받는 입구. 실제 일은 옆의 `_*.ts`가 그대로 한다.
 //
 // **왜 파일 하나로 묶었나.** Vercel Hobby 플랜은 배포 하나에 서버리스 함수를
 // 12개까지만 허용하고, api/ 아래 파일 하나가 함수 하나다. 엔드포인트마다 파일을
@@ -20,7 +20,7 @@
 import { POST as broadcast } from './_broadcast.js'
 import { POST as effectImage } from './_effect-image.js'
 import { POST as effects } from './_effects.js'
-import { GET as exercise, POST as exerciseConfirm } from './_exercise.js'
+import { GET as exercise, POST as exerciseConfirm, setOwner as exerciseOwner } from './_exercise.js'
 import { GET as stats } from './_stats.js'
 
 interface Route {
@@ -34,6 +34,7 @@ const ROUTES = new Map<string, Route>([
   ['effects', { method: 'POST', handler: effects }],
   ['exercise', { method: 'GET', handler: exercise }],
   ['exercise-confirm', { method: 'POST', handler: exerciseConfirm }],
+  ['exercise-owner', { method: 'POST', handler: exerciseOwner }],
   ['stats', { method: 'GET', handler: stats }],
 ])
 

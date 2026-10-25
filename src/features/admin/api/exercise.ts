@@ -11,6 +11,8 @@ export interface AdminExerciseLog {
 export interface AdminExercisePerson {
   id: string
   name: string | null
+  /** 그 커플에서 재활운동을 하는 사람인지. */
+  isExerciser: boolean
   streak: number
   rewards: number
   logs: AdminExerciseLog[]
@@ -61,4 +63,12 @@ export async function confirmExercise(input: {
     method: 'POST',
     body: JSON.stringify(input),
   })) as { rewarded: number }
+}
+
+/** 이 사람을 그 커플의 운동하는 사람으로 정한다. 이미 다른 사람이면 바꾼다. */
+export async function setExerciseOwnerAsAdmin(ownerId: string): Promise<void> {
+  await authorizedFetch('/api/admin/exercise-owner', {
+    method: 'POST',
+    body: JSON.stringify({ ownerId }),
+  })
 }

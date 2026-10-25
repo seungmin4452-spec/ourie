@@ -1,5 +1,6 @@
-// 관리자 전용 — 재활운동 기록 보기(GET /api/admin/exercise)와, 시작/종료를
-// 깜빡한 날을 "했다"고 인정하기(POST /api/admin/exercise-confirm).
+// 관리자 전용 — 재활운동 기록 보기(GET /api/admin/exercise), 시작/종료를
+// 깜빡한 날을 "했다"고 인정하기(POST /api/admin/exercise-confirm), 커플에서
+// 운동하는 사람 바꾸기(POST /api/admin/exercise-owner).
 //
 // 인증·권한 검사는 api/admin/_stats.ts와 같은 뼈대다. 인정 자체는 DB 함수
 // admin_confirm_exercise가 하고(인정한 뒤 30일을 채웠으면 소원권까지 준다),
@@ -75,15 +76,20 @@ export async function GET(request: Request): Promise<Response> {
   const oldest = days[days.length - 1]
 
   // 커플이 연결된 사람만 — 운동 기록은 커플이 있어야 남는다.
-  const [{ data: people, error: peopleError }, { data: logs, error: logsError }] = await Promise.all([
+  const [
+    { data: people, error: peopleError },
+    { data: logs, error: logsError },
+    { data: couples, error: couplesError },
+  ] = await Promise.all([
     supabase.from('profiles').select('id, name').not('couple_id', 'is', null).order('created_at'),
     supabase
       .from('exercise_logs')
       .select('owner_id, exercise_date, started_at, ended_at, admin_confirmed_at')
       .gte('exercise_date', oldest),
+    supabase.from('couples').select('exercise_owner_id').not('exercise_owner_id', 'is', null),
   ])
 
-  const firstError = peopleError ?? logsError
+  const firstError = peopleError ?? logsError ?? couplesError
   if (firstError) {
     return Response.json({ error: 'db', message: firstError.message }, { status: 500 })
   }
@@ -102,6 +108,7 @@ export async function GET(request: Request): Promise<Response> {
     people: (people ?? []).map((person, index) => ({
       id: person.id,
       name: person.name,
+      isExerciser: (couples ?? []).some((couple) => couple.exercise_owner_id === person.id),
       streak: streaks[index].streak,
       rewards: streaks[index].rewards,
       logs: (logs ?? []).filter((log) => log.owner_id === person.id),
@@ -150,4 +157,42 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   return Response.json({ rewarded: (data as number | null) ?? 0 })
+}
+
+/** 이 사람을 그 커플의 운동하는 사람으로 정한다 (이미 다른 사람이 정해져 있어도 바꾼다). */
+export async function setOwner(request: Request): Promise<Response> {
+  const auth = await authorize(request)
+  if ('response' in auth) return auth.response
+  const { supabase } = auth
+
+  const body = (await request.json().catch(() => null)) as { ownerId?: unknown } | null
+  const ownerId = typeof body?.ownerId === 'string' ? body.ownerId : null
+  if (!ownerId) {
+    return Response.json({ error: 'invalid_input', message: '잘못된 요청이에요.' }, { status: 400 })
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('couple_id')
+    .eq('id', ownerId)
+    .maybeSingle()
+  if (profileError) {
+    return Response.json({ error: 'db', message: profileError.message }, { status: 500 })
+  }
+  if (!profile?.couple_id) {
+    return Response.json(
+      { error: 'no_couple', message: '커플이 연결되지 않은 사람이에요.' },
+      { status: 400 },
+    )
+  }
+
+  const { error } = await supabase
+    .from('couples')
+    .update({ exercise_owner_id: ownerId })
+    .eq('id', profile.couple_id)
+  if (error) {
+    return Response.json({ error: 'db', message: error.message }, { status: 500 })
+  }
+
+  return Response.json({ ok: true })
 }

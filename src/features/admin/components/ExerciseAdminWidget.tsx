@@ -12,7 +12,12 @@ import { RotateCw } from 'lucide-react'
 import { useState } from 'react'
 
 import { EXERCISE_STREAK_GOAL } from '@/features/exercise/message'
-import { confirmExercise, getExerciseOverview, type AdminExerciseLog } from '../api/exercise'
+import {
+  confirmExercise,
+  getExerciseOverview,
+  setExerciseOwnerAsAdmin,
+  type AdminExerciseLog,
+} from '../api/exercise'
 
 type DayStatus = 'done' | 'admin' | 'unfinished' | 'none'
 
@@ -57,9 +62,12 @@ export function ExerciseAdminWidget() {
     queryFn: getExerciseOverview,
   })
 
-  // 처음엔 최근 기록이 있는 사람을 먼저 고른다 — 보통 운동하는 사람은 한 명이다.
+  // 처음엔 운동하는 사람을, 없으면 최근 기록이 있는 사람을 먼저 고른다.
   const people = data?.people ?? []
-  const fallback = people.find((person) => person.logs.length > 0) ?? people[0]
+  const fallback =
+    people.find((person) => person.isExerciser) ??
+    people.find((person) => person.logs.length > 0) ??
+    people[0]
   const person = people.find((candidate) => candidate.id === selectedId) ?? fallback
 
   async function toggle(date: string, confirm: boolean) {
@@ -84,6 +92,20 @@ export function ExerciseAdminWidget() {
     }
   }
 
+  async function makeExerciser() {
+    if (!person) return
+    try {
+      await setExerciseOwnerAsAdmin(person.id)
+      await refetch()
+      showToast({ type: 'info', body: '운동하는 사람으로 정했어요.' })
+    } catch (caught) {
+      showToast({
+        type: 'error',
+        body: caught instanceof Error ? caught.message : '처리하지 못했어요.',
+      })
+    }
+  }
+
   return (
     <VStack gap={3}>
       <HStack gap={2} vAlign="end">
@@ -93,7 +115,7 @@ export function ExerciseAdminWidget() {
           width="100%"
           options={people.map((candidate) => ({
             value: candidate.id,
-            label: candidate.name?.trim() || '이름 없음',
+            label: `${candidate.name?.trim() || '이름 없음'}${candidate.isExerciser ? ' · 운동하는 사람' : ''}`,
           }))}
           value={person?.id}
           onChange={setSelectedId}
@@ -123,9 +145,21 @@ export function ExerciseAdminWidget() {
 
       {data && person && (
         <>
-          <Text type="supporting">
-            연속 {person.streak}/{EXERCISE_STREAK_GOAL}일 · 지금까지 받은 소원권 {person.rewards}장
-          </Text>
+          <HStack hAlign="between" vAlign="center" gap={2} wrap="wrap">
+            <Text type="supporting">
+              연속 {person.streak}/{EXERCISE_STREAK_GOAL}일 · 지금까지 받은 소원권 {person.rewards}장
+            </Text>
+            {person.isExerciser ? (
+              <Token label="운동하는 사람" color="blue" size="sm" />
+            ) : (
+              <Button
+                label="운동하는 사람으로 정하기"
+                variant="secondary"
+                size="sm"
+                clickAction={makeExerciser}
+              />
+            )}
+          </HStack>
 
           <List hasDividers density="compact">
             {data.days.map((date) => {

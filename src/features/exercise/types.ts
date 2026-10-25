@@ -1,6 +1,8 @@
 /** exercise_board() RPC의 한 줄 — 커플 중 한 사람의 오늘 상태. */
 export interface ExerciseBoardRow {
   owner_id: string
+  /** 이 커플에서 재활운동을 하는 사람인지 (couples.exercise_owner_id). 둘 다 false면 아직 안 골랐다. */
+  is_exerciser: boolean
   /** 지금 보고 있는 운동 기록의 날짜. 오늘 것, 또는 어제 시작해 아직 안 끝낸 것. 없으면 null. */
   session_date: string | null
   started_at: string | null

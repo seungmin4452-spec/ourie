@@ -2,8 +2,9 @@ import { supabase } from '@/lib/supabase'
 import type { ExerciseAction } from '../message'
 import type { ExerciseBoardRow } from '../types'
 
-/** DB 함수가 막은 것 (supabase/schema.sql의 start_exercise / finish_exercise). */
-export type ExerciseErrorCode = 'no_couple' | 'not_started'
+/** DB 함수가 막은 것 (supabase/schema.sql의 start_exercise / finish_exercise /
+ * set_exercise_owner). */
+export type ExerciseErrorCode = 'no_couple' | 'not_started' | 'not_owner' | 'owner_already_set'
 
 export class ExerciseError extends Error {
   readonly code: ExerciseErrorCode
@@ -23,7 +24,22 @@ function toExerciseError(error: { message: string }): unknown {
     // 다른 기기에서 이미 끝냈거나, 자정을 두 번 넘겨 시작 기록이 지난 경우.
     return new ExerciseError('not_started', '진행 중인 운동이 없어요. 새로고침해주세요.')
   }
+  if (error.message.includes('not_exercise_owner')) {
+    return new ExerciseError('not_owner', '운동하는 사람만 기록할 수 있어요.')
+  }
+  if (error.message.includes('exercise_owner_already_set')) {
+    return new ExerciseError('owner_already_set', '운동하는 사람이 이미 정해졌어요.')
+  }
   return error
+}
+
+/**
+ * 이 커플에서 재활운동을 할 사람을 처음 한 번 정한다. 이미 정해져 있으면
+ * 막힌다 — 바꾸는 건 관리자 화면에서만 한다.
+ */
+export async function setExerciseOwner(ownerId: string): Promise<void> {
+  const { error } = await supabase.rpc('set_exercise_owner', { p_owner_id: ownerId })
+  if (error) throw toExerciseError(error)
 }
 
 /** 커플 두 사람의 오늘 상태와 연속 일수 (0~2줄). */
