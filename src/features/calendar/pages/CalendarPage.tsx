@@ -1,5 +1,6 @@
 import { AlertDialog } from '@astryxdesign/core/AlertDialog'
 import { Button } from '@astryxdesign/core/Button'
+import { Collapsible } from '@astryxdesign/core/Collapsible'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { Field } from '@astryxdesign/core/Field'
 import { Heading } from '@astryxdesign/core/Heading'
@@ -24,6 +25,12 @@ import { calendarEventsQueryKey, useCalendarEvents } from '../hooks/useCalendarE
 import { useDayCovers } from '../hooks/useDayPhotos'
 import { formatEventDate, splitByToday, startOfToday, toDateKey } from '../schedule'
 import type { CalendarEvent, DateKey } from '../types'
+
+/**
+ * 지난 일정은 시간이 갈수록 끝없이 늘어나므로 최근 것만 펼쳐 둔다. 특정 날의
+ * 일정은 위 달력에서 날짜를 짚으면 접힌 것과 상관없이 바로 보인다.
+ */
+const RECENT_PAST_COUNT = 3
 
 export function CalendarPage() {
   const { user } = useAuth()
@@ -192,13 +199,32 @@ export function CalendarPage() {
                 />
               )}
               {pastExcludingSelected.length > 0 && (
-                <CalendarEventList
-                  header="지난 일정"
-                  events={pastExcludingSelected}
-                  userId={user.id}
-                  onEdit={openEdit}
-                  onDelete={setPendingDelete}
-                />
+                <VStack gap={2}>
+                  <CalendarEventList
+                    header="지난 일정"
+                    events={pastExcludingSelected.slice(0, RECENT_PAST_COUNT)}
+                    userId={user.id}
+                    onEdit={openEdit}
+                    onDelete={setPendingDelete}
+                  />
+                  {pastExcludingSelected.length > RECENT_PAST_COUNT && (
+                    <Collapsible
+                      defaultIsOpen={false}
+                      trigger={
+                        <Text weight="medium">
+                          이전 일정 {pastExcludingSelected.length - RECENT_PAST_COUNT}개 더 보기
+                        </Text>
+                      }
+                    >
+                      <CalendarEventList
+                        events={pastExcludingSelected.slice(RECENT_PAST_COUNT)}
+                        userId={user.id}
+                        onEdit={openEdit}
+                        onDelete={setPendingDelete}
+                      />
+                    </Collapsible>
+                  )}
+                </VStack>
               )}
             </>
           )}

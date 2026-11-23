@@ -8,7 +8,8 @@ import { canEditEvent, formatEventDate, formatEventTime } from '../schedule'
 import type { CalendarEvent } from '../types'
 
 interface CalendarEventListProps {
-  header: string
+  /** 접힌 영역처럼 앞 목록에 이어지는 묶음은 머리글 없이 부른다. */
+  header?: string
   events: CalendarEvent[]
   userId: string
   onEdit: (event: CalendarEvent) => void
