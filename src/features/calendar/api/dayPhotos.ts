@@ -18,6 +18,13 @@ const THUMB_QUALITY = 0.75
 export const DAY_PHOTO_MAX = 10
 export const DAY_NOTE_MAX = 100
 
+/**
+ * memories와 photos 사이에는 외래 키가 둘이다 (photos.memory_id,
+ * memories.cover_photo_id). 어느 쪽인지 적지 않으면 PostgREST가 PGRST201로
+ * 조회를 거부한다.
+ */
+const PHOTOS_EMBED = 'photos!photos_memory_id_fkey(id, storage_path, sort_order)'
+
 interface PhotoRow {
   id: string
   storage_path: string
@@ -77,7 +84,7 @@ export async function listDayCovers(
 ): Promise<Map<DateKey, string>> {
   const { data, error } = await supabase
     .from('memories')
-    .select('memory_date, cover_photo_id, photos(id, storage_path, sort_order)')
+    .select(`memory_date, cover_photo_id, ${PHOTOS_EMBED}`)
     .eq('couple_id', coupleId)
     .gte('memory_date', from)
     .lte('memory_date', to)
@@ -103,7 +110,7 @@ export async function listDayCovers(
 export async function getDayRecord(coupleId: string, date: DateKey): Promise<DayRecord | null> {
   const { data, error } = await supabase
     .from('memories')
-    .select('id, memory_date, content, cover_photo_id, photos(id, storage_path, sort_order)')
+    .select(`id, memory_date, content, cover_photo_id, ${PHOTOS_EMBED}`)
     .eq('couple_id', coupleId)
     .eq('memory_date', date)
     .maybeSingle()
