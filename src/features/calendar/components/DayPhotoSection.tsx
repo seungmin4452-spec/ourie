@@ -3,7 +3,6 @@ import { Button } from '@astryxdesign/core/Button'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Heading } from '@astryxdesign/core/Heading'
 import { HStack } from '@astryxdesign/core/HStack'
-import { Lightbox } from '@astryxdesign/core/Lightbox'
 import { Text } from '@astryxdesign/core/Text'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Thumbnail } from '@astryxdesign/core/Thumbnail'
@@ -25,6 +24,7 @@ import {
   type DayRecord,
 } from '../api/dayPhotos'
 import { dayPhotosQueryKey, useDayRecord } from '../hooks/useDayPhotos'
+import { DayPhotoViewer } from './DayPhotoViewer'
 import { formatEventDate, startOfToday, toDateKey } from '../schedule'
 import type { DateKey } from '../types'
 
@@ -202,19 +202,14 @@ function DayPhotoSectionBody({ coupleId, userId, date }: DayPhotoSectionProps) {
       />
 
       {photos.length > 0 && (
-        <Lightbox
-          isOpen={viewerIndex != null}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) setViewerIndex(null)
-          }}
+        <DayPhotoViewer
           media={photos.map((photo, index) => ({
             src: photo.fullUrl,
             alt: `${formatEventDate(date)} 사진 ${index + 1}`,
             caption: record?.note ?? undefined,
           }))}
-          index={viewerIndex ?? 0}
+          index={viewerIndex}
           onIndexChange={setViewerIndex}
-          hasZoom
         />
       )}
 
