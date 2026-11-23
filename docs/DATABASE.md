@@ -257,7 +257,7 @@ RLS는 select만 커플 범위다.
 | created_at | timestamptz | default now() |
 | updated_at | timestamptz | default now() |
 
-**캘린더 날짜별 사진이 이 테이블을 쓴다** (`2026-11-23-calendar-day-photos.sql`). 일정이 아니라 날짜에 붙고, `(couple_id, memory_date)` 유니크로 하루에 기록 하나, 그 아래 `photos` 여러 장(화면에서 10장까지)이다. `content`는 한 줄 메모, `cover_photo_id`는 대표 사진(null이면 첫 장)이다.
+**캘린더 날짜별 사진이 이 테이블을 쓴다** (`2026-11-23-calendar-day-photos.sql`). 일정이 아니라 날짜에 붙고, `(couple_id, memory_date)` 유니크로 하루에 기록 하나, 그 아래 `photos` 여러 장(화면에서 10장까지)이다. `title`(40자)·`content`(500자)는 게시물의 제목과 내용이고 글자 수는 화면에서 막는다. 마지막 사진을 지우면 게시물도 함께 지워진다. `cover_photo_id`는 대표 사진(null이면 첫 장)이다.
 
 **연결이 끊겨도 보존한다.** `couple_id`·`created_by`는 `on delete set null`이다. 계정 삭제가 `couples`를 cascade로 지워도 기록과 사진은 남고, `couple_id`가 null인 row는 RLS상 아무에게도 보이지 않는다. 파일 경로 첫 칸에 원래 `couple_id`가 남아 있어 복구할 수 있다.
 

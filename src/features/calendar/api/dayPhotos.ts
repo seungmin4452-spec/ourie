@@ -16,7 +16,8 @@ const THUMB_QUALITY = 0.75
 
 /** 하루에 올릴 수 있는 사진 수. 화면에서만 막는다 (poke_presets 개수와 같은 판단). */
 export const DAY_PHOTO_MAX = 10
-export const DAY_NOTE_MAX = 100
+export const DAY_TITLE_MAX = 40
+export const DAY_CONTENT_MAX = 500
 
 /**
  * memories와 photos 사이에는 외래 키가 둘이다 (photos.memory_id,
@@ -41,7 +42,8 @@ export interface DayPhoto {
 export interface DayRecord {
   memoryId: string
   date: DateKey
-  note: string | null
+  title: string | null
+  content: string | null
   coverPhotoId: string | null
   photos: DayPhoto[]
 }
@@ -121,7 +123,7 @@ export async function listDayCovers(
 export async function getDayRecord(coupleId: string, date: DateKey): Promise<DayRecord | null> {
   const { data, error } = await supabase
     .from('memories')
-    .select(`id, memory_date, content, cover_photo_id, ${PHOTOS_EMBED}`)
+    .select(`id, memory_date, title, content, cover_photo_id, ${PHOTOS_EMBED}`)
     .eq('couple_id', coupleId)
     .eq('memory_date', date)
     .maybeSingle()
@@ -144,7 +146,8 @@ export async function getDayRecord(coupleId: string, date: DateKey): Promise<Day
   return {
     memoryId: data.id,
     date,
-    note: data.content,
+    title: data.title,
+    content: data.content,
     coverPhotoId: data.cover_photo_id,
     photos,
   }
@@ -243,14 +246,23 @@ export async function addDayPhotos(
 
   // 전부 실패해서 빈 기록만 남았다면 치운다.
   if (addedCount === 0 && (existing?.length ?? 0) === 0) {
-    await supabase.from('memories').delete().eq('id', memoryId).is('content', null)
+    await supabase
+      .from('memories')
+      .delete()
+      .eq('id', memoryId)
+      .is('title', null)
+      .is('content', null)
   }
 
   return { addedCount, failedFiles }
 }
 
-export async function updateDayNote(memoryId: string, note: string | null): Promise<void> {
-  const { error } = await supabase.from('memories').update({ content: note }).eq('id', memoryId)
+export async function updateDayPost(
+  memoryId: string,
+  title: string | null,
+  content: string | null,
+): Promise<void> {
+  const { error } = await supabase.from('memories').update({ title, content }).eq('id', memoryId)
   if (error) throw error
 }
 
@@ -262,7 +274,10 @@ export async function setDayCover(memoryId: string, photoId: string): Promise<vo
   if (error) throw error
 }
 
-/** 사진을 지운다. 마지막 사진이고 메모도 없으면 그날의 기록까지 지운다. */
+/**
+ * 사진을 지운다. 마지막 사진이면 그날의 게시물도 지운다 — 사진 없는 게시물은
+ * 달력에서 열 길이 없어 글만 보이지 않게 남는다. 화면이 지우기 전에 알린다.
+ */
 export async function deleteDayPhoto(record: DayRecord, photo: DayPhoto): Promise<void> {
   const { error } = await supabase.from('photos').delete().eq('id', photo.id)
   if (error) throw error
@@ -275,6 +290,6 @@ export async function deleteDayPhoto(record: DayRecord, photo: DayPhoto): Promis
     .select('id', { count: 'exact', head: true })
     .eq('memory_id', record.memoryId)
   if (count === 0) {
-    await supabase.from('memories').delete().eq('id', record.memoryId).is('content', null)
+    await supabase.from('memories').delete().eq('id', record.memoryId)
   }
 }

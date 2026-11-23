@@ -3,11 +3,12 @@ import { Button } from '@astryxdesign/core/Button'
 import { Collapsible } from '@astryxdesign/core/Collapsible'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { Heading } from '@astryxdesign/core/Heading'
+import { HStack } from '@astryxdesign/core/HStack'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarDays, Plus } from 'lucide-react'
+import { CalendarDays, ImagePlus, Plus, RotateCw } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 
 import { Calendar } from '@/components/astryx/Calendar'
@@ -15,12 +16,14 @@ import { BackButton } from '@/components/common/BackButton'
 import { FullscreenLoader } from '@/components/common/FullscreenLoader'
 import { PageShell } from '@/components/common/PageShell'
 import { useAuth } from '@/features/auth'
+import { usePartner } from '@/features/couple/hooks/usePartner'
 import { getProfile } from '@/features/onboarding/api/profile'
 import { deleteCalendarEvent } from '../api/calendar'
 import { CalendarEventFormDialog } from '../components/CalendarEventFormDialog'
 import { CalendarEventList } from '../components/CalendarEventList'
-import { DayPhotoSection } from '../components/DayPhotoSection'
+import { DayPostDialog } from '../components/DayPostDialog'
 import { calendarEventsQueryKey, useCalendarEvents } from '../hooks/useCalendarEvents'
+import { useDayPhotoUpload } from '../hooks/useDayPhotoUpload'
 import { useDayCovers } from '../hooks/useDayPhotos'
 import { formatEventDate, splitByToday, startOfToday, toDateKey } from '../schedule'
 import type { CalendarEvent, DateKey } from '../types'
@@ -45,6 +48,8 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<DateKey>(toDateKey(startOfToday()))
   // 달력이 지금 보여주는 달. 선택한 날짜와 따로 움직인다 (날짜를 안 고르고 달만 넘길 수 있다).
   const [focusDate, setFocusDate] = useState<DateKey>(selectedDate)
+  // 지금 열려 있는 게시물. 사진을 막 올리고 열면 바로 글을 쓰게 한다.
+  const [openPost, setOpenPost] = useState<{ date: DateKey; startInEdit: boolean } | null>(null)
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -52,6 +57,7 @@ export function CalendarPage() {
     enabled: user != null,
   })
   const coupleId = profile?.couple_id ?? null
+  const { data: partner } = usePartner(profile)
 
   const { data: events, isLoading, error } = useCalendarEvents(coupleId)
   const { data: dayCovers } = useDayCovers(coupleId, focusDate)
@@ -59,6 +65,20 @@ export function CalendarPage() {
     (date: Date) => dayCovers?.get(toDateKey(date)),
     [dayCovers],
   )
+
+  // 사진이 없는 날에 첫 사진을 올리는 문. 있는 날의 추가는 게시물 메뉴에 있다.
+  const firstUpload = useDayPhotoUpload({
+    coupleId: coupleId ?? '',
+    userId: user?.id ?? '',
+    date: selectedDate,
+    photoCount: 0,
+    onUploaded: (date) => setOpenPost({ date, startInEdit: true }),
+  })
+
+  function handleSelectDate(date: DateKey) {
+    setSelectedDate(date)
+    if (dayCovers?.has(date)) setOpenPost({ date, startInEdit: false })
+  }
 
   // startOfToday()를 렌더 중에 부르므로 의존성은 "오늘"이 아니라 데이터로
   // 잡는다 (anniversary/AnniversaryPage와 같은 이유).
@@ -121,6 +141,9 @@ export function CalendarPage() {
   }
 
   const isEmpty = upcoming.length === 0 && past.length === 0
+  // 사진은 지나간 날의 기록이다. 앞으로의 날짜에는 일정만 잡는다.
+  const canAddFirstPhoto =
+    selectedDate <= toDateKey(startOfToday()) && !dayCovers?.has(selectedDate)
 
   return (
     <PageShell gap={5}>
@@ -148,7 +171,7 @@ export function CalendarPage() {
             mode="single"
             className="page-full-bleed"
             value={selectedDate}
-            onChange={setSelectedDate}
+            onChange={handleSelectDate}
             hasEvent={hasEventOnDate}
             getDayPhoto={getDayPhoto}
             focusDate={focusDate}
@@ -156,8 +179,6 @@ export function CalendarPage() {
             hasOutsideDays={false}
             hasVariableRowCount
           />
-
-          <DayPhotoSection coupleId={coupleId} userId={user.id} date={selectedDate} />
 
           {eventsOnSelectedDate.length > 0 && (
             <CalendarEventList
@@ -170,13 +191,38 @@ export function CalendarPage() {
           )}
           {/* 등록 버튼은 언제나 하나뿐이고 선택된 날짜를 그대로 물려받는다 —
               그날에 일정이 있든 없든 새로 추가하는 문은 같아야 한다. */}
-          <Button
-            label={`${formatEventDate(selectedDate)}에 일정 추가`}
-            variant="secondary"
-            icon={<Plus className="size-4" />}
-            width="100%"
-            onClick={() => openCreate(selectedDate)}
-          />
+          <VStack gap={2}>
+            {firstUpload.failedCount > 0 && canAddFirstPhoto && (
+              <Button
+                label={`실패한 ${firstUpload.failedCount}장 다시 올리기`}
+                variant="secondary"
+                icon={<RotateCw className="size-4" />}
+                width="100%"
+                isLoading={firstUpload.isUploading}
+                onClick={firstUpload.retry}
+              />
+            )}
+            <HStack gap={2} width="100%">
+              {canAddFirstPhoto && (
+                <Button
+                  label="사진 남기기"
+                  variant="primary"
+                  icon={<ImagePlus className="size-4" />}
+                  width="100%"
+                  isLoading={firstUpload.isUploading}
+                  onClick={firstUpload.openPicker}
+                />
+              )}
+              <Button
+                label={canAddFirstPhoto ? '일정 추가' : `${formatEventDate(selectedDate)}에 일정 추가`}
+                variant="secondary"
+                icon={<Plus className="size-4" />}
+                width="100%"
+                onClick={() => openCreate(selectedDate)}
+              />
+            </HStack>
+            <input {...firstUpload.inputProps} />
+          </VStack>
 
           {isEmpty ? (
             <EmptyState
@@ -226,6 +272,21 @@ export function CalendarPage() {
             </>
           )}
         </>
+      )}
+
+      {openPost && (
+        <DayPostDialog
+          key={openPost.date}
+          coupleId={coupleId}
+          userId={user.id}
+          date={openPost.date}
+          startInEdit={openPost.startInEdit}
+          me={{ name: profile?.name ?? null, avatarUrl: profile?.avatar_url ?? null }}
+          partner={
+            partner ? { name: partner.name, avatarUrl: partner.avatar_url } : null
+          }
+          onClose={() => setOpenPost(null)}
+        />
       )}
 
       <CalendarEventFormDialog
