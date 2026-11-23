@@ -257,6 +257,10 @@ RLS는 select만 커플 범위다.
 | created_at | timestamptz | default now() |
 | updated_at | timestamptz | default now() |
 
+**캘린더 날짜별 사진이 이 테이블을 쓴다** (`2026-11-23-calendar-day-photos.sql`). 일정이 아니라 날짜에 붙고, `(couple_id, memory_date)` 유니크로 하루에 기록 하나, 그 아래 `photos` 여러 장(화면에서 10장까지)이다. `content`는 한 줄 메모, `cover_photo_id`는 대표 사진(null이면 첫 장)이다.
+
+**연결이 끊겨도 보존한다.** `couple_id`·`created_by`는 `on delete set null`이다. 계정 삭제가 `couples`를 cascade로 지워도 기록과 사진은 남고, `couple_id`가 null인 row는 RLS상 아무에게도 보이지 않는다. 파일 경로 첫 칸에 원래 `couple_id`가 남아 있어 복구할 수 있다.
+
 ### 2.4.1 `travel_visits` (스크래치 지도)
 
 | 컬럼 | 타입 | 설명 |
@@ -389,7 +393,7 @@ RLS는 읽기가 커플 범위 전체(select) — 상대가 몇 번 열었는지
 
 | 버킷명 | 용도 | 접근 정책 |
 |---|---|---|
-| `memory-photos` | 추억 사진 원본 | 커플 단위 RLS (해당 couple_id 소속 사용자만) |
+| `memory-photos` | 캘린더 날짜별 사진 (`{couple_id}/{날짜}/{photo_id}[-thumb].jpg`) | **비공개 버킷.** 커플 폴더 단위로 읽기·쓰기·삭제, 클라이언트는 서명 URL로 읽는다 |
 | `profile-avatars` | 프로필 이미지 | **공개 버킷.** 본인 폴더(`{user_id}/`)에만 쓰기 |
 | `travel-maps` | 지도 사진 (두 위젯이 나눠 쓴다) | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |
 | `ai-avatars` | AI 아바타 원본·결과 이미지 | **비공개 버킷.** 커플 폴더(`{couple_id}/`) 단위로 읽기·쓰기, 클라이언트는 서명 URL로 읽는다 |

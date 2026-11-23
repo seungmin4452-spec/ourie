@@ -19,7 +19,9 @@ import { getProfile } from '@/features/onboarding/api/profile'
 import { deleteCalendarEvent } from '../api/calendar'
 import { CalendarEventFormDialog } from '../components/CalendarEventFormDialog'
 import { CalendarEventList } from '../components/CalendarEventList'
+import { DayPhotoSection } from '../components/DayPhotoSection'
 import { calendarEventsQueryKey, useCalendarEvents } from '../hooks/useCalendarEvents'
+import { useDayCovers } from '../hooks/useDayPhotos'
 import { formatEventDate, splitByToday, startOfToday, toDateKey } from '../schedule'
 import type { CalendarEvent, DateKey } from '../types'
 
@@ -35,6 +37,8 @@ export function CalendarPage() {
   // 수정할 때는 event 쪽 날짜를 그대로 쓰므로 여기서는 건드리지 않는다.
   const [createDate, setCreateDate] = useState<DateKey | undefined>(undefined)
   const [selectedDate, setSelectedDate] = useState<DateKey>(toDateKey(startOfToday()))
+  // 달력이 지금 보여주는 달. 선택한 날짜와 따로 움직인다 (날짜를 안 고르고 달만 넘길 수 있다).
+  const [focusDate, setFocusDate] = useState<DateKey>(selectedDate)
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -44,6 +48,11 @@ export function CalendarPage() {
   const coupleId = profile?.couple_id ?? null
 
   const { data: events, isLoading, error } = useCalendarEvents(coupleId)
+  const { data: dayCovers } = useDayCovers(coupleId, focusDate)
+  const getDayPhoto = useCallback(
+    (date: Date) => dayCovers?.get(toDateKey(date)),
+    [dayCovers],
+  )
 
   // startOfToday()를 렌더 중에 부르므로 의존성은 "오늘"이 아니라 데이터로
   // 잡는다 (anniversary/AnniversaryPage와 같은 이유).
@@ -138,8 +147,13 @@ export function CalendarPage() {
               value={selectedDate}
               onChange={setSelectedDate}
               hasEvent={hasEventOnDate}
+              getDayPhoto={getDayPhoto}
+              focusDate={focusDate}
+              onFocusDateChange={setFocusDate}
             />
           </Field>
+
+          <DayPhotoSection coupleId={coupleId} userId={user.id} date={selectedDate} />
 
           {eventsOnSelectedDate.length > 0 && (
             <CalendarEventList

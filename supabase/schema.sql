@@ -248,8 +248,9 @@ create index anniversaries_couple_id_date_idx
 -- ------------------------------------------------------------
 create table public.memories (
   id uuid primary key default gen_random_uuid(),
-  couple_id uuid not null references public.couples (id) on delete cascade,
-  created_by uuid not null references public.profiles (id) on delete cascade,
+  -- 계정·커플이 지워져도 사진 기록은 보존한다 (set null).
+  couple_id uuid references public.couples (id) on delete set null,
+  created_by uuid references public.profiles (id) on delete set null,
   title text,
   content text,
   memory_date date not null,
@@ -259,6 +260,10 @@ create table public.memories (
 
 create index memories_couple_id_memory_date_idx
   on public.memories (couple_id, memory_date desc);
+
+-- 캘린더는 하루에 기록 하나, 그 아래 사진 여러 장이다.
+create unique index memories_couple_id_memory_date_key
+  on public.memories (couple_id, memory_date);
 
 -- keep updated_at current on every update
 create or replace function public.set_updated_at()
@@ -288,6 +293,10 @@ create table public.photos (
 );
 
 create index photos_memory_id_idx on public.photos (memory_id);
+
+-- null이면 첫 번째 사진이 대표다.
+alter table public.memories
+  add column cover_photo_id uuid references public.photos (id) on delete set null;
 
 -- ------------------------------------------------------------
 -- travel_places
@@ -2173,6 +2182,36 @@ create policy "travel_maps_couple_delete"
   on storage.objects for delete
   using (
     bucket_id = 'travel-maps'
+    and (storage.foldername(name))[1] = public.current_couple_id()::text
+  );
+
+-- ============================================================
+-- Storage: 캘린더 날짜별 사진
+-- 비공개 버킷. {couple_id}/{YYYY-MM-DD}/{photo_id}[-thumb].jpg
+-- ============================================================
+
+insert into storage.buckets (id, name, public)
+values ('memory-photos', 'memory-photos', false)
+on conflict (id) do nothing;
+
+create policy "memory_photos_couple_read"
+  on storage.objects for select
+  using (
+    bucket_id = 'memory-photos'
+    and (storage.foldername(name))[1] = public.current_couple_id()::text
+  );
+
+create policy "memory_photos_couple_write"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'memory-photos'
+    and (storage.foldername(name))[1] = public.current_couple_id()::text
+  );
+
+create policy "memory_photos_couple_delete"
+  on storage.objects for delete
+  using (
+    bucket_id = 'memory-photos'
     and (storage.foldername(name))[1] = public.current_couple_id()::text
   );
 

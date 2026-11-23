@@ -130,6 +130,12 @@ interface CalendarBaseProps
   hasEvent?: (date: Date) => boolean;
 
   /**
+   * 날짜 칸에 깔 사진 URL을 돌려준다. 이 prop을 주면 달력이 부모 폭을 채우고
+   * 칸이 정사각형으로 커진다 — 기본 28px 칸에서는 사진을 알아볼 수 없다.
+   */
+  getDayPhoto?: (date: Date) => string | undefined;
+
+  /**
    * Controlled focus date (which month is visible).
    * If not provided, defaults to selected date or today.
    */
@@ -224,6 +230,7 @@ export function Calendar({ ref, ...props }: CalendarProps) {
     max,
     dateConstraints,
     hasEvent,
+    getDayPhoto,
     focusDate: focusDateProp,
     onFocusDateChange,
     hasOutsideDays = true,
@@ -476,7 +483,11 @@ export function Calendar({ ref, ...props }: CalendarProps) {
     <div
       ref={ref}
       {...rest}
-      className={cn('inline-block min-w-[220px] p-3', className)}
+      className={cn(
+        'inline-block min-w-[220px] p-3',
+        getDayPhoto && 'block w-full',
+        className,
+      )}
       onKeyDown={composeEventHandlers(onKeyDown, handleCalendarKeyDown)}
     >
       {/* Header with navigation */}
@@ -517,6 +528,7 @@ export function Calendar({ ref, ...props }: CalendarProps) {
             max={max}
             dateConstraints={dateConstraints}
             hasEvent={hasEvent}
+            getDayPhoto={getDayPhoto}
             hasOutsideDays={hasOutsideDays}
             hasWeekNumbers={hasWeekNumbers}
             hasVariableRowCount={hasVariableRowCount}
@@ -557,6 +569,7 @@ interface MonthGridProps {
   max?: ISODateString;
   dateConstraints?: ReadonlyArray<(date: Date) => boolean>;
   hasEvent?: (date: Date) => boolean;
+  getDayPhoto?: (date: Date) => string | undefined;
   hasOutsideDays: boolean;
   hasWeekNumbers: boolean;
   hasVariableRowCount: boolean;
@@ -580,6 +593,7 @@ function MonthGrid({
   max,
   dateConstraints,
   hasEvent,
+  getDayPhoto,
   hasOutsideDays,
   hasWeekNumbers,
   hasVariableRowCount,
@@ -822,7 +836,10 @@ function MonthGrid({
             <div
               key={name}
               role="columnheader"
-              className="box-border flex h-9 w-8 items-center justify-center pb-1 text-sm text-secondary"
+              className={cn(
+                'box-border flex h-9 items-center justify-center pb-1 text-sm text-secondary',
+                getDayPhoto ? 'w-full' : 'w-8',
+              )}
             >
               {name}
             </div>
@@ -873,6 +890,8 @@ function MonthGrid({
                     hasOutsideDays={hasOutsideDays}
                     isDisabled={isDateDisabled(day.date)}
                     hasEvent={hasEvent?.(plainDateToDate(day.date)) ?? false}
+                    isPhotoLayout={getDayPhoto != null}
+                    photoUrl={getDayPhoto?.(plainDateToDate(day.date))}
                     neighbors={neighbors}
                     isTabbable={day.iso === seedTabbableIso}
                     isRangeSelectionInProgress={rangeSelectionStart !== null}
@@ -907,6 +926,10 @@ interface DayCellProps {
   isDisabled: boolean;
   /** Whether this day has at least one event — shows a small dot above the number. */
   hasEvent: boolean;
+  /** 달력이 사진 칸 배치(부모 폭을 채우는 정사각형 칸)인지. */
+  isPhotoLayout: boolean;
+  /** 이 날짜 칸에 깔 사진. */
+  photoUrl?: string;
   /**
    * Whether the previous/next day in the same week continues the highlighted
    * run (range and preview). When a neighbour is disabled or outside the month
@@ -943,6 +966,8 @@ function DayCell({
   hasOutsideDays,
   isDisabled,
   hasEvent,
+  isPhotoLayout,
+  photoUrl,
   neighbors,
   isTabbable: isTabbableDay,
   isRangeSelectionInProgress,
@@ -955,7 +980,15 @@ function DayCell({
   if (isOutside && !hasOutsideDays) {
     // Empty placeholder cell — still a gridcell so the grid geometry stays a
     // clean 7-per-row set for keyboard navigation.
-    return <div role="gridcell" className="relative flex h-8 items-center justify-center isolate" />;
+    return (
+      <div
+        role="gridcell"
+        className={cn(
+          'relative isolate flex items-center justify-center',
+          isPhotoLayout ? 'aspect-square' : 'h-8',
+        )}
+      />
+    );
   }
 
   const state = computeDayCellState({
@@ -1012,7 +1045,10 @@ function DayCell({
     <div
       role="gridcell"
       aria-selected={state.isSelected || state.isInRange || undefined}
-      className="relative isolate flex h-8 items-center justify-center"
+      className={cn(
+        'relative isolate flex items-center justify-center',
+        isPhotoLayout ? 'aspect-square p-0.5' : 'h-8',
+      )}
     >
       {/* Range background */}
       {state.isInRange && (
@@ -1040,7 +1076,7 @@ function DayCell({
       <button
         type="button"
         data-date={day.iso}
-        aria-label={dayLabel}
+        aria-label={photoUrl ? `${dayLabel}, 사진 있음` : dayLabel}
         aria-disabled={state.effectivelyDisabled || undefined}
         // Mark today's cell programmatically (APG date-picker pattern), not just
         // visually, so screen-reader users can identify the current date.
@@ -1052,25 +1088,43 @@ function DayCell({
         onMouseEnter={() => !state.effectivelyDisabled && onDayHover(date)}
         onMouseLeave={() => onDayHover(null)}
         className={cn(
-          'relative z-[1] flex size-7 items-center justify-center rounded-full',
+          'relative z-[1] flex items-center justify-center',
+          isPhotoLayout ? 'size-full overflow-hidden rounded-lg' : 'size-7 rounded-full',
           'font-sans text-base outline-none transition-colors duration-150',
           isOutside ? 'text-secondary' : 'text-primary',
           !state.effectivelyDisabled && 'cursor-pointer hover:bg-overlay-hover',
           !state.effectivelyDisabled &&
             'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-          showsTodayRing && 'ring-1 ring-inset ring-border-strong',
+          // 사진이 칸을 덮으므로 사진 칸에서는 안쪽 링 대신 바깥 링으로 표시한다.
+          showsTodayRing &&
+            (photoUrl ? 'ring-2 ring-border-strong' : 'ring-1 ring-inset ring-border-strong'),
           showsTodayInRangeRing && 'ring-1 ring-inset ring-primary',
           endpoint && 'bg-accent text-on-accent hover:bg-accent',
+          endpoint && photoUrl && 'ring-2 ring-accent',
           state.effectivelyDisabled && 'cursor-not-allowed opacity-30',
+          photoUrl && isOutside && 'opacity-50',
         )}
       >
-        {dayNumber}
+        {photoUrl && (
+          <>
+            <img
+              src={photoUrl}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 size-full object-cover"
+            />
+            <span aria-hidden="true" className="absolute inset-0 bg-overlay" />
+          </>
+        )}
+        <span className={cn('relative', photoUrl && 'font-semibold text-on-dark')}>
+          {dayNumber}
+        </span>
         {hasEvent && (
           <span
             aria-hidden="true"
             className={cn(
               'absolute top-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full',
-              endpoint ? 'bg-on-accent' : 'bg-accent',
+              photoUrl ? 'bg-on-dark' : endpoint ? 'bg-on-accent' : 'bg-accent',
             )}
           />
         )}

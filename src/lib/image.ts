@@ -25,7 +25,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   })
 }
 
-function toJpegBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+function toJpegBlob(canvas: HTMLCanvasElement, quality = JPEG_QUALITY): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -33,7 +33,7 @@ function toJpegBlob(canvas: HTMLCanvasElement): Promise<Blob> {
         else reject(new Error('이미지를 처리하지 못했어요.'))
       },
       'image/jpeg',
-      JPEG_QUALITY,
+      quality,
     )
   })
 }
@@ -45,21 +45,25 @@ function toJpegBlob(canvas: HTMLCanvasElement): Promise<Blob> {
  * 가운데를 남긴다. 사람이 손으로 맞추던 시절에도 결국 이 기본값이 제일
  * 좋아 보였기 때문에, 위치/확대 조절 UI 없이 이 결과만 쓴다.
  */
-export async function cropImageToSquare(file: File): Promise<Blob> {
+export async function cropImageToSquare(
+  file: File,
+  size = SQUARE_OUTPUT_SIZE,
+  quality = JPEG_QUALITY,
+): Promise<Blob> {
   const img = await loadImage(file)
 
   const canvas = document.createElement('canvas')
-  canvas.width = SQUARE_OUTPUT_SIZE
-  canvas.height = SQUARE_OUTPUT_SIZE
+  canvas.width = size
+  canvas.height = size
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('이미지를 처리하지 못했어요.')
 
   const side = Math.min(img.naturalWidth, img.naturalHeight)
   const sx = (img.naturalWidth - side) / 2
   const sy = (img.naturalHeight - side) / 2
-  ctx.drawImage(img, sx, sy, side, side, 0, 0, SQUARE_OUTPUT_SIZE, SQUARE_OUTPUT_SIZE)
+  ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
 
-  return toJpegBlob(canvas)
+  return toJpegBlob(canvas, quality)
 }
 
 /**
@@ -73,7 +77,11 @@ export async function cropImageToSquare(file: File): Promise<Blob> {
  *
  * 원본보다 크게 늘리지는 않는다. 작은 사진을 키워봐야 용량만 커진다.
  */
-export async function downscaleImage(file: File, maxSide: number): Promise<Blob> {
+export async function downscaleImage(
+  file: File,
+  maxSide: number,
+  quality = JPEG_QUALITY,
+): Promise<Blob> {
   const img = await loadImage(file)
 
   const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight))
@@ -85,5 +93,5 @@ export async function downscaleImage(file: File, maxSide: number): Promise<Blob>
 
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-  return toJpegBlob(canvas)
+  return toJpegBlob(canvas, quality)
 }
