@@ -22,7 +22,6 @@ import {
   type DayRecord,
 } from '../api/dayPhotos'
 import { formatEventDate, parseDateKey } from '../schedule'
-import { DayPhotoViewer } from './DayPhotoViewer'
 
 export interface DayPostPerson {
   name: string | null
@@ -62,7 +61,6 @@ export function DayPostView({
   onSave,
 }: DayPostViewProps) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [isEditing, setIsEditing] = useState(startInEdit)
 
   const { photos } = record
@@ -89,7 +87,7 @@ export function DayPostView({
         gap={2}
         vAlign="center"
         width="100%"
-        className="sticky top-0 z-10 shrink-0 bg-body px-2 pt-[calc(var(--spacing-6)+env(safe-area-inset-top))] pb-2"
+        className="sticky top-0 z-10 shrink-0 bg-body px-2 pt-[calc(var(--spacing-8)+env(safe-area-inset-top))] pb-2"
       >
         <IconButton
           label="닫기"
@@ -149,21 +147,14 @@ export function DayPostView({
             onScrollCapture={handleScroll}
           >
             {photos.map((photo, index) => (
-              <button
+              <img
                 key={photo.id}
-                type="button"
-                aria-label={`사진 ${index + 1} 크게 보기`}
-                className="block aspect-4/5 w-[min(100dvw,35rem)] cursor-zoom-in border-0 bg-muted p-0"
-                onClick={() => setViewerIndex(index)}
-              >
-                <img
-                  src={photo.fullUrl}
-                  alt={`${formatEventDate(record.date)} 사진 ${index + 1}`}
-                  loading={index === 0 ? 'eager' : 'lazy'}
-                  draggable={false}
-                  className="size-full object-cover"
-                />
-              </button>
+                src={photo.fullUrl}
+                alt={`${formatEventDate(record.date)} 사진 ${index + 1}`}
+                loading={index === 0 ? 'eager' : 'lazy'}
+                draggable={false}
+                className="block aspect-4/5 w-[min(100dvw,35rem)] bg-muted object-cover"
+              />
             ))}
           </Carousel>
           {photos.length > 1 && (
@@ -237,15 +228,6 @@ export function DayPostView({
         </VStack>
       </VStack>
 
-      <DayPhotoViewer
-        media={photos.map((photo, index) => ({
-          src: photo.fullUrl,
-          alt: `${formatEventDate(record.date)} 사진 ${index + 1}`,
-          caption: record.title ?? undefined,
-        }))}
-        index={viewerIndex}
-        onIndexChange={setViewerIndex}
-      />
     </VStack>
   )
 }
