@@ -130,10 +130,10 @@ interface CalendarBaseProps
   hasEvent?: (date: Date) => boolean;
 
   /**
-   * 날짜 칸에 깔 사진 URL을 돌려준다. 이 prop을 주면 달력이 부모 폭을 채우고
-   * 칸이 정사각형으로 커진다 — 기본 28px 칸에서는 사진을 알아볼 수 없다.
+   * 날짜 칸에 깔 사진을 돌려준다. 이 prop을 주면 달력이 3:4 사진 칸 배치로
+   * 바뀐다 — 기본 28px 칸에서는 사진을 알아볼 수 없다. 폭은 className으로 준다.
    */
-  getDayPhoto?: (date: Date) => string | undefined;
+  getDayPhoto?: (date: Date) => CalendarDayPhoto | undefined;
 
   /**
    * Controlled focus date (which month is visible).
@@ -168,6 +168,12 @@ interface CalendarBaseProps
    * Default: 0 (Sunday)
    */
   weekStartsOn?: DayOfWeek | DayOfWeekName;
+}
+
+/** 날짜 칸에 깔 대표 사진과, 그 외 사진 장수. */
+export interface CalendarDayPhoto {
+  url: string;
+  extraCount: number;
 }
 
 // ─── Mode-specific Props (discriminated union) ────────────────
@@ -485,13 +491,18 @@ export function Calendar({ ref, ...props }: CalendarProps) {
       {...rest}
       className={cn(
         'inline-block min-w-[220px] p-3',
-        getDayPhoto && 'block w-full',
+        getDayPhoto && 'block min-w-0 p-0',
         className,
       )}
       onKeyDown={composeEventHandlers(onKeyDown, handleCalendarKeyDown)}
     >
       {/* Header with navigation */}
-      <div className="mb-2 flex items-center justify-between gap-2">
+      <div
+        className={cn(
+          'mb-2 flex items-center justify-between gap-2',
+          getDayPhoto && 'px-4',
+        )}
+      >
         <Button
           label={t('@astryx.calendar.previousMonth')}
           variant="ghost"
@@ -569,7 +580,7 @@ interface MonthGridProps {
   max?: ISODateString;
   dateConstraints?: ReadonlyArray<(date: Date) => boolean>;
   hasEvent?: (date: Date) => boolean;
-  getDayPhoto?: (date: Date) => string | undefined;
+  getDayPhoto?: (date: Date) => CalendarDayPhoto | undefined;
   hasOutsideDays: boolean;
   hasWeekNumbers: boolean;
   hasVariableRowCount: boolean;
@@ -825,6 +836,7 @@ function MonthGrid({
         onFocus={handleGridFocus}
         className={cn(
           'grid grid-cols-7',
+          getDayPhoto && 'gap-px',
           hasWeekNumbers && 'grid-cols-[auto_repeat(7,1fr)]',
         )}
       >
@@ -891,7 +903,7 @@ function MonthGrid({
                     isDisabled={isDateDisabled(day.date)}
                     hasEvent={hasEvent?.(plainDateToDate(day.date)) ?? false}
                     isPhotoLayout={getDayPhoto != null}
-                    photoUrl={getDayPhoto?.(plainDateToDate(day.date))}
+                    photo={getDayPhoto?.(plainDateToDate(day.date))}
                     neighbors={neighbors}
                     isTabbable={day.iso === seedTabbableIso}
                     isRangeSelectionInProgress={rangeSelectionStart !== null}
@@ -926,10 +938,10 @@ interface DayCellProps {
   isDisabled: boolean;
   /** Whether this day has at least one event — shows a small dot above the number. */
   hasEvent: boolean;
-  /** 달력이 사진 칸 배치(부모 폭을 채우는 정사각형 칸)인지. */
+  /** 달력이 사진 칸 배치(3:4 칸)인지. */
   isPhotoLayout: boolean;
   /** 이 날짜 칸에 깔 사진. */
-  photoUrl?: string;
+  photo?: CalendarDayPhoto;
   /**
    * Whether the previous/next day in the same week continues the highlighted
    * run (range and preview). When a neighbour is disabled or outside the month
@@ -967,7 +979,7 @@ function DayCell({
   isDisabled,
   hasEvent,
   isPhotoLayout,
-  photoUrl,
+  photo,
   neighbors,
   isTabbable: isTabbableDay,
   isRangeSelectionInProgress,
@@ -985,7 +997,7 @@ function DayCell({
         role="gridcell"
         className={cn(
           'relative isolate flex items-center justify-center',
-          isPhotoLayout ? 'aspect-square' : 'h-8',
+          isPhotoLayout ? 'aspect-3/4' : 'h-8',
         )}
       />
     );
@@ -1047,7 +1059,7 @@ function DayCell({
       aria-selected={state.isSelected || state.isInRange || undefined}
       className={cn(
         'relative isolate flex items-center justify-center',
-        isPhotoLayout ? 'aspect-square p-0.5' : 'h-8',
+        isPhotoLayout ? 'aspect-3/4' : 'h-8',
       )}
     >
       {/* Range background */}
@@ -1076,7 +1088,7 @@ function DayCell({
       <button
         type="button"
         data-date={day.iso}
-        aria-label={photoUrl ? `${dayLabel}, 사진 있음` : dayLabel}
+        aria-label={photo ? `${dayLabel}, 사진 ${photo.extraCount + 1}장` : dayLabel}
         aria-disabled={state.effectivelyDisabled || undefined}
         // Mark today's cell programmatically (APG date-picker pattern), not just
         // visually, so screen-reader users can identify the current date.
@@ -1089,42 +1101,76 @@ function DayCell({
         onMouseLeave={() => onDayHover(null)}
         className={cn(
           'relative z-[1] flex items-center justify-center',
-          isPhotoLayout ? 'size-full overflow-hidden rounded-lg' : 'size-7 rounded-full',
+          isPhotoLayout ? 'size-full overflow-hidden rounded-sm' : 'size-7 rounded-full',
           'font-sans text-base outline-none transition-colors duration-150',
           isOutside ? 'text-secondary' : 'text-primary',
           !state.effectivelyDisabled && 'cursor-pointer hover:bg-overlay-hover',
           !state.effectivelyDisabled &&
             'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-          // 사진이 칸을 덮으므로 사진 칸에서는 안쪽 링 대신 바깥 링으로 표시한다.
-          showsTodayRing &&
-            (photoUrl ? 'ring-2 ring-border-strong' : 'ring-1 ring-inset ring-border-strong'),
-          showsTodayInRangeRing && 'ring-1 ring-inset ring-primary',
-          endpoint && 'bg-accent text-on-accent hover:bg-accent',
-          endpoint && photoUrl && 'ring-2 ring-accent',
+          isPhotoLayout && 'focus-visible:-outline-offset-2',
+          // 사진 칸에서는 오늘을 숫자 배경으로, 선택을 칸 테두리로 표시한다.
+          !isPhotoLayout && showsTodayRing && 'ring-1 ring-inset ring-border-strong',
+          !isPhotoLayout && showsTodayInRangeRing && 'ring-1 ring-inset ring-primary',
+          !isPhotoLayout && endpoint && 'bg-accent text-on-accent hover:bg-accent',
           state.effectivelyDisabled && 'cursor-not-allowed opacity-30',
-          photoUrl && isOutside && 'opacity-50',
         )}
       >
-        {photoUrl && (
+        {photo && (
+          <img
+            src={photo.url}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 size-full object-cover"
+          />
+        )}
+        {isPhotoLayout ? (
+          <span
+            className={cn(
+              'absolute top-1 left-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-sm',
+              state.isToday
+                ? 'bg-accent font-semibold text-on-accent'
+                : photo && 'bg-overlay font-semibold text-on-dark',
+            )}
+          >
+            {dayNumber}
+          </span>
+        ) : (
+          dayNumber
+        )}
+        {photo && photo.extraCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="absolute right-1 bottom-1 rounded-full bg-overlay px-1 text-xs font-semibold text-on-dark"
+          >
+            +{photo.extraCount}
+          </span>
+        )}
+        {isPhotoLayout && endpoint && (
+          // 어떤 사진 위에서도 보이도록 강조색과 밝은 색 테두리를 겹친다.
           <>
-            <img
-              src={photoUrl}
-              alt=""
-              loading="lazy"
-              className="absolute inset-0 size-full object-cover"
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-sm border-2 border-accent"
             />
-            <span aria-hidden="true" className="absolute inset-0 bg-overlay" />
+            <span
+              aria-hidden="true"
+              className="absolute inset-0.5 rounded-sm border border-on-dark"
+            />
           </>
         )}
-        <span className={cn('relative', photoUrl && 'font-semibold text-on-dark')}>
-          {dayNumber}
-        </span>
         {hasEvent && (
           <span
             aria-hidden="true"
             className={cn(
-              'absolute top-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full',
-              photoUrl ? 'bg-on-dark' : endpoint ? 'bg-on-accent' : 'bg-accent',
+              'absolute rounded-full',
+              isPhotoLayout
+                ? 'top-1.5 right-1.5 size-1.5'
+                : 'top-0.5 left-1/2 size-1 -translate-x-1/2',
+              photo
+                ? 'bg-on-dark ring-1 ring-overlay'
+                : !isPhotoLayout && endpoint
+                  ? 'bg-on-accent'
+                  : 'bg-accent',
             )}
           />
         )}

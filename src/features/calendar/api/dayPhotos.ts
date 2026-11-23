@@ -46,6 +46,12 @@ export interface DayRecord {
   photos: DayPhoto[]
 }
 
+/** 달력 칸 하나에 필요한 것. `extraCount`는 대표 사진을 뺀 나머지 장수다. */
+export interface DayCover {
+  url: string
+  extraCount: number
+}
+
 export interface AddDayPhotosResult {
   addedCount: number
   failedFiles: File[]
@@ -81,7 +87,7 @@ export async function listDayCovers(
   coupleId: string,
   from: DateKey,
   to: DateKey,
-): Promise<Map<DateKey, string>> {
+): Promise<Map<DateKey, DayCover>> {
   const { data, error } = await supabase
     .from('memories')
     .select(`memory_date, cover_photo_id, ${PHOTOS_EMBED}`)
@@ -90,19 +96,24 @@ export async function listDayCovers(
     .lte('memory_date', to)
   if (error) throw error
 
-  const coverPaths = new Map<DateKey, string>()
+  const coverPaths = new Map<DateKey, { path: string; extraCount: number }>()
   for (const row of data ?? []) {
     const photos = [...((row.photos ?? []) as PhotoRow[])].sort(bySortOrder)
     const cover = photos.find((photo) => photo.id === row.cover_photo_id) ?? photos[0]
-    if (cover) coverPaths.set(row.memory_date as DateKey, thumbPathOf(cover.storage_path))
+    if (cover) {
+      coverPaths.set(row.memory_date as DateKey, {
+        path: thumbPathOf(cover.storage_path),
+        extraCount: photos.length - 1,
+      })
+    }
   }
 
-  await signPaths([...coverPaths.values()])
+  await signPaths([...coverPaths.values()].map(({ path }) => path))
 
-  const covers = new Map<DateKey, string>()
-  for (const [date, path] of coverPaths) {
+  const covers = new Map<DateKey, DayCover>()
+  for (const [date, { path, extraCount }] of coverPaths) {
     const url = getSignedUrl(SCOPE, path)
-    if (url) covers.set(date, url)
+    if (url) covers.set(date, { url, extraCount })
   }
   return covers
 }

@@ -50,6 +50,14 @@
     padding-inline-end: calc(var(--spacing-4, 1rem) + env(safe-area-inset-right));
   }
 
+  /* PageShell의 좌우 여백을 되돌려 화면 폭을 다 쓴다. 안전 영역은 되돌리지
+     않아 가로 화면에서도 노치에 가리지 않는다. 사진 달력(CalendarPage)에서
+     칸을 키우려고 쓴다. */
+  .page-full-bleed {
+    width: calc(100% + 2 * var(--spacing-4, 1rem));
+    margin-inline: calc(-1 * var(--spacing-4, 1rem));
+  }
+
   /* 위젯 편집 도구 막대(+ · 완료). 화면 맨 위에 붙어 스크롤을 따라다닌다 —
      위젯 서너 개만 있어도 홈은 한 화면을 넘기고, 그때 "완료"가 위로 사라져
      버리면 편집을 끝내려고 다시 맨 위까지 올라가야 한다.

@@ -2,7 +2,6 @@ import { AlertDialog } from '@astryxdesign/core/AlertDialog'
 import { Button } from '@astryxdesign/core/Button'
 import { Collapsible } from '@astryxdesign/core/Collapsible'
 import { EmptyState } from '@astryxdesign/core/EmptyState'
-import { Field } from '@astryxdesign/core/Field'
 import { Heading } from '@astryxdesign/core/Heading'
 import { Text } from '@astryxdesign/core/Text'
 import { useToast } from '@astryxdesign/core/Toast'
@@ -129,10 +128,7 @@ export function CalendarPage() {
 
       <VStack gap={1}>
         <Heading level={1}>커플 캘린더</Heading>
-        <Text type="supporting">
-          서로의 일정을 함께 봐요. "우리 약속"으로 등록하면 상대방도 수정하고 지울 수
-          있고, 그렇지 않은 개인 일정은 등록한 사람만 고칠 수 있어요.
-        </Text>
+        <Text type="supporting">우리의 일정과 함께한 날의 사진을 남겨요.</Text>
       </VStack>
 
       {error ? (
@@ -148,17 +144,18 @@ export function CalendarPage() {
           {/* 달력에서 날짜를 짚으면 아래가 그날의 일정으로 바뀐다 — 목록만
               있으면 "몇 월 며칠이 무슨 요일이었더라"를 머릿속으로 계산해야
               한다. */}
-          <Field label="날짜로 찾아보기" inputID="calendar-page-date">
-            <Calendar
-              mode="single"
-              value={selectedDate}
-              onChange={setSelectedDate}
-              hasEvent={hasEventOnDate}
-              getDayPhoto={getDayPhoto}
-              focusDate={focusDate}
-              onFocusDateChange={setFocusDate}
-            />
-          </Field>
+          <Calendar
+            mode="single"
+            className="page-full-bleed"
+            value={selectedDate}
+            onChange={setSelectedDate}
+            hasEvent={hasEventOnDate}
+            getDayPhoto={getDayPhoto}
+            focusDate={focusDate}
+            onFocusDateChange={setFocusDate}
+            hasOutsideDays={false}
+            hasVariableRowCount
+          />
 
           <DayPhotoSection coupleId={coupleId} userId={user.id} date={selectedDate} />
 
