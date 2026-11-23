@@ -60,6 +60,8 @@
 ### 캘린더 날짜별 사진 (MVP 구현)
 - [x] 날짜별 사진 추가·보기·삭제, 대표 사진, 달력 칸 썸네일
 - [x] 사진이 있는 날을 누르면 전체 화면 게시물로 열기 (제목·내용 작성)
+- [x] 사진 교체·순서 변경
+      - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-11-23-day-photos-update.sql`
 - [ ] **DB 마이그레이션 적용** — `supabase/migrations/2026-11-23-calendar-day-photos.sql`
 - [ ] 실기기에서 업로드 확인
 - [ ] 상대방 알림 (`api/calendar.ts`에 합친다 — Vercel 함수 12개 한도)

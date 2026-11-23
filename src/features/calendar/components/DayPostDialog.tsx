@@ -7,10 +7,12 @@ import { useToast } from '@astryxdesign/core/Toast'
 import { VStack } from '@astryxdesign/core/VStack'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ImageOff } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 
 import {
   deleteDayPhoto,
+  reorderDayPhotos,
+  replaceDayPhoto,
   setDayCover,
   updateDayPost,
   type DayPhoto,
@@ -18,6 +20,7 @@ import {
 import { useDayPhotoUpload } from '../hooks/useDayPhotoUpload'
 import { dayPhotosQueryKey, useDayRecord } from '../hooks/useDayPhotos'
 import type { DateKey } from '../types'
+import { DayPhotoReorderDialog } from './DayPhotoReorderDialog'
 import { DayPostView, type DayPostPerson } from './DayPostView'
 
 interface DayPostDialogProps {
@@ -61,6 +64,10 @@ function DayPostContent({
   const showToast = useToast()
   const { data: record, isLoading } = useDayRecord(coupleId, date)
   const [pendingDelete, setPendingDelete] = useState<DayPhoto | null>(null)
+  const [isReordering, setIsReordering] = useState(false)
+  const replaceInputRef = useRef<HTMLInputElement>(null)
+  // 사진첩이 열려 있는 동안 어떤 사진을 바꾸려던 것인지 기억해 둔다.
+  const replaceTargetRef = useRef<DayPhoto | null>(null)
 
   const photoCount = record?.photos.length ?? 0
   const upload = useDayPhotoUpload({ coupleId, userId, date, photoCount })
@@ -81,6 +88,46 @@ function DayPostContent({
     },
     onError: () => showToast({ type: 'error', body: '대표 사진을 바꾸지 못했어요.' }),
   })
+
+  const replacement = useMutation({
+    mutationFn: ({ photo, file }: { photo: DayPhoto; file: File }) =>
+      replaceDayPhoto(coupleId, date, photo, file),
+    onSuccess: async () => {
+      await refresh()
+      showToast({ type: 'info', body: '사진을 바꿨어요.' })
+    },
+    onError: (error) => {
+      showToast({
+        type: 'error',
+        body: error instanceof Error ? error.message : '사진을 바꾸지 못했어요.',
+      })
+    },
+  })
+
+  const reordering = useMutation({
+    mutationFn: reorderDayPhotos,
+    onSuccess: async () => {
+      await refresh()
+      setIsReordering(false)
+      showToast({ type: 'info', body: '사진 순서를 바꿨어요.' })
+    },
+    onError: async (error) => {
+      // 일부만 저장됐을 수 있으니 실제 순서를 다시 읽는다.
+      await refresh()
+      showToast({
+        type: 'error',
+        body: error instanceof Error ? error.message : '사진 순서를 바꾸지 못했어요.',
+      })
+    },
+  })
+
+  function handleReplaceFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    // 같은 사진을 다시 골라도 change가 나도록 비운다.
+    event.target.value = ''
+    const photo = replaceTargetRef.current
+    if (file && photo) replacement.mutate({ photo, file })
+  }
 
   const removal = useMutation({
     mutationFn: (photo: DayPhoto) => deleteDayPhoto(record!, photo),
@@ -126,8 +173,14 @@ function DayPostContent({
         startInEdit={startInEdit}
         isSaving={save.isPending}
         isUploading={upload.isUploading}
+        isReplacing={replacement.isPending}
         onClose={onClose}
         onAddPhotos={upload.openPicker}
+        onReplacePhoto={(photo) => {
+          replaceTargetRef.current = photo
+          replaceInputRef.current?.click()
+        }}
+        onReorderPhotos={() => setIsReordering(true)}
         onSetCover={(photo) => cover.mutate(photo)}
         onDeletePhoto={setPendingDelete}
         onSave={async (title, content) => {
@@ -141,6 +194,22 @@ function DayPostContent({
       />
 
       <input {...upload.inputProps} />
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleReplaceFile}
+      />
+
+      {isReordering && (
+        <DayPhotoReorderDialog
+          photos={record.photos}
+          isSaving={reordering.isPending}
+          onCancel={() => setIsReordering(false)}
+          onSave={(photos) => reordering.mutate(photos)}
+        />
+      )}
 
       <AlertDialog
         isOpen={pendingDelete != null}

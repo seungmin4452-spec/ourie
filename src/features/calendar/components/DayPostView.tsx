@@ -35,8 +35,11 @@ interface DayPostViewProps {
   startInEdit: boolean
   isSaving: boolean
   isUploading: boolean
+  isReplacing: boolean
   onClose: () => void
   onAddPhotos: () => void
+  onReplacePhoto: (photo: DayPhoto) => void
+  onReorderPhotos: () => void
   onSetCover: (photo: DayPhoto) => void
   onDeletePhoto: (photo: DayPhoto) => void
   /** 저장에 성공하면 true. 실패하면 쓰던 글을 그대로 둔다. */
@@ -54,8 +57,11 @@ export function DayPostView({
   startInEdit,
   isSaving,
   isUploading,
+  isReplacing,
   onClose,
   onAddPhotos,
+  onReplacePhoto,
+  onReorderPhotos,
   onSetCover,
   onDeletePhoto,
   onSave,
@@ -125,6 +131,16 @@ export function DayPostView({
               onClick: onAddPhotos,
             },
             {
+              label: '이 사진 교체',
+              isDisabled: isUploading || isReplacing,
+              onClick: () => current && onReplacePhoto(current),
+            },
+            {
+              label: '사진 순서 변경',
+              isDisabled: photos.length < 2 || isUploading || isReplacing,
+              onClick: onReorderPhotos,
+            },
+            {
               label: isCover ? '달력 대표 사진이에요' : '달력 대표 사진으로',
               isDisabled: isCover,
               onClick: () => current && onSetCover(current),
@@ -157,6 +173,15 @@ export function DayPostView({
               />
             ))}
           </Carousel>
+          {isReplacing && (
+            <Text
+              size="sm"
+              weight="medium"
+              className="pointer-events-none absolute top-3 left-3 rounded-full bg-overlay px-2 py-0.5 text-on-dark"
+            >
+              사진 바꾸는 중
+            </Text>
+          )}
           {photos.length > 1 && (
             <Text
               size="sm"

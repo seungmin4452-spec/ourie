@@ -1814,6 +1814,20 @@ create policy "photos_insert_couple"
     )
   );
 
+-- 사진 교체(storage_path)와 순서 변경(sort_order).
+create policy "photos_update_couple"
+  on public.photos for update
+  using (
+    memory_id in (
+      select id from public.memories where couple_id = public.current_couple_id()
+    )
+  )
+  with check (
+    memory_id in (
+      select id from public.memories where couple_id = public.current_couple_id()
+    )
+  );
+
 create policy "photos_delete_couple"
   on public.photos for delete
   using (

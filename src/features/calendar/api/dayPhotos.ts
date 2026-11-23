@@ -173,6 +173,34 @@ async function ensureDayMemory(coupleId: string, userId: string, date: DateKey):
   return data.id
 }
 
+/** 보기용과 썸네일 파일을 새 경로에 올리고 보기용 경로를 돌려준다. */
+async function uploadPhotoFiles(
+  coupleId: string,
+  date: DateKey,
+  id: string,
+  file: File,
+): Promise<string> {
+  const [full, thumb] = await Promise.all([
+    downscaleImage(file, FULL_MAX_SIDE, FULL_QUALITY),
+    cropImageToSquare(file, THUMB_SIZE, THUMB_QUALITY),
+  ])
+
+  const path = `${coupleId}/${date}/${id}.jpg`
+  const storage = supabase.storage.from(BUCKET)
+
+  const { error: fullError } = await storage.upload(path, full, { contentType: 'image/jpeg' })
+  if (fullError) throw fullError
+
+  const { error: thumbError } = await storage.upload(thumbPathOf(path), thumb, {
+    contentType: 'image/jpeg',
+  })
+  if (thumbError) {
+    await storage.remove([path])
+    throw thumbError
+  }
+  return path
+}
+
 async function uploadOnePhoto(
   coupleId: string,
   memoryId: string,
@@ -180,33 +208,68 @@ async function uploadOnePhoto(
   file: File,
   sortOrder: number,
 ): Promise<void> {
-  const [full, thumb] = await Promise.all([
-    downscaleImage(file, FULL_MAX_SIDE, FULL_QUALITY),
-    cropImageToSquare(file, THUMB_SIZE, THUMB_QUALITY),
-  ])
-
   const id = crypto.randomUUID()
-  const path = `${coupleId}/${date}/${id}.jpg`
-  const thumbPath = thumbPathOf(path)
-  const storage = supabase.storage.from(BUCKET)
-
-  const { error: fullError } = await storage.upload(path, full, { contentType: 'image/jpeg' })
-  if (fullError) throw fullError
-
-  const { error: thumbError } = await storage.upload(thumbPath, thumb, {
-    contentType: 'image/jpeg',
-  })
-  if (thumbError) {
-    await storage.remove([path])
-    throw thumbError
-  }
+  const path = await uploadPhotoFiles(coupleId, date, id, file)
 
   const { error } = await supabase
     .from('photos')
     .insert({ id, memory_id: memoryId, storage_path: path, sort_order: sortOrder })
   if (error) {
-    await storage.remove([path, thumbPath])
+    await supabase.storage.from(BUCKET).remove([path, thumbPathOf(path)])
     throw error
+  }
+}
+
+/**
+ * RLS에 막힌 update는 에러 없이 0건으로 끝난다. 그대로 두면 저장된 줄 알고
+ * 넘어가므로 바뀐 row가 있는지 확인한다.
+ */
+function assertPhotoUpdated(rows: unknown[] | null) {
+  if (!rows || rows.length === 0) {
+    throw new Error('사진을 수정하지 못했어요. DB 마이그레이션 적용 여부를 확인해주세요.')
+  }
+}
+
+/**
+ * 사진 한 장을 갈아 끼운다. row는 그대로 두고 파일 경로만 바꿔서 순서와
+ * 대표 사진 지정이 유지된다. 새 파일이 연결된 뒤에 옛 파일을 지운다.
+ */
+export async function replaceDayPhoto(
+  coupleId: string,
+  date: DateKey,
+  photo: DayPhoto,
+  file: File,
+): Promise<void> {
+  const path = await uploadPhotoFiles(coupleId, date, crypto.randomUUID(), file)
+  const storage = supabase.storage.from(BUCKET)
+
+  try {
+    const { data, error } = await supabase
+      .from('photos')
+      .update({ storage_path: path })
+      .eq('id', photo.id)
+      .select('id')
+    if (error) throw error
+    assertPhotoUpdated(data)
+  } catch (error) {
+    await storage.remove([path, thumbPathOf(path)])
+    throw error
+  }
+
+  // 실패해도 무시한다. 새 사진은 이미 걸렸고 남는 건 안 쓰이는 파일이다.
+  await storage.remove([photo.path, thumbPathOf(photo.path)])
+}
+
+/** 받은 배열의 순서대로 사진 순서를 저장한다. */
+export async function reorderDayPhotos(photos: DayPhoto[]): Promise<void> {
+  const results = await Promise.all(
+    photos.map((photo, index) =>
+      supabase.from('photos').update({ sort_order: index }).eq('id', photo.id).select('id'),
+    ),
+  )
+  for (const { data, error } of results) {
+    if (error) throw error
+    assertPhotoUpdated(data)
   }
 }
 
