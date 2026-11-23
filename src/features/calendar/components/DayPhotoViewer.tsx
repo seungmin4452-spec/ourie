@@ -227,7 +227,7 @@ export function DayPhotoViewer({ media, index, onIndexChange }: DayPhotoViewerPr
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchCancel}
-      className="box-border h-dvh! touch-pan-y touch-pinch-zoom pt-[env(safe-area-inset-top)]! pr-[env(safe-area-inset-right)]! pb-[env(safe-area-inset-bottom)]! pl-[env(safe-area-inset-left)]!"
+      className="box-border h-dvh! touch-pan-y touch-pinch-zoom pt-[calc(var(--spacing-6)+env(safe-area-inset-top))]! pr-[env(safe-area-inset-right)]! pb-[env(safe-area-inset-bottom)]! pl-[env(safe-area-inset-left)]!"
     />
   )
 }

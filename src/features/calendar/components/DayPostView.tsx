@@ -83,11 +83,13 @@ export function DayPostView({
   return (
     // isolate: 버튼 배경은 z-index가 음수인 층이라, 없으면 이 배경 뒤로 숨는다.
     <VStack width="100%" height="100dvh" className="isolate overflow-y-auto bg-body outline-none">
+      {/* 홈 화면 앱에서는 기기가 상태바 아래까지 화면 위쪽을 흐리게 덮는다.
+          안전 영역만 비우면 헤더가 그 흐린 띠에 걸려서 더 내려 둔다. */}
       <HStack
         gap={2}
         vAlign="center"
         width="100%"
-        className="sticky top-0 z-10 shrink-0 bg-body px-2 pt-[calc(var(--spacing-2)+env(safe-area-inset-top))] pb-2"
+        className="sticky top-0 z-10 shrink-0 bg-body px-2 pt-[calc(var(--spacing-6)+env(safe-area-inset-top))] pb-2"
       >
         <IconButton
           label="닫기"
